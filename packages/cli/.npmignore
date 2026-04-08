@@ -1,0 +1,9 @@
+.vscode
+src/
+test/
+.mcp.json
+CLAUDE.md
+eslint.config.mjs
+pnpm-workspace.yaml
+tsconfig.json
+tsup.config.ts

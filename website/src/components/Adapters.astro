@@ -1,0 +1,229 @@
+---
+const adapters = [
+  {
+    id: 'stdio',
+    label: 'MCP stdio',
+    pkg: '@silkweave/mcp',
+    raw: `import { silkweave } from '@silkweave/core'
+import { stdio } from '@silkweave/mcp'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())
+  .action(GreetAction)
+  .start()`,
+    code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { stdio } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/mcp'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-server'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(<span class="token-function">stdio</span>())
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+  .<span class="token-function">start</span>()`
+  },
+  {
+    id: 'http',
+    label: 'MCP HTTP',
+    pkg: '@silkweave/mcp',
+    raw: `import { silkweave } from '@silkweave/core'
+import { http } from '@silkweave/mcp'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(http({ port: 8080 }))
+  .action(GreetAction)
+  .start()`,
+    code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { http } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/mcp'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-server'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(<span class="token-function">http</span>({ <span class="token-property">port</span>: <span class="token-number">8080</span> }))
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+  .<span class="token-function">start</span>()`
+  },
+  {
+    id: 'fastify',
+    label: 'REST API',
+    pkg: '@silkweave/fastify',
+    raw: `import { silkweave } from '@silkweave/core'
+import { fastify } from '@silkweave/fastify'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(fastify({ port: 8080 }))
+  .action(GreetAction)
+  .start()`,
+    code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { fastify } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/fastify'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-server'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(<span class="token-function">fastify</span>({ <span class="token-property">port</span>: <span class="token-number">8080</span> }))
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+  .<span class="token-function">start</span>()`
+  },
+  {
+    id: 'cli',
+    label: 'CLI',
+    pkg: '@silkweave/cli',
+    raw: `import { silkweave } from '@silkweave/core'
+import { cli } from '@silkweave/cli'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-tool', version: '1.0.0' })
+  .adapter(cli())
+  .action(GreetAction)
+  .start()`,
+    code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { cli } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/cli'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-tool'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(<span class="token-function">cli</span>())
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+  .<span class="token-function">start</span>()`
+  },
+  {
+    id: 'vercel',
+    label: 'Vercel',
+    pkg: '@silkweave/vercel',
+    raw: `import { silkweave } from '@silkweave/core'
+import { vercel } from '@silkweave/vercel'
+import { GreetAction } from './actions/greet.js'
+
+const { adapter, handler } = vercel()
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(adapter)
+  .action(GreetAction)
+  .start()
+
+export default { fetch: handler }`,
+    code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { vercel } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/vercel'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">const</span> { adapter, handler } = <span class="token-function">vercel</span>()
+<span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-server'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(adapter)
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+  .<span class="token-function">start</span>()
+
+<span class="token-keyword">export default</span> { <span class="token-property">fetch</span>: handler }`
+  }
+]
+---
+
+<section id="adapters" class="adapters">
+  <div class="container">
+    <p class="section-label">Adapters</p>
+    <h2 class="section-title">Same action. Five transports.</h2>
+    <p class="section-desc">
+      Swap one line to change how your action is served. The business logic stays identical.
+    </p>
+
+    <div class="adapter-tabs" role="tablist">
+      {adapters.map((a, i) => (
+        <button
+          role="tab"
+          class={`adapter-tab ${i === 0 ? 'active' : ''}`}
+          data-tab={a.id}
+          aria-selected={i === 0 ? 'true' : 'false'}
+        >
+          {a.label}
+        </button>
+      ))}
+    </div>
+
+    <div class="adapter-panels">
+      {adapters.map((a, i) => (
+        <div
+          class={`adapter-panel ${i === 0 ? 'active' : ''}`}
+          data-panel={a.id}
+          role="tabpanel"
+        >
+          <div class="code-block">
+            <div class="code-block-header">
+              <span>{a.pkg}</span>
+              <button class="copy-btn" data-copy-raw={a.raw}>Copy</button>
+            </div>
+            <pre><code set:html={a.code} /></pre>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .adapters {
+    border-top: 1px solid var(--border);
+  }
+
+  .adapter-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 2rem;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .adapter-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .adapter-tab:hover {
+    color: var(--text);
+  }
+
+  .adapter-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .adapter-panel {
+    display: none;
+    margin-top: 1rem;
+  }
+
+  .adapter-panel.active {
+    display: block;
+  }
+</style>
+
+<script>
+  const tabs = document.querySelectorAll('.adapter-tab')
+  const panels = document.querySelectorAll('.adapter-panel')
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.getAttribute('data-tab')
+      tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false') })
+      panels.forEach(p => p.classList.remove('active'))
+      tab.classList.add('active')
+      tab.setAttribute('aria-selected', 'true')
+      document.querySelector(`[data-panel="${target}"]`)?.classList.add('active')
+    })
+  })
+
+  document.querySelectorAll('[data-copy-raw]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.getAttribute('data-copy-raw') || ''
+      await navigator.clipboard.writeText(text)
+      const original = btn.textContent
+      btn.textContent = 'Copied!'
+      setTimeout(() => { btn.textContent = original }, 1500)
+    })
+  })
+</script>

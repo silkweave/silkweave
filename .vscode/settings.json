@@ -1,0 +1,56 @@
+{
+  "[jsonc]": { "editor.formatOnSave": false },
+  "[html]": { "editor.formatOnSave": false },
+  "editor.codeActionsOnSave": {
+    "source.fixAll.ts": "explicit",
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "eslint.workingDirectories": [
+    "example",
+    "website",
+    "packages/auth",
+    "packages/cli",
+    "packages/core",
+    "packages/fastify",
+    "packages/logger",
+    "packages/mcp",
+    "packages/vercel"
+  ],
+  "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "js/ts.preferences.importModuleSpecifier": "relative",
+  "editor.rulers": [80],
+  "editor.tabCompletion": "on",
+  "editor.tabSize": 2,
+  "editor.trimAutoWhitespace": true,
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/flutter/ephemeral": true,
+    "**/Flutter/ephemeral": true,
+    "**/.symlinks": true,
+    "**/.plugin_symlinks": true,
+    "**/node_modules": true,
+    "**/build": true,
+    "**/.turbo": true,
+    ".claude": false,
+    ".astragraph": false,
+    ".astragraph.wal": false
+  },
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "js/ts.preferences.quoteStyle": "single",
+  "json.format.enable": false,
+  "js/ts.format.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces": true,
+  "js/ts.format.semicolons": "remove",
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "[typescript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+  "js/ts.tsdk.path": "node_modules/typescript/lib"
+}

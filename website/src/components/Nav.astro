@@ -1,0 +1,108 @@
+---
+---
+
+<nav>
+  <div class="container nav-inner">
+    <a href="/" class="logo">
+      <img src="/logo-color.svg" alt="Silkweave" class="logo-icon" width="28" height="28" />
+      <span class="logo-text">Silkweave</span>
+    </a>
+    <div class="nav-links">
+      <a href="#how-it-works">How it works</a>
+      <a href="#adapters">Adapters</a>
+      <a href="#features">Features</a>
+      <a href="https://github.com/atomicbi/silkweave" target="_blank" rel="noopener" class="nav-github">
+        GitHub
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M7 17L17 7M17 7H7M17 7V17" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<style>
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: transparent;
+    backdrop-filter: blur(0px);
+    border-bottom: 1px solid transparent;
+    transition: background 0.3s, backdrop-filter 0.3s, border-color 0.3s;
+  }
+
+  nav.scrolled {
+    background: rgba(10, 10, 15, 0.7);
+    backdrop-filter: blur(16px);
+    border-bottom-color: var(--border);
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 5rem;
+    transition: height 0.3s;
+  }
+
+  nav.scrolled .nav-inner {
+    height: 3.5rem;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+
+  .logo:hover {
+    color: var(--text);
+  }
+
+  .logo-icon {
+    border-radius: 50%;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    font-size: 0.95rem;
+  }
+
+  .nav-links a {
+    color: rgba(228, 228, 239, 0.8);
+    transition: color 0.15s;
+  }
+
+  .nav-links a:hover {
+    color: #fff;
+  }
+
+  .nav-github {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  @media (max-width: 640px) {
+    .nav-links a:not(.nav-github) {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  const nav = document.querySelector('nav')!
+  function onScroll() {
+    nav.classList.toggle('scrolled', window.scrollY > 20)
+  }
+  window.addEventListener('scroll', onScroll, { passive: true })
+  onScroll()
+</script>

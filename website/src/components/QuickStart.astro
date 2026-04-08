@@ -1,0 +1,164 @@
+---
+const step1raw = `pnpm add @silkweave/core @silkweave/mcp zod`
+const step1 = `pnpm add @silkweave/core @silkweave/mcp zod`
+
+const step2raw = `import { createAction } from '@silkweave/core'
+import z from 'zod'
+
+export const GreetAction = createAction({
+  name: 'greet',
+  description: 'Greet a user by name',
+  input: z.object({
+    name: z.string().describe('Name to greet')
+  }),
+  run: async ({ name }) => {
+    return { message: \`Hello, \${name}!\` }
+  }
+})`
+const step2 = `<span class="token-keyword">import</span> { createAction } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> z <span class="token-keyword">from</span> <span class="token-string">'zod'</span>
+
+<span class="token-keyword">export const</span> <span class="token-function">GreetAction</span> = <span class="token-function">createAction</span>({
+  <span class="token-property">name</span>: <span class="token-string">'greet'</span>,
+  <span class="token-property">description</span>: <span class="token-string">'Greet a user by name'</span>,
+  <span class="token-property">input</span>: z.<span class="token-function">object</span>({
+    <span class="token-property">name</span>: z.<span class="token-function">string</span>().<span class="token-function">describe</span>(<span class="token-string">'Name to greet'</span>)
+  }),
+  <span class="token-property">run</span>: <span class="token-keyword">async</span> ({ name }) <span class="token-operator">=&gt;</span> {
+    <span class="token-keyword">return</span> { <span class="token-property">message</span>: <span class="token-string">\`Hello, \${name}!\`</span> }
+  }
+})`
+
+const step3raw = `import { silkweave } from '@silkweave/core'
+import { stdio } from '@silkweave/mcp'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())
+  .action(GreetAction)
+  .start()`
+const step3 = `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { stdio } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/mcp'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-server'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(<span class="token-function">stdio</span>())
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+  .<span class="token-function">start</span>()`
+---
+
+<section id="quickstart" class="quickstart">
+  <div class="container">
+    <p class="section-label">Quick Start</p>
+    <h2 class="section-title">Up and running in 3 steps.</h2>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>Install</h3>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span>terminal</span>
+              <button class="copy-btn" data-copy-raw={step1raw}>Copy</button>
+            </div>
+            <pre><code set:html={step1} /></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>Define an action</h3>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span>actions/greet.ts</span>
+              <button class="copy-btn" data-copy-raw={step2raw}>Copy</button>
+            </div>
+            <pre><code set:html={step2} /></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>Pick an adapter and start</h3>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span>server.ts</span>
+              <button class="copy-btn" data-copy-raw={step3raw}>Copy</button>
+            </div>
+            <pre><code set:html={step3} /></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .quickstart {
+    border-top: 1px solid var(--border);
+  }
+
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    margin-top: 2.5rem;
+  }
+
+  .step {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  .step-number {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--accent-bg);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.25rem;
+  }
+
+  .step-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .step-content h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  @media (max-width: 640px) {
+    .step {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.quickstart [data-copy-raw]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.getAttribute('data-copy-raw') || ''
+      await navigator.clipboard.writeText(text)
+      const original = btn.textContent
+      btn.textContent = 'Copied!'
+      setTimeout(() => { btn.textContent = original }, 1500)
+    })
+  })
+</script>

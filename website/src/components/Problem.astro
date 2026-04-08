@@ -1,0 +1,83 @@
+---
+const problems = [
+  {
+    icon: '&#x1F500;',
+    title: 'Fragmented Transports',
+    desc: 'MCP stdio, HTTP, REST, CLI — each requires a different server setup, different libraries, different patterns.'
+  },
+  {
+    icon: '&#x1F4CB;',
+    title: 'Boilerplate Overload',
+    desc: 'Every new endpoint means repeating validation, error handling, and serialization. Your business logic drowns in glue code.'
+  },
+  {
+    icon: '&#x1F512;',
+    title: 'Framework Lock-in',
+    desc: 'Pick Express? Now you\'re stuck. Pick Fastify? Same story. Your actions are trapped inside your transport choice.'
+  }
+]
+---
+
+<section class="problem">
+  <div class="container">
+    <p class="section-label">The Problem</p>
+    <h2 class="section-title">Agents need services. Services need many doors.</h2>
+    <p class="section-desc">
+      The agentic landscape demands that services be reachable via MCP, REST, CLI, and more.
+      Building each transport from scratch is unsustainable.
+    </p>
+    <div class="problem-grid">
+      {problems.map(p => (
+        <div class="problem-card">
+          <span class="problem-icon" set:html={p.icon} />
+          <h3>{p.title}</h3>
+          <p>{p.desc}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .problem {
+    border-top: 1px solid var(--border);
+  }
+
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+  }
+
+  .problem-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+  }
+
+  .problem-icon {
+    font-size: 1.5rem;
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+
+  .problem-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .problem-card p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 768px) {
+    .problem-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "silkweave": {
+      "command": "pnpm",
+      "args": ["mcp"]
+    },
+    "roam-code": {
+      "type": "stdio",
+      "command": "roam",
+      "args": ["mcp"]
+    }
+  }
+}

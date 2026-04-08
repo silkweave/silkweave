@@ -1,0 +1,11 @@
+.roam/
+node_modules/
+build/
+resources/
+*.tsbuildinfo
+.turbo
+.astro
+dist/
+.DS_Store
+.env
+store.json

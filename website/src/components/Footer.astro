@@ -1,0 +1,152 @@
+---
+const packages = [
+  { name: '@silkweave/core', desc: 'Actions, adapters, builder' },
+  { name: '@silkweave/mcp', desc: 'MCP stdio & HTTP adapters' },
+  { name: '@silkweave/cli', desc: 'CLI adapter' },
+  { name: '@silkweave/fastify', desc: 'REST API + Swagger' },
+  { name: '@silkweave/auth', desc: 'OAuth 2.1 & bearer auth' },
+  { name: '@silkweave/vercel', desc: 'Vercel serverless adapter' }
+]
+---
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <span class="footer-logo"><img src="/logo-color.svg" alt="Silkweave" width="22" height="22" class="footer-logo-img" /> Silkweave</span>
+        <p>Define once. Deploy everywhere.</p>
+        <p class="footer-license">MIT License</p>
+      </div>
+      <div class="footer-packages">
+        <h4>Packages</h4>
+        <ul>
+          {packages.map(p => (
+            <li>
+              <a href={`https://www.npmjs.com/package/${p.name}`} target="_blank" rel="noopener">
+                {p.name}
+              </a>
+              <span class="pkg-desc">{p.desc}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="footer-links">
+        <h4>Links</h4>
+        <ul>
+          <li><a href="https://github.com/atomicbi/silkweave" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.npmjs.com/org/silkweave" target="_blank" rel="noopener">npm</a></li>
+          <li><a href="https://github.com/atomicbi/silkweave/issues" target="_blank" rel="noopener">Issues</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>Built by <a href="https://github.com/atomicbi" target="_blank" rel="noopener">Atomic BI</a></p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 4rem 0 2rem;
+    margin-top: var(--section-gap);
+  }
+
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 2fr 1fr;
+    gap: 3rem;
+  }
+
+  .footer-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+
+  .footer-logo-img {
+    border-radius: 50%;
+  }
+
+  .footer-brand p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .footer-license {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .footer-packages h4,
+  .footer-links h4 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .footer-packages ul,
+  .footer-links ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .footer-packages li {
+    font-size: 0.85rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .footer-packages li a {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .pkg-desc {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+  }
+
+  .footer-links li {
+    font-size: 0.85rem;
+  }
+
+  .footer-links a {
+    color: var(--text-muted);
+  }
+
+  .footer-links a:hover {
+    color: var(--text);
+  }
+
+  .footer-bottom {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 768px) {
+    .footer-grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+  }
+</style>

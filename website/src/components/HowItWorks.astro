@@ -1,0 +1,119 @@
+---
+const actionCode = `<span class="token-keyword">import</span> { createAction } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> z <span class="token-keyword">from</span> <span class="token-string">'zod'</span>
+
+<span class="token-keyword">export const</span> <span class="token-function">GreetAction</span> = <span class="token-function">createAction</span>({
+  <span class="token-property">name</span>: <span class="token-string">'greet'</span>,
+  <span class="token-property">description</span>: <span class="token-string">'Greet a user by name'</span>,
+  <span class="token-property">input</span>: z.<span class="token-function">object</span>({
+    <span class="token-property">name</span>: z.<span class="token-function">string</span>().<span class="token-function">describe</span>(<span class="token-string">'Name of the person to greet'</span>)
+  }),
+  <span class="token-property">run</span>: <span class="token-keyword">async</span> ({ name }) <span class="token-operator">=&gt;</span> {
+    <span class="token-keyword">return</span> { <span class="token-property">message</span>: <span class="token-string">\`Hello, \${name}!\`</span> }
+  }
+})`
+---
+
+<section id="how-it-works" class="how-it-works">
+  <div class="container">
+    <p class="section-label">How It Works</p>
+    <h2 class="section-title">One action. Every transport.</h2>
+    <p class="section-desc">
+      Define your business logic once as an <strong>Action</strong>. Pick an <strong>Adapter</strong>.
+      Silkweave wires them together.
+    </p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-label">Action</div>
+        <div class="flow-desc">Zod schema + async handler</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">
+        <div class="flow-label">Adapter</div>
+        <div class="flow-desc">stdio, HTTP, REST, CLI, Vercel</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">
+        <div class="flow-label">Silkweave</div>
+        <div class="flow-desc">Fluent builder wires it up</div>
+      </div>
+    </div>
+
+    <div class="code-block" id="action-code-block">
+      <div class="code-block-header">
+        <span>actions/greet.ts</span>
+        <button class="copy-btn" data-copy-block="action-code">Copy</button>
+      </div>
+      <pre id="action-code"><code set:html={actionCode} /></pre>
+    </div>
+  </div>
+</section>
+
+<style>
+  .how-it-works {
+    border-top: 1px solid var(--border);
+  }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin: 2.5rem 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 2rem;
+    text-align: center;
+    min-width: 180px;
+  }
+
+  .flow-label {
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .flow-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .flow-arrow {
+    font-size: 1.5rem;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .code-block {
+    margin-top: 2rem;
+  }
+
+  @media (max-width: 640px) {
+    .flow-step {
+      min-width: 100%;
+    }
+    .flow-arrow {
+      transform: rotate(90deg);
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll('[data-copy-block]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-copy-block')
+      const block = document.getElementById(id)
+      if (!block) return
+      await navigator.clipboard.writeText(block.textContent || '')
+      const original = btn.textContent
+      btn.textContent = 'Copied!'
+      setTimeout(() => { btn.textContent = original }, 1500)
+    })
+  })
+</script>

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "prepack": {
+      "dependsOn": ["^prepack"],
+      "outputs": ["build/**"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["build/**", "dist/**"]
+    },
+    "lint": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "check": {
+      "dependsOn": [],
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    },
+    "serve": {
+      "cache": false,
+      "persistent": true
+    }
+  },
+  "envMode": "loose"
+}
