@@ -3,10 +3,10 @@ node_modules/
 build/
 plans/
 resources/
+.claude/
 *.tsbuildinfo
 .turbo
 .astro
-dist/
 .DS_Store
 .env
 store.json

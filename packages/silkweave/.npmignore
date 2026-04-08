@@ -1,0 +1,6 @@
+.vscode
+src/
+CLAUDE.md
+eslint.config.mjs
+tsconfig.json
+tsup.config.ts

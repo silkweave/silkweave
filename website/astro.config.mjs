@@ -1,7 +1,7 @@
 import { defineConfig } from 'astro/config'
 
 export default defineConfig({
-  outDir: './dist',
+  outDir: './build',
   publicDir: './static',
   build: {
     assets: '_assets',

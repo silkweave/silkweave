@@ -1,5 +1,6 @@
-import { createAction, createSideloadResource } from '@silkweave/core'
+import { createAction } from '@silkweave/core'
 import { Logger } from '@silkweave/logger'
+import { createSideloadResource } from '@silkweave/mcp'
 import z from 'zod'
 
 export const TaskAction = createAction({

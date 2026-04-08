@@ -3,7 +3,7 @@
   "framework": "astro",
   "installCommand": "cd .. && pnpm install",
   "buildCommand": "cd .. && pnpm build",
-  "outputDirectory": "dist",
+  "outputDirectory": "build",
   "rewrites": [
     { "source": "/mcp", "destination": "/api" },
     { "source": "/auth/:path*", "destination": "/api" }

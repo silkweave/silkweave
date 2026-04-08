@@ -14,6 +14,7 @@
     "packages/core",
     "packages/fastify",
     "packages/logger",
+    "packages/silkweave",
     "packages/mcp",
     "packages/vercel"
   ],
@@ -38,9 +39,8 @@
     "**/node_modules": true,
     "**/build": true,
     "**/.turbo": true,
-    ".claude": false,
-    ".astragraph": false,
-    ".astragraph.wal": false
+    "**/.astro": true,
+    "**/.roam": true
   },
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,

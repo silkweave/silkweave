@@ -17,7 +17,6 @@ This package provides the foundational building blocks that all Silkweave adapte
 - **Adapter types** — `Adapter`, `AdapterGenerator`, `AdapterFactory` interfaces for building custom adapters
 - **Context** — `SilkweaveContext` key-value store with `fork()` for per-adapter/per-request isolation
 - **MCP utilities** — `toolResponse()`, `parseToolResponse()` for MCP response formatting
-- **Sideload resources** — `createSideloadResource()` for binary resource handling
 - **Zod utilities** — `unwrap()` to recursively unwrap Zod wrapper types
 
 ## Usage
