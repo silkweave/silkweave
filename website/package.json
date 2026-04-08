@@ -20,6 +20,7 @@
     "@silkweave/vercel": "workspace:*",
     "@upstash/redis": "^1.37.0",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "zod": "4.3.6"
   },
   "devDependencies": {
