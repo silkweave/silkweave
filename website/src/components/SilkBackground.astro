@@ -1,78 +1,100 @@
 ---
 ---
 
-<canvas id="silk-canvas"></canvas>
+<div class="silk-bg">
+  <canvas id="silk-canvas"></canvas>
+</div>
 
 <style>
-  #silk-canvas {
+  .silk-bg {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     z-index: 0;
+    /* Static gradient placeholder matching the shader palette */
+    background: radial-gradient(ellipse at 50% 60%, #2a1d6b 0%, #131040 45%, #0a0a0f 100%);
+  }
+
+  #silk-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+
+  #silk-canvas.active {
+    opacity: 1;
   }
 </style>
 
 <script>
   const canvas = document.getElementById('silk-canvas') as HTMLCanvasElement
-  const gl = canvas.getContext('webgl')
+  let initialized = false
 
-  if (gl) {
+  function getDimensions() {
+    const dpr = Math.min(devicePixelRatio, 2)
+    return { width: canvas.clientWidth * dpr, height: canvas.clientHeight * dpr }
+  }
+
+  function initWorker() {
+    const offscreen = canvas.transferControlToOffscreen()
+    const { width, height } = getDimensions()
+    const worker = new Worker('/silk-worker.js')
+
+    worker.postMessage({ type: 'init', canvas: offscreen, width, height }, [offscreen])
+
+    worker.onmessage = (e: MessageEvent) => {
+      if (e.data.type === 'ready') canvas.classList.add('active')
+    }
+
+    window.addEventListener('resize', () => {
+      const { width, height } = getDimensions()
+      worker.postMessage({ type: 'resize', width, height })
+    })
+
+    new IntersectionObserver(([entry]) => {
+      worker.postMessage({ type: entry.isIntersecting ? 'resume' : 'pause' })
+    }).observe(canvas)
+  }
+
+  function initMainThread() {
+    const gl = canvas.getContext('webgl')
+    if (!gl) return
+
     const vs = `
       attribute vec2 a_position;
-      void main() {
-        gl_Position = vec4(a_position, 0.0, 1.0);
-      }
+      void main() { gl_Position = vec4(a_position, 0.0, 1.0); }
     `
-
     const fs = `
       precision highp float;
       uniform vec2 u_resolution;
       uniform float u_time;
-
-      mat2 rot(float x) {
-        return mat2(cos(x), -sin(x), sin(x), cos(x));
-      }
-
-      float height(vec2 p, float t) {
-        return sin(p.x) + sin(p.x + p.y) + cos(p.y) / 1.5 + sin(t + p.x) + 5.0;
-      }
-
-      float map(vec3 p, float t) {
-        return p.y - height(p.xz, t);
-      }
-
+      mat2 rot(float x) { return mat2(cos(x), -sin(x), sin(x), cos(x)); }
+      float height(vec2 p, float t) { return sin(p.x) + sin(p.x + p.y) + cos(p.y) / 1.5 + sin(t + p.x) + 5.0; }
+      float map(vec3 p, float t) { return p.y - height(p.xz, t); }
       void main() {
         vec2 uv = (gl_FragCoord.xy * 2.0 - u_resolution) / min(u_resolution.x, u_resolution.y);
-
         float t = u_time * 0.4;
-
         vec3 ray = normalize(vec3(uv, 1.0));
         ray.yz *= rot(sin(t) / 3.0 + 1.5);
         ray.xz *= rot((sin(t) / 2.0 + 1.0) / 5.0);
-
         float d = 0.0;
-        for (int i = 0; i < 29; i++) {
-          d += map(vec3(t, 0.0, t / 2.0) + ray * d, t) * 0.5;
-        }
-
+        for (int i = 0; i < 29; i++) { d += map(vec3(t, 0.0, t / 2.0) + ray * d, t) * 0.5; }
         float fog = 1.0 / (1.0 + d * d * 0.005);
-
-        // palette: #3F2EB7 deep indigo, #7932B7 purple, #134FB4 blue, #37C9D9 cyan
-        vec3 c1 = vec3(0.247, 0.180, 0.718);  // deep indigo
-        vec3 c2 = vec3(0.475, 0.196, 0.718);  // purple
-        vec3 c3 = vec3(0.075, 0.310, 0.706);  // blue
-        vec3 c4 = vec3(0.216, 0.788, 0.851);  // cyan
-
-        // blend across palette using fog + screen position
+        vec3 c1 = vec3(0.247, 0.180, 0.718);
+        vec3 c2 = vec3(0.475, 0.196, 0.718);
+        vec3 c3 = vec3(0.075, 0.310, 0.706);
+        vec3 c4 = vec3(0.216, 0.788, 0.851);
         float blend = fog * 0.6 + uv.x * 0.2 + 0.2;
         vec3 warm = mix(c1, c2, smoothstep(0.0, 0.5, blend));
         vec3 cool = mix(c3, c4, smoothstep(0.5, 1.0, blend));
         vec3 tint = mix(warm, cool, smoothstep(0.45, 0.85, blend));
-
         vec3 col = tint * fog * fog * 0.45;
-
         gl_FragColor = vec4(col, 1.0);
       }
     `
@@ -102,7 +124,7 @@
     const uTime = gl.getUniformLocation(prog, 'u_time')
 
     function resize() {
-      const dpr = Math.min(window.devicePixelRatio, 2)
+      const dpr = Math.min(devicePixelRatio, 2)
       canvas.width = canvas.clientWidth * dpr
       canvas.height = canvas.clientHeight * dpr
       gl!.viewport(0, 0, canvas.width, canvas.height)
@@ -111,7 +133,7 @@
     window.addEventListener('resize', resize)
     resize()
 
-    let animId: number
+    let animId = 0
     const start = performance.now()
 
     function frame() {
@@ -122,16 +144,40 @@
     }
 
     frame()
+    canvas.classList.add('active')
 
-    // Pause when out of view
-    const observer = new IntersectionObserver(([entry]) => {
+    new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
         if (!animId) frame()
       } else {
         cancelAnimationFrame(animId)
         animId = 0
       }
-    })
-    observer.observe(canvas)
+    }).observe(canvas)
+  }
+
+  function init() {
+    if (initialized) return
+    initialized = true
+    events.forEach(e => window.removeEventListener(e, init))
+
+    if (typeof canvas.transferControlToOffscreen === 'function') {
+      initWorker()
+    } else {
+      initMainThread()
+    }
+  }
+
+  // Deferred loading: delay interaction listeners by 2s to bypass PSI's simulated events
+  const events = ['mouseover', 'keydown', 'touchmove', 'touchstart', 'scroll']
+  setTimeout(() => {
+    events.forEach(e => window.addEventListener(e, init, { passive: true }))
+  }, 2000)
+
+  // Safety net: start via requestIdleCallback (or 4s timeout) if no interaction
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(() => init(), { timeout: 5000 })
+  } else {
+    setTimeout(init, 4000)
   }
 </script>

@@ -1,6 +1,7 @@
 .roam/
 node_modules/
 build/
+plans/
 resources/
 *.tsbuildinfo
 .turbo

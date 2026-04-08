@@ -1,23 +1,30 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { intro, log } from '@clack/prompts'
-import { Action, AdapterFactory, unwrap } from '@silkweave/core'
+import { Action, AdapterFactory, SilkweaveError, unwrap } from '@silkweave/core'
 import { createCLILogger } from '@silkweave/logger'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import z from 'zod'
 
 function handleCLIError(error: unknown) {
-  if (error instanceof z.ZodError) {
+  if (error instanceof SilkweaveError) {
+    log.error(`[${error.code}] ${error.message}`)
+    process.exitCode = 1
+  } else if (error instanceof z.ZodError) {
     log.error('Validation Error', { withGuide: false })
     for (const issue of error.issues) {
       log.error(`${issue.path}: ${issue.message}`)
     }
+    process.exitCode = 1
   } else if (error instanceof Error) {
     log.error(error.message)
+    process.exitCode = 1
   } else if (typeof error === 'string') {
     log.error(error)
+    process.exitCode = 1
   } else {
     log.error(JSON.stringify(error))
+    process.exitCode = 1
   }
 }
 

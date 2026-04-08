@@ -1,0 +1,691 @@
+---
+import DocsLayout from '../layouts/DocsLayout.astro'
+
+/* ── raw code blocks (for copy buttons) ──────────────────────────── */
+
+const installRaw = `pnpm add @silkweave/core @silkweave/mcp zod`
+
+const actionRaw = `import { createAction } from '@silkweave/core'
+import z from 'zod'
+
+export const GreetAction = createAction({
+  name: 'greet',
+  description: 'Greet a user by name',
+  input: z.object({
+    name: z.string().describe('Name to greet')
+  }),
+  run: async ({ name }) => {
+    return { message: \`Hello, \${'$'}{name}!\` }
+  }
+})`
+
+const wireRaw = `import { silkweave } from '@silkweave/core'
+import { stdio } from '@silkweave/mcp'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())
+  .action(GreetAction)
+  .start()`
+
+const contextRaw = `import { silkweave, createContext } from '@silkweave/core'
+import { http } from '@silkweave/mcp'
+import pg from 'pg'
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .set('db', pool)
+  .adapter(http({ host: 'localhost', port: 8080 }))
+  .action(GreetAction)
+  .start()`
+
+const contextAccessRaw = `export const ListUsersAction = createAction({
+  name: 'listUsers',
+  description: 'List all users',
+  input: z.object({}),
+  run: async (_input, context) => {
+    const db = context.get<pg.Pool>('db')
+    const { rows } = await db.query('SELECT * FROM users')
+    return { users: rows }
+  }
+})`
+
+const bearerRaw = `import { AuthConfig } from '@silkweave/auth'
+import { silkweave } from '@silkweave/core'
+import { http } from '@silkweave/mcp'
+
+const auth: AuthConfig = {
+  verifyToken: async (token) => {
+    if (token === process.env.API_TOKEN) {
+      return { token, clientId: 'api', scopes: ['read', 'write'] }
+    }
+    return undefined
+  }
+}
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(http({ host: 'localhost', port: 8080, auth }))
+  .action(GreetAction)
+  .start()`
+
+const oauthRaw = `import { google, createJsonStore } from '@silkweave/auth'
+
+const auth = google({
+  clientId: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  resourceUrl: 'http://localhost:8080',
+  redirectUris: ['http://localhost:*'],
+  requiredScopes: ['openid'],
+  store: createJsonStore('store.json')
+})`
+
+const guardRaw = `export const AdminAction = createAction({
+  name: 'admin',
+  description: 'Admin-only action',
+  input: z.object({}),
+  isEnabled: (ctx) => {
+    const auth = ctx.getOptional<AuthInfo>('auth')
+    return auth?.scopes?.includes('admin') ?? false
+  },
+  run: async (_input, context) => {
+    return { status: 'ok' }
+  }
+})`
+
+const errorRaw = `import { SilkweaveError, notFound, badRequest } from '@silkweave/core'
+
+export const GetUserAction = createAction({
+  name: 'getUser',
+  description: 'Get a user by ID',
+  input: z.object({
+    id: z.string().describe('User ID')
+  }),
+  run: async ({ id }, context) => {
+    const db = context.get<pg.Pool>('db')
+    const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [id])
+    if (!rows.length) throw notFound(\`User \${'$'}{id} not found\`)
+    return rows[0]
+  }
+})`
+
+const testRaw = `import { describe, it, expect } from 'vitest'
+import { createContext } from '@silkweave/core'
+import { GreetAction } from './actions/greet.js'
+
+describe('GreetAction', () => {
+  it('greets by name', async () => {
+    const ctx = createContext({ logger: { info: () => {} } })
+    const result = await GreetAction.run({ name: 'Alice' }, ctx)
+    expect(result.message).toBe('Hello, Alice!')
+  })
+})`
+
+const escapeRaw = `// Fastify adapter: access raw request
+const req = context.get<FastifyRequest>('request')
+const customHeader = req.headers['x-trace-id']
+
+// CLI adapter: access commander instance
+const cmd = context.get<Command>('command')
+
+// MCP adapters: access MCP extra metadata
+const extra = context.get<ToolExtra>('extra')`
+
+/* ── highlighted code blocks ─────────────────────────────────────── */
+
+function hl(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\b(import|from|export|const|let|async|await|return|throw|if|new)\b/g, '<span class="token-keyword">$1</span>')
+    .replace(/'([^']*)'/g, `<span class="token-string">'$1'</span>`)
+    .replace(/`([^`]*)`/g, '<span class="token-string">`$1`</span>')
+    .replace(/\b(\d+)\b/g, '<span class="token-number">$1</span>')
+    .replace(/\/\/(.*)$/gm, '<span class="token-comment">//$1</span>')
+}
+---
+
+<DocsLayout>
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- GETTING STARTED                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="getting-started">
+    <h1>Documentation</h1>
+    <p class="lead">Silkweave is a TypeScript toolkit for building MCP servers, REST APIs, and CLI tools from a single set of Actions. Define your business logic once, then deploy it via any transport.</p>
+  </section>
+
+  <section id="installation">
+    <h2>Installation</h2>
+    <p>Install the core package and at least one adapter:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>terminal</span>
+        <button class="copy-btn" data-copy-raw={installRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(installRaw)} /></pre>
+    </div>
+    <table class="docs-table">
+      <thead><tr><th>Package</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>@silkweave/core</code></td><td>Actions, adapters, builder, context, error utilities</td></tr>
+        <tr><td><code>@silkweave/mcp</code></td><td>MCP stdio and streamable HTTP adapters</td></tr>
+        <tr><td><code>@silkweave/fastify</code></td><td>Fastify REST API with auto-generated Swagger UI</td></tr>
+        <tr><td><code>@silkweave/cli</code></td><td>CLI adapter with Commander + Clack prompts</td></tr>
+        <tr><td><code>@silkweave/vercel</code></td><td>Stateless MCP over Vercel / Web Standard serverless</td></tr>
+        <tr><td><code>@silkweave/auth</code></td><td>OAuth 2.1 proxy, bearer token validation</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="quick-start">
+    <h2>Quick Start</h2>
+    <h3>1. Define an action</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>actions/greet.ts</span>
+        <button class="copy-btn" data-copy-raw={actionRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(actionRaw)} /></pre>
+    </div>
+    <h3>2. Wire it up and start</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={wireRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(wireRaw)} /></pre>
+    </div>
+    <p>Swap <code>stdio()</code> for <code>http()</code>, <code>fastify()</code>, <code>cli()</code>, or <code>vercel()</code> — the action stays identical.</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- CORE CONCEPTS                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="core-concepts">
+    <h2>Core Concepts</h2>
+  </section>
+
+  <section id="actions">
+    <h3>Actions</h3>
+    <p>An <strong>Action</strong> is a named operation with a Zod input schema and an async handler. Actions are completely transport-agnostic — they know nothing about HTTP, stdio, or CLI.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Action interface</span></div>
+      <pre><code set:html={hl(`interface Action<I, O> {
+  name: string
+  description: string
+  input: z.ZodType<I>
+  args?: (keyof I)[]
+  isEnabled?: (context: SilkweaveContext) => boolean
+  run: (input: I, context: SilkweaveContext) => Promise<O>
+}`)} /></pre>
+    </div>
+    <ul>
+      <li><strong><code>name</code></strong> — Identifier used for routing (kebab-case for CLI, PascalCase for MCP tools, URL path for Fastify).</li>
+      <li><strong><code>input</code></strong> — Zod object schema. Drives validation, CLI option generation, and OpenAPI docs.</li>
+      <li><strong><code>args</code></strong> — Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
+      <li><strong><code>isEnabled</code></strong> — Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
+      <li><strong><code>run</code></strong> — Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
+    </ul>
+  </section>
+
+  <section id="adapters">
+    <h3>Adapters</h3>
+    <p>Adapters translate actions into a specific transport. The pattern is <code>AdapterFactory &rarr; AdapterGenerator &rarr; Adapter</code>:</p>
+    <ol>
+      <li><strong>AdapterFactory</strong> — Takes transport-specific config (port, host, auth) and returns a generator.</li>
+      <li><strong>AdapterGenerator</strong> — Takes silkweave options + base context, returns the adapter.</li>
+      <li><strong>Adapter</strong> — Has <code>start(actions)</code> and <code>stop()</code> methods.</li>
+    </ol>
+    <p>The fluent builder handles all of this — you just call <code>.adapter(stdio())</code>.</p>
+    <table class="docs-table">
+      <thead><tr><th>Adapter</th><th>Package</th><th>Transport</th></tr></thead>
+      <tbody>
+        <tr><td><code>stdio()</code></td><td><code>@silkweave/mcp</code></td><td>MCP over stdin/stdout</td></tr>
+        <tr><td><code>http()</code></td><td><code>@silkweave/mcp</code></td><td>MCP Streamable HTTP (Express)</td></tr>
+        <tr><td><code>fastify()</code></td><td><code>@silkweave/fastify</code></td><td>REST API + Swagger UI</td></tr>
+        <tr><td><code>cli()</code></td><td><code>@silkweave/cli</code></td><td>CLI via Commander + Clack</td></tr>
+        <tr><td><code>vercel()</code></td><td><code>@silkweave/vercel</code></td><td>Stateless MCP (Web Standard)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="context">
+    <h3>Context & Dependency Injection</h3>
+    <p>Silkweave uses a simple key-value context bag for dependency injection. No magic, no decorators — just <code>.set()</code> and <code>.get()</code>.</p>
+
+    <h4>Setting up context</h4>
+    <p>Use the fluent <code>.set(key, value)</code> API to inject singletons (database pools, config, services) into the base context:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={contextRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(contextRaw)} /></pre>
+    </div>
+
+    <h4>Accessing context in actions</h4>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>actions/listUsers.ts</span>
+        <button class="copy-btn" data-copy-raw={contextAccessRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(contextAccessRaw)} /></pre>
+    </div>
+
+    <h4>How context flows</h4>
+    <p>The base context you configure via <code>.set()</code> is <strong>shared across all adapters</strong> (singleton). Each adapter <strong>forks</strong> the context per request, adding transport-specific values. The fork creates a shallow copy — your singletons are shared, but per-request values are isolated.</p>
+    <table class="docs-table">
+      <thead><tr><th>Adapter</th><th>"Request" means</th><th>Context keys injected</th></tr></thead>
+      <tbody>
+        <tr><td>Fastify</td><td>HTTP request</td><td><code>logger</code>, <code>adapter</code>, <code>request</code>, <code>auth?</code></td></tr>
+        <tr><td>CLI</td><td>Process execution</td><td><code>logger</code>, <code>adapter</code>, <code>command</code></td></tr>
+        <tr><td>MCP stdio</td><td>JSON-RPC message</td><td><code>logger</code>, <code>adapter</code>, <code>extra</code></td></tr>
+        <tr><td>MCP HTTP</td><td>HTTP + JSON-RPC</td><td><code>logger</code>, <code>adapter</code>, <code>extra</code>, <code>auth?</code></td></tr>
+        <tr><td>Vercel</td><td>Serverless invocation</td><td><code>logger</code>, <code>adapter</code>, <code>extra</code>, <code>auth?</code></td></tr>
+      </tbody>
+    </table>
+    <p>Use <code>context.get&lt;T&gt;(key)</code> when the key is guaranteed to exist (throws if missing). Use <code>context.getOptional&lt;T&gt;(key)</code> for keys that may not be present (returns <code>undefined</code>).</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ADAPTER REFERENCE                                              -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="adapter-reference">
+    <h2>Adapter Reference</h2>
+  </section>
+
+  <section id="adapter-mcp-stdio">
+    <h3>MCP (stdio)</h3>
+    <p>The <code>stdio()</code> adapter serves actions as MCP tools over stdin/stdout using <code>StdioServerTransport</code>. This is the standard way to connect to Claude Desktop, VS Code, and other MCP clients.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>server.ts</span></div>
+      <pre><code set:html={hl(`import { silkweave } from '@silkweave/core'
+import { stdio } from '@silkweave/mcp'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())
+  .action(GreetAction)
+  .start()`)} /></pre>
+    </div>
+    <ul>
+      <li>Action names are converted to PascalCase for MCP tool names</li>
+      <li>Logging is forwarded via MCP <code>notifications/message</code></li>
+      <li>Progress is reported via MCP <code>notifications/progress</code></li>
+    </ul>
+  </section>
+
+  <section id="adapter-mcp-http">
+    <h3>MCP (HTTP)</h3>
+    <p>The <code>http()</code> adapter serves actions as MCP tools over Streamable HTTP with session management. It uses Express under the hood and supports full OAuth 2.1 integration.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>server.ts</span></div>
+      <pre><code set:html={hl(`import { http } from '@silkweave/mcp'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(http({ host: 'localhost', port: 8080 }))
+  .action(GreetAction)
+  .start()`)} /></pre>
+    </div>
+    <p>Options: <code>host</code>, <code>port</code>, <code>auth</code> (see <a href="#authentication">Authentication</a>), plus any <code>CreateMcpExpressAppOptions</code>.</p>
+  </section>
+
+  <section id="adapter-fastify">
+    <h3>Fastify REST</h3>
+    <p>The <code>fastify()</code> adapter registers each action as a <code>POST /{'{'}<span>name</span>{'}'}</code> endpoint with auto-generated OpenAPI documentation and interactive Swagger UI (powered by Scalar).</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>server.ts</span></div>
+      <pre><code set:html={hl(`import { fastify } from '@silkweave/fastify'
+
+await silkweave({ name: 'my-api', version: '1.0.0' })
+  .adapter(fastify({ port: 8080 }))
+  .action(GreetAction)
+  .start()
+// Swagger UI at http://localhost:8080/`)} /></pre>
+    </div>
+    <ul>
+      <li>Zod schemas are converted to JSON Schema for OpenAPI docs</li>
+      <li>Supports <code>auth</code> option for bearer token / OAuth protection</li>
+      <li>Errors are mapped to HTTP status codes automatically (see <a href="#error-handling">Error Handling</a>)</li>
+    </ul>
+  </section>
+
+  <section id="adapter-cli">
+    <h3>CLI</h3>
+    <p>The <code>cli()</code> adapter exposes each action as a CLI command using Commander with beautiful Clack terminal UI.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>cli.ts</span></div>
+      <pre><code set:html={hl(`import { cli } from '@silkweave/cli'
+
+await silkweave({ name: 'my-tool', version: '1.0.0' })
+  .adapter(cli())
+  .action(GreetAction)
+  .start()
+// $ my-tool greet --name Alice`)} /></pre>
+    </div>
+    <ul>
+      <li>Action names become kebab-case commands</li>
+      <li>Zod types map to CLI options: <code>z.string()</code> &rarr; <code>--name &lt;string&gt;</code>, <code>z.boolean()</code> &rarr; <code>--verbose / --no-verbose</code></li>
+      <li>Use <code>args: ['name']</code> to make a field a positional argument instead</li>
+    </ul>
+  </section>
+
+  <section id="adapter-vercel">
+    <h3>Vercel Serverless</h3>
+    <p>The <code>vercel()</code> adapter creates a stateless MCP server for serverless environments. It uses Web Standard <code>Request</code> / <code>Response</code> APIs, making it compatible with <strong>Vercel, Cloudflare Workers, and Bun</strong>.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>api/mcp/route.ts</span></div>
+      <pre><code set:html={hl(`import { vercel } from '@silkweave/vercel'
+
+const { adapter, GET, POST, DELETE } = vercel()
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(adapter)
+  .action(GreetAction)
+  .start()
+
+export { GET, POST, DELETE }`)} /></pre>
+    </div>
+    <ul>
+      <li>Each request creates a fresh MCP server instance (fully stateless)</li>
+      <li>Uses <code>WebStandardStreamableHTTPServerTransport</code> from the MCP SDK</li>
+      <li>Supports OAuth 2.1 and bearer token auth</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- AUTHENTICATION                                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="authentication">
+    <h2>Authentication</h2>
+    <p><code>@silkweave/auth</code> provides authentication for MCP and REST adapters. It supports bearer token validation and a full OAuth 2.1 proxy with PKCE, refresh tokens, and dynamic client registration.</p>
+  </section>
+
+  <section id="bearer-token">
+    <h3>Bearer Token</h3>
+    <p>The simplest auth setup — provide a <code>verifyToken</code> callback that validates tokens against your own logic:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={bearerRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(bearerRaw)} /></pre>
+    </div>
+    <p>When a valid token is provided, the adapter injects an <code>auth</code> key into the context. Access it in your actions:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Inside an action</span></div>
+      <pre><code set:html={hl(`const auth = context.getOptional<AuthInfo>('auth')
+if (auth) {
+  console.log(auth.clientId, auth.scopes)
+}`)} /></pre>
+    </div>
+  </section>
+
+  <section id="oauth">
+    <h3>OAuth 2.1</h3>
+    <p>For production use, Silkweave includes a full OAuth 2.1 proxy. The <code>google()</code> helper pre-configures Google as the upstream provider:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={oauthRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(oauthRaw)} /></pre>
+    </div>
+    <p>The OAuth proxy handles:</p>
+    <ul>
+      <li><strong>PKCE</strong> — Proof Key for Code Exchange for public clients</li>
+      <li><strong>Refresh tokens</strong> — Automatic token renewal</li>
+      <li><strong>Dynamic client registration</strong> — RFC 7591 support</li>
+      <li><strong>Protected Resource Metadata</strong> — RFC 9728 discovery</li>
+    </ul>
+    <p>Storage backends: <code>createMemoryStore()</code> (development), <code>createJsonStore(path)</code> (file-based), <code>createRedisStore(redis)</code> (production).</p>
+  </section>
+
+  <section id="per-action-guards">
+    <h3>Per-Action Guards</h3>
+    <p>Use the <code>isEnabled</code> field to conditionally expose actions based on context (including auth state):</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>actions/admin.ts</span>
+        <button class="copy-btn" data-copy-raw={guardRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(guardRaw)} /></pre>
+    </div>
+    <p>When <code>isEnabled</code> returns <code>false</code>, the action is not registered with that adapter — it won't appear in MCP tool lists, Swagger docs, or CLI help.</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="error-handling">
+    <h2>Error Handling</h2>
+    <p>Silkweave provides standard error classes that automatically map to the correct behavior in each transport.</p>
+  </section>
+
+  <section id="silkweave-error">
+    <h3>SilkweaveError</h3>
+    <p>Throw a <code>SilkweaveError</code> from your action to communicate structured errors:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>actions/getUser.ts</span>
+        <button class="copy-btn" data-copy-raw={errorRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(errorRaw)} /></pre>
+    </div>
+    <p>Convenience factories: <code>notFound()</code>, <code>badRequest()</code>, <code>forbidden()</code>, <code>internal()</code>. Or construct directly:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Custom error</span></div>
+      <pre><code set:html={hl(`throw new SilkweaveError('Rate limited', 'rate_limited', 429)`)} /></pre>
+    </div>
+  </section>
+
+  <section id="adapter-error-behavior">
+    <h3>Adapter Error Behavior</h3>
+    <p>Each adapter maps errors to the appropriate transport response:</p>
+    <table class="docs-table">
+      <thead><tr><th>Error Type</th><th>Fastify</th><th>CLI</th><th>MCP</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>SilkweaveError(404)</code></td>
+          <td>HTTP 404 + JSON body</td>
+          <td>exit 1 + <code>[not_found] message</code></td>
+          <td><code>&#123; isError: true, code: 'not_found' &#125;</code></td>
+        </tr>
+        <tr>
+          <td><code>ZodError</code></td>
+          <td>HTTP 400 + validation issues</td>
+          <td>exit 1 + field-level errors</td>
+          <td><code>&#123; isError: true &#125;</code></td>
+        </tr>
+        <tr>
+          <td>Unknown error</td>
+          <td>HTTP 500</td>
+          <td>exit 1 + error message</td>
+          <td><code>&#123; isError: true &#125;</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- TESTING                                                        -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="testing">
+    <h2>Testing</h2>
+  </section>
+
+  <section id="unit-testing">
+    <h3>Unit Testing Actions</h3>
+    <p>Because actions are plain async functions decoupled from any transport, testing them is trivial — no server required:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>greet.test.ts</span>
+        <button class="copy-btn" data-copy-raw={testRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(testRaw)} /></pre>
+    </div>
+    <p>Create a minimal context with <code>createContext()</code>, call <code>action.run()</code>, and assert on the return value. That's it.</p>
+    <p>For actions that access context keys like <code>db</code> or <code>auth</code>, pass mocks in the context store:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Testing with mocked dependencies</span></div>
+      <pre><code set:html={hl(`const ctx = createContext({
+  logger: { info: () => {} },
+  db: { query: async () => ({ rows: [{ id: '1', name: 'Alice' }] }) }
+})
+const result = await GetUserAction.run({ id: '1' }, ctx)
+expect(result.name).toBe('Alice')`)} /></pre>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ESCAPE HATCHES                                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="escape-hatches">
+    <h2>Escape Hatches</h2>
+    <p>Silkweave provides a clean default path but never hides the underlying transport. When you need transport-specific features, the native objects are right there in context.</p>
+  </section>
+
+  <section id="native-objects">
+    <h3>Accessing Native Objects</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>Inside an action</span>
+        <button class="copy-btn" data-copy-raw={escapeRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(escapeRaw)} /></pre>
+    </div>
+    <p>This lets you access transport-specific features like custom headers, cookies, or MCP metadata when your action truly needs them — while keeping the common case clean.</p>
+  </section>
+
+  <section id="context-by-adapter">
+    <h3>Context by Adapter</h3>
+    <table class="docs-table">
+      <thead><tr><th>Adapter</th><th>Key</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>All</td><td><code>logger</code></td><td><code>Logger</code></td><td>Adapter-specific logger instance</td></tr>
+        <tr><td>All</td><td><code>adapter</code></td><td><code>string</code></td><td>Adapter name (<code>'fastify'</code>, <code>'stdio'</code>, etc.)</td></tr>
+        <tr><td>Fastify</td><td><code>request</code></td><td><code>FastifyRequest</code></td><td>Raw Fastify request with headers, URL, body</td></tr>
+        <tr><td>Fastify, MCP HTTP, Vercel</td><td><code>auth</code></td><td><code>AuthInfo</code></td><td>Authenticated user info (when auth is configured)</td></tr>
+        <tr><td>CLI</td><td><code>command</code></td><td><code>Command</code></td><td>Commander command instance</td></tr>
+        <tr><td>MCP (all)</td><td><code>extra</code></td><td><code>ToolExtra</code></td><td>MCP request metadata, session info</td></tr>
+      </tbody>
+    </table>
+    <p>Use <code>context.getOptional&lt;T&gt;(key)</code> when writing actions that run across multiple adapters — it returns <code>undefined</code> instead of throwing when a key isn't present.</p>
+  </section>
+</DocsLayout>
+
+<style>
+  section {
+    padding: 2rem 0 1rem;
+    scroll-margin-top: 3.5rem;
+  }
+
+  section:first-child {
+    padding-top: 1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  section:first-child h2,
+  section:nth-child(2) h2 {
+    border-top: none;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--text);
+  }
+
+  .lead {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    max-width: 640px;
+  }
+
+  p {
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 0.75rem;
+  }
+
+  ul, ol {
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  li {
+    margin-bottom: 0.35rem;
+  }
+
+  strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .code-block {
+    margin: 1rem 0 1.5rem;
+  }
+
+  .docs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 1rem 0 1.5rem;
+  }
+
+  .docs-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-surface);
+  }
+
+  .docs-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    vertical-align: top;
+  }
+
+  .docs-table code {
+    font-size: 0.82rem;
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.docs-content [data-copy-raw]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.getAttribute('data-copy-raw') || ''
+      await navigator.clipboard.writeText(text)
+      const original = btn.textContent
+      btn.textContent = 'Copied!'
+      setTimeout(() => { btn.textContent = original }, 1500)
+    })
+  })
+</script>

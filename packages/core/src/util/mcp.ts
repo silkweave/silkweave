@@ -2,12 +2,14 @@ import { TextContent } from '@modelcontextprotocol/sdk/types.js'
 
 export interface ToolResponse {
   content: TextContent[]
+  isError?: boolean
   [x: string]: unknown
 }
 
-export function toolResponse(data: object): ToolResponse {
+export function toolResponse(data: object, isError = false): ToolResponse {
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }]
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    ...(isError ? { isError: true } : {})
   }
 }
 

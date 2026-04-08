@@ -1,8 +1,9 @@
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { AdapterFactory } from '@silkweave/core'
+import { AdapterFactory, SilkweaveError } from '@silkweave/core'
 import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { Server } from 'http'
+import z from 'zod'
 
 type FastifyLogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
 
@@ -100,6 +101,17 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
             }
           })
         }
+
+        instance.setErrorHandler((error, _request, reply) => {
+          if (error instanceof SilkweaveError) {
+            return reply.status(error.statusCode).send({ error: error.code, message: error.message })
+          }
+          if (error instanceof z.ZodError) {
+            return reply.status(400).send({ error: 'validation_error', issues: error.issues })
+          }
+          instance.log.error(error)
+          return reply.status(500).send({ error: 'internal', message: 'Internal server error' })
+        })
 
         for (const action of actions) {
           const schema = action.input.toJSONSchema()

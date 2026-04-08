@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, AdapterFactory, SideloadResource, SilkweaveContext, SilkweaveOptions, toolResponse } from '@silkweave/core'
+import { Action, AdapterFactory, SideloadResource, SilkweaveContext, SilkweaveError, SilkweaveOptions, toolResponse } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
 import cors from 'cors'
@@ -117,10 +117,12 @@ function createMcpServer(options: SilkweaveOptions, actions: Action[], context: 
       return action.run(input, context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })).then((result) => {
         return toolResponse(result)
       }).catch((error) => {
-        if (error instanceof Error) {
-          return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack })
+        if (error instanceof SilkweaveError) {
+          return toolResponse({ success: false, code: error.code, name: error.name, message: error.message }, true)
+        } else if (error instanceof Error) {
+          return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack }, true)
         } else {
-          return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occured', error })
+          return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occurred', error }, true)
         }
       })
     })

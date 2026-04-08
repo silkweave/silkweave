@@ -8,8 +8,10 @@
   },
   "type": "module",
   "scripts": {
+    "clean": "rimraf .astro",
     "dev": "astro dev",
-    "build": "astro build"
+    "build": "astro build",
+    "prepack": "pnpm clean && pnpm build"
   },
   "dependencies": {
     "@silkweave/auth": "workspace:*",

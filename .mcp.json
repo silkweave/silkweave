@@ -8,6 +8,10 @@
       "type": "stdio",
       "command": "roam",
       "args": ["mcp"]
+    },
+    "lighthouse": {
+      "command": "npx",
+      "args": ["@danielsogl/lighthouse-mcp"]
     }
   }
 }

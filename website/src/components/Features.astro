@@ -3,32 +3,38 @@ const features = [
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
     title: 'Zod-Powered Schemas',
-    desc: 'Define inputs with Zod. Get validation, type inference, and auto-generated docs for free.'
+    desc: 'Define inputs with Zod. Get validation, type inference, and auto-generated docs for free.',
+    link: '/docs#actions'
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>`,
     title: 'Built-in OAuth 2.1',
-    desc: 'Full OAuth proxy with PKCE, refresh tokens, and dynamic client registration out of the box.'
+    desc: 'Full OAuth proxy with PKCE, refresh tokens, and dynamic client registration out of the box.',
+    link: '/docs#authentication'
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
     title: 'Auto-Generated Swagger',
-    desc: 'The Fastify adapter produces OpenAPI specs and interactive Swagger UI automatically.'
+    desc: 'The Fastify adapter produces OpenAPI specs and interactive Swagger UI automatically.',
+    link: '/docs#adapter-fastify'
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>`,
     title: 'Session & Context',
-    desc: 'Fluent .set() API for per-request context. Actions receive a typed context bag — no globals.'
+    desc: 'Fluent .set() API for per-request context. Actions receive a typed context bag — no globals.',
+    link: '/docs#context'
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
     title: 'Vercel Serverless',
-    desc: 'Deploy stateless MCP servers to Vercel edge functions. Zero infrastructure to manage.'
+    desc: 'Deploy stateless MCP servers to Vercel, Cloudflare Workers, or Bun. Web Standard APIs, zero lock-in.',
+    link: '/docs#adapter-vercel'
   },
   {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
     title: 'CLI with Prompts',
-    desc: 'Expose the same actions as a CLI tool with interactive prompts, powered by Commander + Clack.'
+    desc: 'Expose the same actions as a CLI tool with interactive prompts, powered by Commander + Clack.',
+    link: '/docs#adapter-cli'
   }
 ]
 ---
@@ -43,6 +49,7 @@ const features = [
           <div class="feature-icon" set:html={f.icon} />
           <h3>{f.title}</h3>
           <p>{f.desc}</p>
+          <a href={f.link} class="feature-link">Learn more &rarr;</a>
         </div>
       ))}
     </div>
@@ -88,6 +95,13 @@ const features = [
     font-size: 0.85rem;
     color: var(--text-muted);
     line-height: 1.6;
+  }
+
+  .feature-link {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
   }
 
   @media (max-width: 768px) {

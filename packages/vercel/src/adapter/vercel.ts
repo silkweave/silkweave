@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, validateToken } from '@silkweave/auth'
-import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions, toolResponse } from '@silkweave/core'
+import { Action, AdapterGenerator, SilkweaveContext, SilkweaveError, SilkweaveOptions, toolResponse } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
 
@@ -151,10 +151,12 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
         return action.run(input, requestContext.fork({ logger, extra })).then((result) => {
           return toolResponse(result)
         }).catch((error) => {
-          if (error instanceof Error) {
-            return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack })
+          if (error instanceof SilkweaveError) {
+            return toolResponse({ success: false, code: error.code, name: error.name, message: error.message }, true)
+          } else if (error instanceof Error) {
+            return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack }, true)
           } else {
-            return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occured', error })
+            return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occurred', error }, true)
           }
         })
       })

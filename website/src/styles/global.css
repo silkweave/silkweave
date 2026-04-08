@@ -12,12 +12,12 @@
   /* Text */
   --text: #e4e4ef;
   --text-muted: #8888a0;
-  --text-dim: #555568;
+  --text-dim: #7e7e94;
 
   /* Accent */
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --accent-dim: #4f46e5;
+  --accent: #7b7ef5;
+  --accent-hover: #9ba0f8;
+  --accent-dim: #5558e6;
   --accent-bg: #1e1b4b;
 
   /* Semantic */
@@ -65,6 +65,17 @@ a {
 
 a:hover {
   color: var(--accent-hover);
+}
+
+/* Inline links in text blocks need underlines for WCAG link-in-text-block */
+p a, li a, td a, dd a {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+p a:hover, li a:hover, td a:hover, dd a:hover {
+  text-decoration-color: var(--accent-hover);
 }
 
 img {
