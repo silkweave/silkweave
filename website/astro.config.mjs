@@ -4,6 +4,7 @@ export default defineConfig({
   outDir: './dist',
   publicDir: './static',
   build: {
-    assets: '_assets'
+    assets: '_assets',
+    inlineStylesheets: 'always'
   }
 })
