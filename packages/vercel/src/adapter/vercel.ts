@@ -202,8 +202,8 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
     return new Response(responseBody, { status: oauthRes.status, headers: oauthRes.headers })
   }
 
-  const adapter: AdapterGenerator = (mcpHeroOptions: SilkweaveOptions, baseContext: SilkweaveContext) => {
-    _options = mcpHeroOptions
+  const adapter: AdapterGenerator = (silkweaveOptions: SilkweaveOptions, baseContext: SilkweaveContext) => {
+    _options = silkweaveOptions
     _context = baseContext.fork({ adapter: 'vercel' })
     return {
       context: _context,
