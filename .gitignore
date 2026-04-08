@@ -1,4 +1,5 @@
 .roam/
+!.roam/fitness.yaml
 node_modules/
 build/
 plans/

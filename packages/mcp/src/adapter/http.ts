@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, AdapterFactory, SilkweaveContext, SilkweaveError, SilkweaveOptions, toolResponse } from '@silkweave/core'
+import { Action, AdapterFactory, handleToolError, SilkweaveContext, SilkweaveOptions, toolResponse } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
 import cors from 'cors'
@@ -81,15 +81,7 @@ function mountAuthMiddleware(app: Express, auth: AuthConfig, oauthPaths: Set<str
   })
 }
 
-function createMcpServer(options: SilkweaveOptions, actions: Action[], context: SilkweaveContext): McpServer {
-  const server = new McpServer({
-    name: options.name,
-    description: options.description,
-    version: options.version
-  }, {
-    capabilities: { tools: {}, logging: {} }
-  })
-
+function registerTools(server: McpServer, actions: Action[], context: SilkweaveContext) {
   for (const action of actions) {
     server.registerTool(pascalCase(action.name), {
       title: capitalCase(action.name),
@@ -105,31 +97,52 @@ function createMcpServer(options: SilkweaveOptions, actions: Action[], context: 
           if (!extra._meta?.progressToken) { return }
           extra.sendNotification({
             method: 'notifications/progress',
-            params: {
-              progress,
-              total,
-              message,
-              progressToken: extra._meta.progressToken
-            }
+            params: { progress, total, message, progressToken: extra._meta.progressToken }
           })
         }
       })
       const currentAuth = authStorage.getStore()
-      return action.run(input, context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })).then((result) => {
-        return toolResponse(result)
-      }).catch((error) => {
-        if (error instanceof SilkweaveError) {
-          return toolResponse({ success: false, code: error.code, name: error.name, message: error.message }, true)
-        } else if (error instanceof Error) {
-          return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack }, true)
-        } else {
-          return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occurred', error }, true)
-        }
-      })
+      return action.run(input, context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) }))
+        .then((result) => toolResponse(result))
+        .catch(handleToolError)
     })
   }
+}
 
+function createMcpServer(options: SilkweaveOptions, actions: Action[], context: SilkweaveContext): McpServer {
+  const server = new McpServer({
+    name: options.name,
+    description: options.description,
+    version: options.version
+  }, {
+    capabilities: { tools: {}, logging: {} }
+  })
+  registerTools(server, actions, context)
   return server
+}
+
+function createSessionTransport(transports: Record<string, StreamableHTTPServerTransport>): StreamableHTTPServerTransport {
+  const eventStore = new InMemoryEventStore()
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+    enableJsonResponse: false,
+    eventStore,
+    onsessioninitialized: (sId) => {
+      console.log(`Session initialized with ID: ${sId}`)
+      transports[sId] = transport
+    }
+  })
+  transport.onerror = (error) => {
+    console.error(error)
+  }
+  transport.onclose = () => {
+    const sid = transport.sessionId
+    if (sid && transports[sid]) {
+      console.log(`Transport closed for session ${sid}, removing from transports map`)
+      delete transports[sid]
+    }
+  }
+  return transport
 }
 
 function mountMcpTransport(
@@ -140,34 +153,12 @@ function mountMcpTransport(
   app.post('/mcp', async (req: Request, res: Response) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined
     try {
-      let transport: StreamableHTTPServerTransport
       if (sessionId && transports[sessionId]) {
-        transport = transports[sessionId]
-      } else if (isInitializeRequest(req.body)) {
-        const eventStore = new InMemoryEventStore()
-        transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          enableJsonResponse: false,
-          eventStore,
-          onsessioninitialized: (sId) => {
-            console.log(`Session initialized with ID: ${sId}`)
-            transports[sId] = transport
-          }
-        })
-        transport.onerror = (error) => {
-          console.error(error)
-        }
-        transport.onclose = () => {
-          const sid = transport.sessionId
-          if (sid && transports[sid]) {
-            console.log(`Transport closed for session ${sid}, removing from transports map`)
-            delete transports[sid]
-          }
-        }
-        await createServer().connect(transport)
-        await transport.handleRequest(req, res, req.body)
+        await transports[sessionId].handleRequest(req, res, req.body)
         return
-      } else {
+      }
+
+      if (!isInitializeRequest(req.body)) {
         res.status(404).json({
           jsonrpc: '2.0',
           error: { code: -32_000, message: 'Session not found' },
@@ -175,6 +166,9 @@ function mountMcpTransport(
         })
         return
       }
+
+      const transport = createSessionTransport(transports)
+      await createServer().connect(transport)
       await transport.handleRequest(req, res, req.body)
     } catch (error) {
       console.error('Error handling MCP request:', error)

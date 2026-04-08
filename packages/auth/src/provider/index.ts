@@ -1,4 +1,3 @@
-export * from '../store/memory-store.js'
 export * from './google.js'
 export * from './proxy.js'
 export * from './store.js'

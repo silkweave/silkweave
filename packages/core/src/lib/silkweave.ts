@@ -1,12 +1,8 @@
 import { Action } from '../util/action.js'
-import { Adapter, AdapterGenerator } from '../util/adapter.js'
+import { Adapter, AdapterGenerator, SilkweaveOptions } from '../util/adapter.js'
 import { createContext } from '../util/context.js'
 
-export interface SilkweaveOptions {
-  name: string
-  description: string
-  version: string
-}
+export type { SilkweaveOptions } from '../util/adapter.js'
 
 export interface Silkweave {
   set: <T>(key: string, value: T) => Silkweave

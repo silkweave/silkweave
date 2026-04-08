@@ -1,12 +1,6 @@
-import type { OAuthProvider } from './provider/types.js'
+import type { AuthInfo, OAuthProvider } from './provider/types.js'
 
-export interface AuthInfo {
-  token: string
-  clientId?: string
-  scopes?: string[]
-  expiresAt?: number
-  [key: string]: unknown
-}
+export type { AuthInfo } from './provider/types.js'
 
 export type VerifyToken = (token: string) => Promise<AuthInfo | undefined>
 

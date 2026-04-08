@@ -1,6 +1,11 @@
-import { SilkweaveOptions } from '../lib/silkweave.js'
 import { Action } from './action.js'
 import { SilkweaveContext } from './context.js'
+
+export interface SilkweaveOptions {
+  name: string
+  description: string
+  version: string
+}
 
 export interface Adapter {
   context: SilkweaveContext

@@ -1,0 +1,66 @@
+# Architectural fitness functions for silkweave
+# Run with: roam fitness
+# Use in CI: roam fitness && echo "Architecture OK"
+#
+# This project is a multi-package library toolkit with an adapter pattern.
+# roam health score is NOT a useful north-star metric here because:
+#   - Monorepo packages create disconnected graphs (low algebraic connectivity)
+#   - Adapter factories are intentional hubs (flagged as god components/bottlenecks)
+#   - Public API exports for library consumers appear "dead" to static analysis
+#
+# Track these instead:
+#   roam fitness        — these rules (CI-friendly, exit 1 on failure)
+#   roam complexity     — function-level cognitive complexity
+#   roam vibe-check     — AI rot score (currently 3/100 = healthy)
+#   roam ai-readiness   — agent-friendliness (currently 62/100)
+
+rules:
+  # ── Complexity thresholds ─────────────────────────────────────────
+  # OAuth proxy (36) and Zod unwrap (29) have inherent domain complexity.
+  # Threshold at 40 prevents new god functions while accepting these.
+  - name: "Max function complexity 40"
+    type: metric
+    metric: cognitive_complexity
+    max: 40
+    reason: "Functions above 40 cognitive complexity must be decomposed. Current worst: createOAuthProxy (36), unwrap (29)."
+
+  # ── Cycle control ─────────────────────────────────────────────────
+  # Roam detects 2 SCCs from symbolic reference edges (shared property
+  # names between store implementations), not actual import cycles.
+  # All real import cycles have been fixed. Prevent new ones.
+  - name: "No new import cycles"
+    type: metric
+    metric: cycles
+    max: 2
+    reason: "All real import cycles are fixed. 2 remaining SCCs are symbolic reference edges in auth stores — not actionable."
+
+  # ── Trend-based regression guards ─────────────────────────────────
+  # These catch gradual degradation over time.
+  # Run `roam trends --save` after each release to build history.
+  - name: "Complexity must not creep"
+    type: trend
+    metric: avg_complexity
+    max_increase: 0.5
+    window: 3
+    reason: "Average complexity is trending upward — decompose new functions"
+
+  - name: "Tangle ratio must stay stable"
+    type: trend
+    metric: tangle_ratio
+    max_increase: 1.0
+    window: 3
+    reason: "Dependency tangle is increasing — check for new circular imports"
+
+  - name: "Dead code must not accumulate"
+    type: trend
+    metric: dead_exports
+    max_increase: 2
+    window: 3
+    reason: "Dead exports are accumulating — clean up unused public API"
+
+  - name: "God components must not grow"
+    type: trend
+    metric: god_components
+    max_increase: 1
+    window: 3
+    reason: "New god component detected — check if it's an intentional hub or accidental coupling"

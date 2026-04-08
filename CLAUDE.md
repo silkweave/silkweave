@@ -61,7 +61,7 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 ### Key Utilities (in @silkweave/core)
 
 - `unwrap()` in `packages/core/src/util/zod.ts` — recursively unwraps Zod wrapper types (optional, nullable, default, readonly) to get the base type and metadata. Used by the CLI adapter for option generation.
-- `toolResponse()` in `packages/core/src/util/mcp.ts` — wraps any object as MCP `TextContent` JSON.
+- `toolResponse()` / `handleToolError()` in `packages/core/src/util/mcp.ts` — wraps results/errors as MCP `TextContent` JSON. `handleToolError` is shared across all MCP adapters.
 - `buildLogLevels()` in `packages/core/src/util/logger.ts` — builds a log-level record from a single callback function.
 - `buildCLILogger()` / `parseCLIInput()` / `handleCLIError()` in `packages/core/src/util/cli.ts` — CLI logging and input parsing utilities shared by `@silkweave/cli` and `@silkweave/mcp`'s cliProxy.
 
@@ -75,6 +75,20 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 - `roam context` gives exact line ranges — more precise than reading whole files.
 - After `git pull`, run `roam index` to keep the graph fresh.
 - For disambiguation, use `file:symbol` syntax: `roam symbol myfile:MyClass`.
+
+### Code Quality Metrics
+
+**Do NOT use `roam health` as a quality metric** for this project. It penalizes
+architectural patterns that are correct for a multi-package library toolkit
+(adapter hubs → bottlenecks, disconnected packages → low connectivity,
+public API exports → "dead" symbols).
+
+Use these instead:
+- `roam fitness` — custom rules in `.roam/fitness.yaml` (CI-friendly, exit 1 on failure)
+- `roam complexity --threshold 15` — function-level cognitive complexity
+- `roam vibe-check` — AI rot score (target: < 10)
+- `roam ai-readiness` — agent-friendliness score
+- `roam trends --save` — save a snapshot after each release for trend guards
 
 ### Roam in Sub-Agents
 

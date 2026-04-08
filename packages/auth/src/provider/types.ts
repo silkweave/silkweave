@@ -1,4 +1,10 @@
-import { AuthInfo } from '../types.js'
+export interface AuthInfo {
+  token: string
+  clientId?: string
+  scopes?: string[]
+  expiresAt?: number
+  [key: string]: unknown
+}
 
 export interface OAuthRequest {
   method: string

@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
-import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, validateToken } from '@silkweave/auth'
-import { Action, AdapterGenerator, SilkweaveContext, SilkweaveError, SilkweaveOptions, toolResponse } from '@silkweave/core'
+import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
+import { Action, AdapterGenerator, handleToolError, SilkweaveContext, SilkweaveOptions, toolResponse } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
 
@@ -24,6 +24,86 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': '*',
   'Access-Control-Max-Age': '86400'
+}
+
+function registerTools(server: McpServer, actions: Action[], requestContext: SilkweaveContext) {
+  for (const action of actions) {
+    server.registerTool(pascalCase(action.name), {
+      title: capitalCase(action.name),
+      description: action.description,
+      inputSchema: action.input
+    }, async (input, extra) => {
+      const logger = createLogger({
+        stream: process.stderr,
+        onLog: (level, data) => {
+          extra.sendNotification({ method: 'notifications/message', params: { level, data } })
+        },
+        onProgress: ({ progress, total, message }) => {
+          if (!extra._meta?.progressToken) { return }
+          extra.sendNotification({
+            method: 'notifications/progress',
+            params: {
+              progress,
+              total,
+              message,
+              progressToken: extra._meta.progressToken
+            }
+          })
+        }
+      })
+      return action.run(input, requestContext.fork({ logger, extra }))
+        .then((result) => toolResponse(result))
+        .catch(handleToolError)
+    })
+  }
+}
+
+async function parseOAuthRequest(url: URL, request: Request): Promise<OAuthRequest> {
+  let body: Record<string, string> | undefined
+  if (request.method === 'POST') {
+    const contentType = request.headers.get('content-type') ?? ''
+    const text = await request.text()
+    if (contentType.includes('json')) {
+      body = JSON.parse(text)
+    } else {
+      body = Object.fromEntries(new URLSearchParams(text))
+    }
+  }
+  return {
+    method: request.method,
+    url,
+    headers: Object.fromEntries(request.headers.entries()),
+    body
+  }
+}
+
+function oauthResponseToResponse(oauthRes: OAuthResponse): Response {
+  const responseBody = oauthRes.body
+    ? (typeof oauthRes.body === 'string' ? oauthRes.body : JSON.stringify(oauthRes.body))
+    : null
+  return new Response(responseBody, { status: oauthRes.status, headers: oauthRes.headers })
+}
+
+async function routeOAuth(
+  url: URL,
+  request: Request,
+  provider: NonNullable<AuthConfig['provider']>,
+  callbackPath: string
+): Promise<Response> {
+  const oauthReq = await parseOAuthRequest(url, request)
+  let oauthRes
+  if (url.pathname === '/.well-known/oauth-authorization-server') {
+    oauthRes = provider.metadata()
+  } else if (url.pathname === '/authorize') {
+    oauthRes = await provider.authorize(oauthReq)
+  } else if (url.pathname === callbackPath) {
+    oauthRes = await provider.callback(oauthReq)
+  } else if (url.pathname === '/token') {
+    oauthRes = await provider.token(oauthReq)
+  } else {
+    oauthRes = await provider.register(oauthReq)
+  }
+  return oauthResponseToResponse(oauthRes)
 }
 
 export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
@@ -90,7 +170,7 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
         if (!methods.includes(request.method)) {
           return new Response('Method not allowed', { status: 405 })
         }
-        return handleOAuth(url, request, options.auth!.provider!)
+        return routeOAuth(url, request, options.auth!.provider!, callbackPath)
       }
     }
 
@@ -124,84 +204,10 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
       capabilities: { tools: {}, logging: {} }
     })
 
-    for (const action of _actions) {
-      server.registerTool(pascalCase(action.name), {
-        title: capitalCase(action.name),
-        description: action.description,
-        inputSchema: action.input
-      }, async (input, extra) => {
-        const logger = createLogger({
-          stream: process.stderr,
-          onLog: (level, data) => {
-            extra.sendNotification({ method: 'notifications/message', params: { level, data } })
-          },
-          onProgress: ({ progress, total, message }) => {
-            if (!extra._meta?.progressToken) { return }
-            extra.sendNotification({
-              method: 'notifications/progress',
-              params: {
-                progress,
-                total,
-                message,
-                progressToken: extra._meta.progressToken
-              }
-            })
-          }
-        })
-        return action.run(input, requestContext.fork({ logger, extra })).then((result) => {
-          return toolResponse(result)
-        }).catch((error) => {
-          if (error instanceof SilkweaveError) {
-            return toolResponse({ success: false, code: error.code, name: error.name, message: error.message }, true)
-          } else if (error instanceof Error) {
-            return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack }, true)
-          } else {
-            return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occurred', error }, true)
-          }
-        })
-      })
-    }
+    registerTools(server, _actions, requestContext)
 
     await server.connect(transport)
     return transport.handleRequest(request)
-  }
-
-  async function handleOAuth(url: URL, request: Request, provider: NonNullable<AuthConfig['provider']>): Promise<Response> {
-    const toOAuthReq = async (): Promise<OAuthRequest> => {
-      let body: Record<string, string> | undefined
-      if (request.method === 'POST') {
-        const contentType = request.headers.get('content-type') ?? ''
-        const text = await request.text()
-        if (contentType.includes('json')) {
-          body = JSON.parse(text)
-        } else {
-          body = Object.fromEntries(new URLSearchParams(text))
-        }
-      }
-      return {
-        method: request.method,
-        url,
-        headers: Object.fromEntries(request.headers.entries()),
-        body
-      }
-    }
-
-    const oauthReq = await toOAuthReq()
-    let oauthRes
-    if (url.pathname === '/.well-known/oauth-authorization-server') {
-      oauthRes = provider.metadata()
-    } else if (url.pathname === '/authorize') {
-      oauthRes = await provider.authorize(oauthReq)
-    } else if (url.pathname === callbackPath) {
-      oauthRes = await provider.callback(oauthReq)
-    } else if (url.pathname === '/token') {
-      oauthRes = await provider.token(oauthReq)
-    } else {
-      oauthRes = await provider.register(oauthReq)
-    }
-
-    const responseBody = oauthRes.body ? (typeof oauthRes.body === 'string' ? oauthRes.body : JSON.stringify(oauthRes.body)) : null
-    return new Response(responseBody, { status: oauthRes.status, headers: oauthRes.headers })
   }
 
   const adapter: AdapterGenerator = (silkweaveOptions: SilkweaveOptions, baseContext: SilkweaveContext) => {

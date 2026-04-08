@@ -1,7 +1,7 @@
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
 import { AdapterFactory, SilkweaveError } from '@silkweave/core'
 import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
-import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { Server } from 'http'
 import z from 'zod'
 
@@ -22,6 +22,77 @@ export interface FastifyAdapterOptions extends FastifyHttpOptions<Server, Fastif
   host?: string
   port?: number
   auth?: AuthConfig
+}
+
+function toOAuthReq(request: FastifyRequest): OAuthRequest {
+  return {
+    method: request.method,
+    url: new URL(request.url, `http://${request.hostname}`),
+    headers: Object.fromEntries(Object.entries(request.headers).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
+    body: request.body as Record<string, string> | undefined
+  }
+}
+
+function sendOAuth(reply: FastifyReply, oauthRes: OAuthResponse) {
+  for (const [key, value] of Object.entries(oauthRes.headers)) { reply.header(key, value) }
+  return reply.status(oauthRes.status).send(oauthRes.body)
+}
+
+function mountOAuthRoutes(instance: FastifyInstance, auth: AuthConfig): Set<string> {
+  const provider = auth.provider!
+
+  const paths = new Set([
+    '/.well-known/oauth-authorization-server',
+    '/authorize',
+    '/auth/callback',
+    '/token',
+    '/register'
+  ])
+
+  instance.get('/.well-known/oauth-authorization-server', async (_req, reply) => {
+    return sendOAuth(reply, provider.metadata())
+  })
+  instance.get('/authorize', async (req, reply) => {
+    return sendOAuth(reply, await provider.authorize(toOAuthReq(req)))
+  })
+  instance.get('/auth/callback', async (req, reply) => {
+    return sendOAuth(reply, await provider.callback(toOAuthReq(req)))
+  })
+  instance.post('/token', async (req, reply) => {
+    return sendOAuth(reply, await provider.token(toOAuthReq(req)))
+  })
+  instance.post('/register', async (req, reply) => {
+    return sendOAuth(reply, await provider.register(toOAuthReq(req)))
+  })
+
+  return paths
+}
+
+function mountAuthMiddleware(instance: FastifyInstance, auth: AuthConfig, oauthPaths: Set<string>) {
+  instance.decorateRequest('__silkweave_auth', undefined)
+  instance.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (request.url.startsWith('/.well-known/') || oauthPaths.has(request.url.split('?')[0])) { return }
+    const result = await validateToken(request.headers.authorization, auth)
+    if (result.error) {
+      for (const [key, value] of Object.entries(result.error.headers)) {
+        reply.header(key, value)
+      }
+      return reply.status(result.error.statusCode).send(result.error.body)
+    }
+    if (result.auth) {
+      (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth = result.auth
+    }
+  })
+}
+
+function createActionLogger(instance: FastifyInstance): Logger {
+  return {
+    ...buildLogLevels((level, data) => {
+      const pinoLevel = PINO_LEVEL_MAP[level] ?? 'info'
+      instance.log[pinoLevel](data)
+    }),
+    progress: ({ progress, total, message }) => { instance.log.trace({ progress, total }, message) }
+  }
 }
 
 export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, auth, ...fastifyOptions }) => {
@@ -48,58 +119,10 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
           })
         }
 
-        const oauthPaths = new Set<string>()
-        if (auth?.provider) {
-          const provider = auth.provider
-          const toOAuthReq = (request: FastifyRequest): OAuthRequest => ({
-            method: request.method,
-            url: new URL(request.url, `http://${request.hostname}`),
-            headers: Object.fromEntries(Object.entries(request.headers).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
-            body: request.body as Record<string, string> | undefined
-          })
-          const sendOAuth = (reply: FastifyReply, oauthRes: OAuthResponse) => {
-            for (const [key, value] of Object.entries(oauthRes.headers)) { reply.header(key, value) }
-            return reply.status(oauthRes.status).send(oauthRes.body)
-          }
-
-          oauthPaths.add('/.well-known/oauth-authorization-server')
-          oauthPaths.add('/authorize')
-          oauthPaths.add('/auth/callback')
-          oauthPaths.add('/token')
-          oauthPaths.add('/register')
-
-          instance.get('/.well-known/oauth-authorization-server', async (_req, reply) => {
-            return sendOAuth(reply, provider.metadata())
-          })
-          instance.get('/authorize', async (req, reply) => {
-            return sendOAuth(reply, await provider.authorize(toOAuthReq(req)))
-          })
-          instance.get('/auth/callback', async (req, reply) => {
-            return sendOAuth(reply, await provider.callback(toOAuthReq(req)))
-          })
-          instance.post('/token', async (req, reply) => {
-            return sendOAuth(reply, await provider.token(toOAuthReq(req)))
-          })
-          instance.post('/register', async (req, reply) => {
-            return sendOAuth(reply, await provider.register(toOAuthReq(req)))
-          })
-        }
+        const oauthPaths = auth?.provider ? mountOAuthRoutes(instance, auth) : new Set<string>()
 
         if (auth) {
-          instance.decorateRequest('__silkweave_auth', undefined)
-          instance.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
-            if (request.url.startsWith('/.well-known/') || oauthPaths.has(request.url.split('?')[0])) { return }
-            const result = await validateToken(request.headers.authorization, auth)
-            if (result.error) {
-              for (const [key, value] of Object.entries(result.error.headers)) {
-                reply.header(key, value)
-              }
-              return reply.status(result.error.statusCode).send(result.error.body)
-            }
-            if (result.auth) {
-              (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth = result.auth
-            }
-          })
+          mountAuthMiddleware(instance, auth, oauthPaths)
         }
 
         instance.setErrorHandler((error, _request, reply) => {
@@ -112,6 +135,8 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
           instance.log.error(error)
           return reply.status(500).send({ error: 'internal', message: 'Internal server error' })
         })
+
+        const logger = createActionLogger(instance)
 
         for (const action of actions) {
           const schema = action.input.toJSONSchema()
@@ -128,13 +153,6 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
               }
             }
           }, (request) => {
-            const logger: Logger = {
-              ...buildLogLevels((level, data) => {
-                const pinoLevel = PINO_LEVEL_MAP[level] ?? 'info'
-                instance.log[pinoLevel](data)
-              }),
-              progress: ({ progress, total, message }) => { instance.log.trace({ progress, total }, message) }
-            }
             const authInfo = auth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
             return action.run(request.body, context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) }))
           })

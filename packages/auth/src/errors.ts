@@ -16,7 +16,3 @@ export function invalidToken(message = 'Invalid token') {
 export function insufficientScope(message = 'Insufficient scope') {
   return new AuthError(message, 'insufficient_scope', 403)
 }
-
-export function missingToken(message = 'No authorization provided') {
-  return new AuthError(message, 'missing_token', 401)
-}

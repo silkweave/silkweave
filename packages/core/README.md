@@ -16,7 +16,7 @@ This package provides the foundational building blocks that all Silkweave adapte
 - **`createAction()`** — Define transport-agnostic actions with Zod input schemas
 - **Adapter types** — `Adapter`, `AdapterGenerator`, `AdapterFactory` interfaces for building custom adapters
 - **Context** — `SilkweaveContext` key-value store with `fork()` for per-adapter/per-request isolation
-- **MCP utilities** — `toolResponse()`, `parseToolResponse()` for MCP response formatting
+- **MCP utilities** — `toolResponse()`, `handleToolError()`, `parseToolResponse()` for MCP response formatting
 - **Zod utilities** — `unwrap()` to recursively unwrap Zod wrapper types
 
 ## Usage

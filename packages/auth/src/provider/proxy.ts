@@ -1,9 +1,8 @@
 import { randomBytes, randomUUID } from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import { createMemoryStore } from '../store/memory-store.js'
-import { AuthInfo } from '../types.js'
 import { OAuthStore } from './store.js'
-import { OAuthProvider, OAuthResponse } from './types.js'
+import { AuthInfo, OAuthProvider, OAuthResponse } from './types.js'
 import { matchRedirectUri } from './uri.js'
 
 export interface OAuthProxyConfig {
@@ -27,6 +26,296 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Headers': '*'
 }
 
+function generateCode(): string {
+  return randomBytes(32).toString('base64url')
+}
+
+async function generatePkce(): Promise<{ verifier: string; challenge: string }> {
+  const verifier = randomBytes(32).toString('base64url')
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
+  const challenge = Buffer.from(hash).toString('base64url')
+  return { verifier, challenge }
+}
+
+async function verifyPkce(verifier: string, challenge: string): Promise<boolean> {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
+  const computed = Buffer.from(hash).toString('base64url')
+  return computed === challenge
+}
+
+function jsonResponse(status: number, body: Record<string, unknown>, headers: Record<string, string> = {}): OAuthResponse {
+  return {
+    status,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS, ...headers },
+    body
+  }
+}
+
+function redirectResponse(url: string): OAuthResponse {
+  return {
+    status: 302,
+    headers: { Location: url, ...CORS_HEADERS },
+    body: undefined
+  }
+}
+
+function errorResponse(status: number, error: string, description: string): OAuthResponse {
+  return jsonResponse(status, { error, error_description: description })
+}
+
+async function signAccessToken(
+  key: Uint8Array,
+  opts: { scopes: string[]; email?: string; sub?: string; clientId: string; issuer: string; ttl: number }
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  return new SignJWT({ scope: opts.scopes.join(' '), email: opts.email })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(opts.sub ?? opts.email ?? opts.clientId)
+    .setIssuer(opts.issuer)
+    .setAudience(opts.issuer)
+    .setIssuedAt(now)
+    .setExpirationTime(now + opts.ttl)
+    .sign(key)
+}
+
+async function handleRegister(
+  req: { body?: Record<string, string> },
+  store: OAuthStore,
+  allowedRedirectUris: string[]
+): Promise<OAuthResponse> {
+  const body = req.body
+  if (!body) { return errorResponse(400, 'invalid_request', 'Missing request body') }
+
+  const redirectUris = body.redirect_uris
+  if (!redirectUris) { return errorResponse(400, 'invalid_request', 'redirect_uris is required') }
+
+  let uris: string[]
+  try {
+    uris = typeof redirectUris === 'string' ? JSON.parse(redirectUris) : redirectUris
+  } catch {
+    uris = [redirectUris]
+  }
+
+  if (!Array.isArray(uris) || uris.length === 0) {
+    return errorResponse(400, 'invalid_request', 'redirect_uris must be a non-empty array')
+  }
+
+  for (const uri of uris) {
+    if (!matchRedirectUri(uri, allowedRedirectUris)) {
+      return errorResponse(400, 'invalid_redirect_uri', `Redirect URI not allowed: ${uri}`)
+    }
+  }
+
+  const clientId = randomUUID()
+  const clientSecret = randomBytes(32).toString('base64url')
+  const registration = {
+    clientId,
+    clientSecret,
+    redirectUris: uris,
+    clientName: body.client_name,
+    createdAt: Date.now() / 1000
+  }
+
+  await store.saveClient(clientId, registration)
+
+  return jsonResponse(201, {
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uris: uris,
+    client_name: body.client_name,
+    token_endpoint_auth_method: 'none'
+  })
+}
+
+async function resolveClient(
+  clientId: string,
+  store: OAuthStore,
+  allowedRedirectUris: string[]
+): Promise<{ clientId: string; clientSecret: string; redirectUris: string[]; clientName?: string; createdAt: number } | OAuthResponse> {
+  const existing = await store.getClient(clientId)
+  if (existing) { return existing }
+
+  if (!clientId.startsWith('https://')) {
+    return errorResponse(400, 'invalid_client', 'Unknown client_id')
+  }
+
+  try {
+    const metaRes = await fetch(clientId)
+    if (!metaRes.ok) {
+      return errorResponse(400, 'invalid_client', 'Failed to fetch client metadata document')
+    }
+    const meta = await metaRes.json() as Record<string, unknown>
+    const metaRedirectUris = meta.redirect_uris as string[] | undefined
+    if (!Array.isArray(metaRedirectUris) || metaRedirectUris.length === 0) {
+      return errorResponse(400, 'invalid_client', 'Client metadata must include redirect_uris')
+    }
+    for (const uri of metaRedirectUris) {
+      if (!matchRedirectUri(uri, allowedRedirectUris)) {
+        return errorResponse(400, 'invalid_redirect_uri', `Redirect URI not allowed: ${uri}`)
+      }
+    }
+    const client = {
+      clientId,
+      clientSecret: '',
+      redirectUris: metaRedirectUris,
+      clientName: meta.client_name as string | undefined,
+      createdAt: Date.now() / 1000
+    }
+    await store.saveClient(clientId, client)
+    return client
+  } catch {
+    return errorResponse(400, 'invalid_client', 'Failed to fetch client metadata document')
+  }
+}
+
+async function exchangeUpstreamCode(
+  code: string,
+  config: OAuthProxyConfig,
+  callbackPath: string,
+  pkceVerifier: string
+): Promise<{ accessToken: string; idToken?: string } | OAuthResponse> {
+  const tokenBody = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: `${config.resourceUrl}${callbackPath}`,
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    code_verifier: pkceVerifier
+  })
+
+  const tokenResponse = await fetch(config.tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: tokenBody.toString()
+  })
+
+  if (!tokenResponse.ok) {
+    const errorBody = await tokenResponse.text()
+    console.error('Upstream token exchange failed:', errorBody)
+    return errorResponse(502, 'upstream_error', 'Failed to exchange code with upstream provider')
+  }
+
+  const tokens = await tokenResponse.json() as Record<string, unknown>
+  return {
+    accessToken: tokens.access_token as string,
+    idToken: tokens.id_token as string | undefined
+  }
+}
+
+async function fetchUserinfo(
+  userinfoUrl: string | undefined,
+  accessToken: string
+): Promise<{ email?: string; sub?: string }> {
+  if (!userinfoUrl || !accessToken) { return {} }
+  try {
+    const res = await fetch(userinfoUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+    if (res.ok) {
+      const userinfo = await res.json() as Record<string, unknown>
+      return { email: userinfo.email as string | undefined, sub: userinfo.sub as string | undefined }
+    }
+  } catch {
+    // Userinfo fetch is best-effort
+  }
+  return {}
+}
+
+async function handleRefreshToken(
+  body: Record<string, string>,
+  store: OAuthStore,
+  getSigningKey: () => Promise<Uint8Array>,
+  config: { resourceUrl: string; tokenTtl: number }
+): Promise<OAuthResponse> {
+  const refreshToken = body.refresh_token
+  if (!refreshToken) {
+    return errorResponse(400, 'invalid_request', 'Missing refresh_token')
+  }
+
+  const tokenData = await store.getRefreshToken(refreshToken)
+  if (!tokenData) {
+    return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
+  }
+
+  const key = await getSigningKey()
+  const accessToken = await signAccessToken(key, {
+    scopes: tokenData.scopes,
+    email: tokenData.email,
+    sub: tokenData.sub,
+    clientId: tokenData.clientId,
+    issuer: config.resourceUrl,
+    ttl: config.tokenTtl
+  })
+
+  return jsonResponse(200, {
+    access_token: accessToken,
+    token_type: 'Bearer',
+    expires_in: config.tokenTtl,
+    scope: tokenData.scopes.join(' '),
+    refresh_token: refreshToken
+  })
+}
+
+async function handleAuthorizationCode(
+  body: Record<string, string>,
+  store: OAuthStore,
+  getSigningKey: () => Promise<Uint8Array>,
+  config: { resourceUrl: string; tokenTtl: number }
+): Promise<OAuthResponse> {
+  const code = body.code
+  const redirectUri = body.redirect_uri
+  const clientId = body.client_id
+  const codeVerifier = body.code_verifier
+
+  if (!code || !codeVerifier || !clientId) {
+    return errorResponse(400, 'invalid_request', 'Missing required parameters')
+  }
+
+  const authCode = await store.getAuthCode(code)
+  if (!authCode) { return errorResponse(400, 'invalid_grant', 'Invalid or expired authorization code') }
+
+  await store.deleteAuthCode(code)
+
+  if (authCode.clientId !== clientId) {
+    return errorResponse(400, 'invalid_grant', 'client_id mismatch')
+  }
+  if (redirectUri && authCode.redirectUri !== redirectUri) {
+    return errorResponse(400, 'invalid_grant', 'redirect_uri mismatch')
+  }
+
+  const pkceValid = await verifyPkce(codeVerifier, authCode.codeChallenge)
+  if (!pkceValid) {
+    return errorResponse(400, 'invalid_grant', 'PKCE verification failed')
+  }
+
+  const key = await getSigningKey()
+  const accessToken = await signAccessToken(key, {
+    scopes: authCode.scopes,
+    email: authCode.email,
+    sub: authCode.sub,
+    clientId: authCode.clientId,
+    issuer: config.resourceUrl,
+    ttl: config.tokenTtl
+  })
+
+  const refreshToken = randomBytes(32).toString('base64url')
+  await store.saveRefreshToken(refreshToken, {
+    clientId: authCode.clientId,
+    scopes: authCode.scopes,
+    email: authCode.email,
+    sub: authCode.sub,
+    expiresAt: Math.floor(Date.now() / 1000) + 30 * 24 * 3600
+  })
+
+  return jsonResponse(200, {
+    access_token: accessToken,
+    token_type: 'Bearer',
+    expires_in: config.tokenTtl,
+    scope: authCode.scopes.join(' '),
+    refresh_token: refreshToken
+  })
+}
+
 export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
   const store = config.store ?? createMemoryStore()
   const callbackPath = config.callbackPath ?? '/auth/callback'
@@ -45,44 +334,7 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
     return signingKey
   }
 
-  function generateCode(): string {
-    return randomBytes(32).toString('base64url')
-  }
-
-  async function generatePkce(): Promise<{ verifier: string; challenge: string }> {
-    const verifier = randomBytes(32).toString('base64url')
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
-    const challenge = Buffer.from(hash).toString('base64url')
-    return { verifier, challenge }
-  }
-
-  async function verifyPkce(verifier: string, challenge: string): Promise<boolean> {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
-    const computed = Buffer.from(hash).toString('base64url')
-    return computed === challenge
-  }
-
-  function jsonResponse(status: number, body: Record<string, unknown>, headers: Record<string, string> = {}): OAuthResponse {
-    return {
-      status,
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS, ...headers },
-      body
-    }
-  }
-
-  function redirectResponse(url: string): OAuthResponse {
-    return {
-      status: 302,
-      headers: { Location: url, ...CORS_HEADERS },
-      body: undefined
-    }
-  }
-
-  function errorResponse(status: number, error: string, description: string): OAuthResponse {
-    return jsonResponse(status, { error, error_description: description })
-  }
-
-  const provider: OAuthProvider = {
+  return {
     metadata(): OAuthResponse {
       return jsonResponse(200, {
         issuer: config.resourceUrl,
@@ -97,49 +349,8 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
       }, { 'Cache-Control': 'max-age=3600' })
     },
 
-    async register(req): Promise<OAuthResponse> {
-      const body = req.body
-      if (!body) { return errorResponse(400, 'invalid_request', 'Missing request body') }
-
-      const redirectUris = body.redirect_uris
-      if (!redirectUris) { return errorResponse(400, 'invalid_request', 'redirect_uris is required') }
-
-      let uris: string[]
-      try {
-        uris = typeof redirectUris === 'string' ? JSON.parse(redirectUris) : redirectUris
-      } catch {
-        uris = [redirectUris]
-      }
-
-      if (!Array.isArray(uris) || uris.length === 0) {
-        return errorResponse(400, 'invalid_request', 'redirect_uris must be a non-empty array')
-      }
-
-      for (const uri of uris) {
-        if (!matchRedirectUri(uri, config.redirectUris)) {
-          return errorResponse(400, 'invalid_redirect_uri', `Redirect URI not allowed: ${uri}`)
-        }
-      }
-
-      const clientId = randomUUID()
-      const clientSecret = randomBytes(32).toString('base64url')
-      const registration = {
-        clientId,
-        clientSecret,
-        redirectUris: uris,
-        clientName: body.client_name,
-        createdAt: Date.now() / 1000
-      }
-
-      await store.saveClient(clientId, registration)
-
-      return jsonResponse(201, {
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uris: uris,
-        client_name: body.client_name,
-        token_endpoint_auth_method: 'none'
-      })
+    register(req) {
+      return handleRegister(req, store, config.redirectUris)
     },
 
     async authorize(req): Promise<OAuthResponse> {
@@ -162,38 +373,9 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
         return errorResponse(400, 'invalid_request', 'PKCE with S256 is required')
       }
 
-      let client = await store.getClient(clientId)
-
-      if (!client && clientId.startsWith('https://')) {
-        try {
-          const metaRes = await fetch(clientId)
-          if (!metaRes.ok) {
-            return errorResponse(400, 'invalid_client', 'Failed to fetch client metadata document')
-          }
-          const meta = await metaRes.json() as Record<string, unknown>
-          const metaRedirectUris = meta.redirect_uris as string[] | undefined
-          if (!Array.isArray(metaRedirectUris) || metaRedirectUris.length === 0) {
-            return errorResponse(400, 'invalid_client', 'Client metadata must include redirect_uris')
-          }
-          for (const uri of metaRedirectUris) {
-            if (!matchRedirectUri(uri, config.redirectUris)) {
-              return errorResponse(400, 'invalid_redirect_uri', `Redirect URI not allowed: ${uri}`)
-            }
-          }
-          client = {
-            clientId,
-            clientSecret: '',
-            redirectUris: metaRedirectUris,
-            clientName: meta.client_name as string | undefined,
-            createdAt: Date.now() / 1000
-          }
-          await store.saveClient(clientId, client)
-        } catch {
-          return errorResponse(400, 'invalid_client', 'Failed to fetch client metadata document')
-        }
-      }
-
-      if (!client) { return errorResponse(400, 'invalid_client', 'Unknown client_id') }
+      const result = await resolveClient(clientId, store, config.redirectUris)
+      if ('status' in result) { return result }
+      const client = result
 
       if (!client.redirectUris.includes(redirectUri)) {
         return errorResponse(400, 'invalid_redirect_uri', 'redirect_uri does not match registered URIs')
@@ -253,47 +435,10 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
       await store.deletePendingAuth(proxyState)
       await store.deletePkceVerifier(proxyState)
 
-      const tokenBody = new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: upstreamCode,
-        redirect_uri: `${config.resourceUrl}${callbackPath}`,
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        code_verifier: pkceVerifier
-      })
+      const upstream = await exchangeUpstreamCode(upstreamCode, config, callbackPath, pkceVerifier)
+      if ('status' in upstream) { return upstream }
 
-      const tokenResponse = await fetch(config.tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: tokenBody.toString()
-      })
-
-      if (!tokenResponse.ok) {
-        const errorBody = await tokenResponse.text()
-        console.error('Upstream token exchange failed:', errorBody)
-        return errorResponse(502, 'upstream_error', 'Failed to exchange code with upstream provider')
-      }
-
-      const tokens = await tokenResponse.json() as Record<string, unknown>
-      const upstreamAccessToken = tokens.access_token as string
-      const upstreamIdToken = tokens.id_token as string | undefined
-
-      let email: string | undefined
-      let sub: string | undefined
-      if (config.userinfoUrl && upstreamAccessToken) {
-        try {
-          const userinfoResponse = await fetch(config.userinfoUrl, {
-            headers: { Authorization: `Bearer ${upstreamAccessToken}` }
-          })
-          if (userinfoResponse.ok) {
-            const userinfo = await userinfoResponse.json() as Record<string, unknown>
-            email = userinfo.email as string | undefined
-            sub = userinfo.sub as string | undefined
-          }
-        } catch {
-          // Userinfo fetch is best-effort
-        }
-      }
+      const userinfo = await fetchUserinfo(config.userinfoUrl, upstream.accessToken)
 
       const mcpCode = generateCode()
       await store.saveAuthCode(mcpCode, {
@@ -302,10 +447,10 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
         codeChallenge: pending.codeChallenge,
         codeChallengeMethod: pending.codeChallengeMethod,
         scopes: pending.scope.split(' ').filter(Boolean),
-        upstreamAccessToken,
-        upstreamIdToken,
-        email,
-        sub,
+        upstreamAccessToken: upstream.accessToken,
+        upstreamIdToken: upstream.idToken,
+        email: userinfo.email,
+        sub: userinfo.sub,
         expiresAt: Date.now() / 1000 + 600
       })
 
@@ -322,102 +467,15 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
       const body = req.body
       if (!body) { return errorResponse(400, 'invalid_request', 'Missing request body') }
 
-      const grantType = body.grant_type
+      const tokenConfig = { resourceUrl: config.resourceUrl, tokenTtl }
 
-      if (grantType === 'refresh_token') {
-        const refreshToken = body.refresh_token
-        if (!refreshToken) {
-          return errorResponse(400, 'invalid_request', 'Missing refresh_token')
-        }
-
-        const tokenData = await store.getRefreshToken(refreshToken)
-        if (!tokenData) {
-          return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
-        }
-
-        const key = await getSigningKey()
-        const now = Math.floor(Date.now() / 1000)
-        const accessToken = await new SignJWT({
-          scope: tokenData.scopes.join(' '),
-          email: tokenData.email
-        })
-          .setProtectedHeader({ alg: 'HS256' })
-          .setSubject(tokenData.sub ?? tokenData.email ?? tokenData.clientId)
-          .setIssuer(config.resourceUrl)
-          .setAudience(config.resourceUrl)
-          .setIssuedAt(now)
-          .setExpirationTime(now + tokenTtl)
-          .sign(key)
-
-        return jsonResponse(200, {
-          access_token: accessToken,
-          token_type: 'Bearer',
-          expires_in: tokenTtl,
-          scope: tokenData.scopes.join(' '),
-          refresh_token: refreshToken
-        })
+      if (body.grant_type === 'refresh_token') {
+        return handleRefreshToken(body, store, getSigningKey, tokenConfig)
       }
-
-      if (grantType !== 'authorization_code') {
+      if (body.grant_type !== 'authorization_code') {
         return errorResponse(400, 'unsupported_grant_type', 'Supported grant types: authorization_code, refresh_token')
       }
-
-      const code = body.code
-      const redirectUri = body.redirect_uri
-      const clientId = body.client_id
-      const codeVerifier = body.code_verifier
-
-      if (!code || !codeVerifier || !clientId) {
-        return errorResponse(400, 'invalid_request', 'Missing required parameters')
-      }
-
-      const authCode = await store.getAuthCode(code)
-      if (!authCode) { return errorResponse(400, 'invalid_grant', 'Invalid or expired authorization code') }
-
-      await store.deleteAuthCode(code)
-
-      if (authCode.clientId !== clientId) {
-        return errorResponse(400, 'invalid_grant', 'client_id mismatch')
-      }
-      if (redirectUri && authCode.redirectUri !== redirectUri) {
-        return errorResponse(400, 'invalid_grant', 'redirect_uri mismatch')
-      }
-
-      const pkceValid = await verifyPkce(codeVerifier, authCode.codeChallenge)
-      if (!pkceValid) {
-        return errorResponse(400, 'invalid_grant', 'PKCE verification failed')
-      }
-
-      const key = await getSigningKey()
-      const now = Math.floor(Date.now() / 1000)
-      const accessToken = await new SignJWT({
-        scope: authCode.scopes.join(' '),
-        email: authCode.email
-      })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setSubject(authCode.sub ?? authCode.email ?? authCode.clientId)
-        .setIssuer(config.resourceUrl)
-        .setAudience(config.resourceUrl)
-        .setIssuedAt(now)
-        .setExpirationTime(now + tokenTtl)
-        .sign(key)
-
-      const refreshToken = randomBytes(32).toString('base64url')
-      await store.saveRefreshToken(refreshToken, {
-        clientId: authCode.clientId,
-        scopes: authCode.scopes,
-        email: authCode.email,
-        sub: authCode.sub,
-        expiresAt: now + 30 * 24 * 3600
-      })
-
-      return jsonResponse(200, {
-        access_token: accessToken,
-        token_type: 'Bearer',
-        expires_in: tokenTtl,
-        scope: authCode.scopes.join(' '),
-        refresh_token: refreshToken
-      })
+      return handleAuthorizationCode(body, store, getSigningKey, tokenConfig)
     },
 
     async verifyToken(token): Promise<AuthInfo | undefined> {
@@ -439,6 +497,4 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
       }
     }
   }
-
-  return provider
 }
