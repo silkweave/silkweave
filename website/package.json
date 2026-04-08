@@ -3,7 +3,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/atomicbi/silkweave.git",
+    "url": "git+ssh://git@github.com/silkweave/silkweave.git",
     "directory": "website"
   },
   "type": "module",

@@ -4,7 +4,7 @@
   "description": "Silkweave Fastify REST Adapter",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/atomicbi/silkweave.git",
+    "url": "git+ssh://git@github.com/silkweave/silkweave.git",
     "directory": "packages/fastify"
   },
   "type": "module",

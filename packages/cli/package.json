@@ -4,7 +4,7 @@
   "description": "Silkweave CLI Adapter",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/atomicbi/silkweave.git",
+    "url": "git+ssh://git@github.com/silkweave/silkweave.git",
     "directory": "packages/cli"
   },
   "type": "module",

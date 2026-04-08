@@ -1,6 +1,6 @@
 # @silkweave/core
 
-Core library for [Silkweave](https://github.com/atomicbi/silkweave) — the TypeScript toolkit for building MCP servers and CLI tools from a single set of Actions.
+Core library for [Silkweave](https://github.com/silkweave/silkweave) — the TypeScript toolkit for building MCP servers and CLI tools from a single set of Actions.
 
 ## Install
 
@@ -82,7 +82,7 @@ type AdapterFactory<T = void> = (options: T) => AdapterGenerator
 
 ## See Also
 
-- [Silkweave README](https://github.com/atomicbi/silkweave) — Full documentation
+- [Silkweave README](https://github.com/silkweave/silkweave) — Full documentation
 - [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp) — MCP stdio and HTTP adapters
 - [`@silkweave/fastify`](https://www.npmjs.com/package/@silkweave/fastify) — Fastify REST adapter
 - [`@silkweave/cli`](https://www.npmjs.com/package/@silkweave/cli) — CLI adapter

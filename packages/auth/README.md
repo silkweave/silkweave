@@ -1,6 +1,6 @@
 # @silkweave/auth
 
-OAuth 2.1 authentication for [Silkweave](https://github.com/atomicbi/silkweave) MCP servers. Acts as an OAuth proxy between MCP clients and upstream identity providers (Google, etc.), handling PKCE, refresh tokens, dynamic client registration (CIMD), and protected resource metadata (RFC 9728).
+OAuth 2.1 authentication for [Silkweave](https://github.com/silkweave/silkweave) MCP servers. Acts as an OAuth proxy between MCP clients and upstream identity providers (Google, etc.), handling PKCE, refresh tokens, dynamic client registration (CIMD), and protected resource metadata (RFC 9728).
 
 Standalone package -- only depends on `jose` for JWT signing/verification.
 
@@ -240,6 +240,6 @@ The proxy also supports:
 
 ## See Also
 
-- [Silkweave README](https://github.com/atomicbi/silkweave) -- Full documentation
+- [Silkweave README](https://github.com/silkweave/silkweave) -- Full documentation
 - [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) -- Core library
 - [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp) -- MCP stdio and HTTP adapters

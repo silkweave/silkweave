@@ -4,7 +4,7 @@
   "description": "Silkweave Logger",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/atomicbi/silkweave.git",
+    "url": "git+ssh://git@github.com/silkweave/silkweave.git",
     "directory": "packages/logger"
   },
   "type": "module",

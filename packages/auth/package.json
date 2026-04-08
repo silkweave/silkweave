@@ -4,7 +4,7 @@
   "description": "Silkweave Auth — Bearer token and OAuth 2.1 support for MCP servers",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/atomicbi/silkweave.git",
+    "url": "git+ssh://git@github.com/silkweave/silkweave.git",
     "directory": "packages/auth"
   },
   "type": "module",

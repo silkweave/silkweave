@@ -4,7 +4,7 @@
   "description": "Silkweave Core",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/atomicbi/silkweave.git",
+    "url": "git+ssh://git@github.com/silkweave/silkweave.git",
     "directory": "packages/core"
   },
   "type": "module",

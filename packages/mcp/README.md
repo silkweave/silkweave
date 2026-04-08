@@ -1,6 +1,6 @@
 # @silkweave/mcp
 
-MCP transport adapters for [Silkweave](https://github.com/atomicbi/silkweave) — expose your actions as MCP tools over stdio, Streamable HTTP, or via a CLI proxy client.
+MCP transport adapters for [Silkweave](https://github.com/silkweave/silkweave) — expose your actions as MCP tools over stdio, Streamable HTTP, or via a CLI proxy client.
 
 ## Install
 
@@ -86,6 +86,6 @@ Logging notifications (`logger.info()`, `logger.progress()`) are sent to the MCP
 
 ## See Also
 
-- [Silkweave README](https://github.com/atomicbi/silkweave) — Full documentation
+- [Silkweave README](https://github.com/silkweave/silkweave) — Full documentation
 - [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) — Core library
 - [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) — Stateless MCP for Vercel
