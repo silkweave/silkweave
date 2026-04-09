@@ -1,5 +1,6 @@
+import { SilkweaveContext } from '@silkweave/core'
 import { AuthError, insufficientScope, invalidToken } from './errors.js'
-import { extractBearerToken, buildWWWAuthenticate } from './extract.js'
+import { buildWWWAuthenticate, extractBearerToken } from './extract.js'
 import { AuthConfig, AuthInfo } from './types.js'
 
 export interface ValidateResult {
@@ -13,7 +14,8 @@ export interface ValidateResult {
 
 export async function validateToken(
   authorizationHeader: string | null | undefined,
-  config: AuthConfig
+  config: AuthConfig,
+  context: SilkweaveContext
 ): Promise<ValidateResult> {
   const required = config.required ?? true
   const resourceMetadataUrl = config.resourceUrl
@@ -29,7 +31,7 @@ export async function validateToken(
 
   let authInfo: AuthInfo | undefined
   try {
-    authInfo = await config.verifyToken(token)
+    authInfo = await config.verifyToken(token, context)
   } catch (_e) {
     const err = invalidToken()
     return buildErrorResult(err, resourceMetadataUrl)

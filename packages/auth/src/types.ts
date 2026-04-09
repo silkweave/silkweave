@@ -1,8 +1,9 @@
+import { SilkweaveContext } from '@silkweave/core'
 import type { AuthInfo, OAuthProvider } from './provider/types.js'
 
 export type { AuthInfo } from './provider/types.js'
 
-export type VerifyToken = (token: string) => Promise<AuthInfo | undefined>
+export type VerifyToken = (token: string, context: SilkweaveContext) => Promise<AuthInfo | undefined>
 
 export interface AuthConfig {
   verifyToken: VerifyToken

@@ -179,7 +179,7 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
 
     let requestContext = _context!
     if (options.auth) {
-      const result = await validateToken(request.headers.get('authorization'), options.auth)
+      const result = await validateToken(request.headers.get('authorization'), options.auth, _context!.fork({ request }))
       if (result.error) {
         return new Response(JSON.stringify(result.error.body), {
           status: result.error.statusCode,

@@ -38,7 +38,7 @@ The core pattern is **Action → Adapter → Silkweave**:
 | Package | Path | Description |
 |---------|------|-------------|
 | `@silkweave/core` | `packages/core` | Core library — actions, adapters, builder, context, logger, utilities |
-| `@silkweave/auth` | `packages/auth` | Auth — OAuth 2.1 proxy (PKCE, refresh tokens, CIMD, dynamic client registration), bearer token validation, protected resource metadata (RFC 9728). Standalone — only depends on `jose` |
+| `@silkweave/auth` | `packages/auth` | Auth — OAuth 2.1 proxy (PKCE, refresh tokens, CIMD, dynamic client registration), bearer token validation, protected resource metadata (RFC 9728) |
 | `@silkweave/mcp` | `packages/mcp` | MCP adapters — stdio, streamable HTTP, CLI proxy |
 | `@silkweave/cli` | `packages/cli` | CLI adapter — commander + clack terminal UI |
 | `@silkweave/fastify` | `packages/fastify` | Fastify REST adapter — auto-generated OpenAPI/Swagger docs |

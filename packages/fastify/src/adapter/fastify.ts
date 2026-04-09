@@ -1,5 +1,5 @@
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { AdapterFactory, SilkweaveError } from '@silkweave/core'
+import { AdapterFactory, SilkweaveContext, SilkweaveError } from '@silkweave/core'
 import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { Server } from 'http'
@@ -68,11 +68,11 @@ function mountOAuthRoutes(instance: FastifyInstance, auth: AuthConfig): Set<stri
   return paths
 }
 
-function mountAuthMiddleware(instance: FastifyInstance, auth: AuthConfig, oauthPaths: Set<string>) {
+function mountAuthMiddleware(instance: FastifyInstance, auth: AuthConfig, oauthPaths: Set<string>, context: SilkweaveContext) {
   instance.decorateRequest('__silkweave_auth', undefined)
   instance.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     if (request.url.startsWith('/.well-known/') || oauthPaths.has(request.url.split('?')[0])) { return }
-    const result = await validateToken(request.headers.authorization, auth)
+    const result = await validateToken(request.headers.authorization, auth, context.fork({ request }))
     if (result.error) {
       for (const [key, value] of Object.entries(result.error.headers)) {
         reply.header(key, value)
@@ -122,7 +122,7 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
         const oauthPaths = auth?.provider ? mountOAuthRoutes(instance, auth) : new Set<string>()
 
         if (auth) {
-          mountAuthMiddleware(instance, auth, oauthPaths)
+          mountAuthMiddleware(instance, auth, oauthPaths, context)
         }
 
         instance.setErrorHandler((error, _request, reply) => {

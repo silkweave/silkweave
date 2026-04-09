@@ -84,6 +84,9 @@ importers:
 
   packages/auth:
     dependencies:
+      '@silkweave/core':
+        specifier: workspace:*
+        version: link:../core
       jose:
         specifier: ^6.0.0
         version: 6.2.2

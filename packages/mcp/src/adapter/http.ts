@@ -62,10 +62,10 @@ function mountOAuthRoutes(app: Express, auth: AuthConfig): Set<string> {
   return new Set(['/.well-known/oauth-authorization-server', '/authorize', callbackPath, '/token', '/register'])
 }
 
-function mountAuthMiddleware(app: Express, auth: AuthConfig, oauthPaths: Set<string>) {
+function mountAuthMiddleware(app: Express, auth: AuthConfig, oauthPaths: Set<string>, context: SilkweaveContext) {
   app.use(async (req: Request, res: Response, next: (err?: unknown) => void) => {
     if (req.path.startsWith('/.well-known/') || oauthPaths.has(req.path)) { return next() }
-    const result = await validateToken(req.headers.authorization, auth)
+    const result = await validateToken(req.headers.authorization, auth, context.fork({ request: req }))
     if (result.error) {
       for (const [key, value] of Object.entries(result.error.headers)) {
         res.header(key, value)
@@ -213,7 +213,7 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, auth, ...
     const oauthPaths = auth?.provider ? mountOAuthRoutes(app, auth) : new Set<string>()
 
     if (auth) {
-      mountAuthMiddleware(app, auth, oauthPaths)
+      mountAuthMiddleware(app, auth, oauthPaths, context)
     }
 
     const transports: Record<string, StreamableHTTPServerTransport> = {}
