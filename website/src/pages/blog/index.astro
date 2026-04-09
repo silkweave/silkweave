@@ -1,0 +1,107 @@
+---
+import { getCollection } from 'astro:content'
+import Footer from '../../components/Footer.astro'
+import Nav from '../../components/Nav.astro'
+import Layout from '../../layouts/Layout.astro'
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+---
+
+<Layout
+  title="Blog - Silkweave"
+  description="Thoughts on MCP, AI tooling, and building developer infrastructure."
+  slug="blog"
+>
+  <Nav />
+  <main class="blog-index">
+    <div class="container">
+      <header class="blog-index-header">
+        <p class="section-label">Blog</p>
+        <h1 class="section-title">Posts</h1>
+        <p class="section-desc">Thoughts on MCP, AI tooling, and building developer infrastructure.</p>
+      </header>
+      <div class="posts-list">
+        {posts.map(post => (
+          <a href={`/blog/${post.data.slug}`} class="post-card">
+            <time datetime={post.data.date.toISOString()}>
+              {post.data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </time>
+            <h2>{post.data.title}</h2>
+            <p>{post.data.description}</p>
+            <span class="read-more">Read more &rarr;</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .blog-index {
+    padding-top: 6rem;
+  }
+
+  .blog-index-header {
+    margin-bottom: 3rem;
+  }
+
+  .posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 720px;
+  }
+
+  .post-card {
+    display: block;
+    padding: 1.5rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s, background 0.15s;
+    text-decoration: none;
+  }
+
+  .post-card:hover {
+    border-color: var(--border-light);
+    background: var(--bg-surface-hover);
+  }
+
+  .post-card time {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .post-card h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0.5rem 0;
+    line-height: 1.3;
+  }
+
+  .post-card p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+  }
+
+  .read-more {
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .post-card:hover .read-more {
+    color: var(--accent-hover);
+  }
+
+  @media (max-width: 768px) {
+    .blog-index {
+      padding-top: 5rem;
+    }
+  }
+</style>

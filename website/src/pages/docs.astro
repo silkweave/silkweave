@@ -196,7 +196,7 @@ function hl(raw: string): string {
       </div>
       <pre><code set:html={hl(wireRaw)} /></pre>
     </div>
-    <p>Swap <code>stdio()</code> for <code>http()</code>, <code>fastify()</code>, <code>cli()</code>, or <code>vercel()</code> — the action stays identical.</p>
+    <p>Swap <code>stdio()</code> for <code>http()</code>, <code>fastify()</code>, <code>cli()</code>, or <code>vercel()</code> - the action stays identical.</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -208,7 +208,7 @@ function hl(raw: string): string {
 
   <section id="actions">
     <h3>Actions</h3>
-    <p>An <strong>Action</strong> is a named operation with a Zod input schema and an async handler. Actions are completely transport-agnostic — they know nothing about HTTP, stdio, or CLI.</p>
+    <p>An <strong>Action</strong> is a named operation with a Zod input schema and an async handler. Actions are completely transport-agnostic - they know nothing about HTTP, stdio, or CLI.</p>
     <div class="code-block">
       <div class="code-block-header"><span>Action interface</span></div>
       <pre><code set:html={hl(`interface Action<I, O> {
@@ -221,11 +221,11 @@ function hl(raw: string): string {
 }`)} /></pre>
     </div>
     <ul>
-      <li><strong><code>name</code></strong> — Identifier used for routing (kebab-case for CLI, PascalCase for MCP tools, URL path for Fastify).</li>
-      <li><strong><code>input</code></strong> — Zod object schema. Drives validation, CLI option generation, and OpenAPI docs.</li>
-      <li><strong><code>args</code></strong> — Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
-      <li><strong><code>isEnabled</code></strong> — Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
-      <li><strong><code>run</code></strong> — Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
+      <li><strong><code>name</code></strong> - Identifier used for routing (kebab-case for CLI, PascalCase for MCP tools, URL path for Fastify).</li>
+      <li><strong><code>input</code></strong> - Zod object schema. Drives validation, CLI option generation, and OpenAPI docs.</li>
+      <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
+      <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
+      <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
     </ul>
   </section>
 
@@ -233,11 +233,11 @@ function hl(raw: string): string {
     <h3>Adapters</h3>
     <p>Adapters translate actions into a specific transport. The pattern is <code>AdapterFactory &rarr; AdapterGenerator &rarr; Adapter</code>:</p>
     <ol>
-      <li><strong>AdapterFactory</strong> — Takes transport-specific config (port, host, auth) and returns a generator.</li>
-      <li><strong>AdapterGenerator</strong> — Takes silkweave options + base context, returns the adapter.</li>
-      <li><strong>Adapter</strong> — Has <code>start(actions)</code> and <code>stop()</code> methods.</li>
+      <li><strong>AdapterFactory</strong> - Takes transport-specific config (port, host, auth) and returns a generator.</li>
+      <li><strong>AdapterGenerator</strong> - Takes silkweave options + base context, returns the adapter.</li>
+      <li><strong>Adapter</strong> - Has <code>start(actions)</code> and <code>stop()</code> methods.</li>
     </ol>
-    <p>The fluent builder handles all of this — you just call <code>.adapter(stdio())</code>.</p>
+    <p>The fluent builder handles all of this - you just call <code>.adapter(stdio())</code>.</p>
     <table class="docs-table">
       <thead><tr><th>Adapter</th><th>Package</th><th>Transport</th></tr></thead>
       <tbody>
@@ -252,7 +252,7 @@ function hl(raw: string): string {
 
   <section id="context">
     <h3>Context & Dependency Injection</h3>
-    <p>Silkweave uses a simple key-value context bag for dependency injection. No magic, no decorators — just <code>.set()</code> and <code>.get()</code>.</p>
+    <p>Silkweave uses a simple key-value context bag for dependency injection. No magic, no decorators - just <code>.set()</code> and <code>.get()</code>.</p>
 
     <h4>Setting up context</h4>
     <p>Use the fluent <code>.set(key, value)</code> API to inject singletons (database pools, config, services) into the base context:</p>
@@ -274,7 +274,7 @@ function hl(raw: string): string {
     </div>
 
     <h4>How context flows</h4>
-    <p>The base context you configure via <code>.set()</code> is <strong>shared across all adapters</strong> (singleton). Each adapter <strong>forks</strong> the context per request, adding transport-specific values. The fork creates a shallow copy — your singletons are shared, but per-request values are isolated.</p>
+    <p>The base context you configure via <code>.set()</code> is <strong>shared across all adapters</strong> (singleton). Each adapter <strong>forks</strong> the context per request, adding transport-specific values. The fork creates a shallow copy - your singletons are shared, but per-request values are isolated.</p>
     <table class="docs-table">
       <thead><tr><th>Adapter</th><th>"Request" means</th><th>Context keys injected</th></tr></thead>
       <tbody>
@@ -402,7 +402,7 @@ export { GET, POST, DELETE }`)} /></pre>
 
   <section id="bearer-token">
     <h3>Bearer Token</h3>
-    <p>The simplest auth setup — provide a <code>verifyToken</code> callback that validates tokens against your own logic:</p>
+    <p>The simplest auth setup - provide a <code>verifyToken</code> callback that validates tokens against your own logic:</p>
     <div class="code-block">
       <div class="code-block-header">
         <span>server.ts</span>
@@ -432,10 +432,10 @@ if (auth) {
     </div>
     <p>The OAuth proxy handles:</p>
     <ul>
-      <li><strong>PKCE</strong> — Proof Key for Code Exchange for public clients</li>
-      <li><strong>Refresh tokens</strong> — Automatic token renewal</li>
-      <li><strong>Dynamic client registration</strong> — RFC 7591 support</li>
-      <li><strong>Protected Resource Metadata</strong> — RFC 9728 discovery</li>
+      <li><strong>PKCE</strong> - Proof Key for Code Exchange for public clients</li>
+      <li><strong>Refresh tokens</strong> - Automatic token renewal</li>
+      <li><strong>Dynamic client registration</strong> - RFC 7591 support</li>
+      <li><strong>Protected Resource Metadata</strong> - RFC 9728 discovery</li>
     </ul>
     <p>Storage backends: <code>createMemoryStore()</code> (development), <code>createJsonStore(path)</code> (file-based), <code>createRedisStore(redis)</code> (production).</p>
   </section>
@@ -450,7 +450,7 @@ if (auth) {
       </div>
       <pre><code set:html={hl(guardRaw)} /></pre>
     </div>
-    <p>When <code>isEnabled</code> returns <code>false</code>, the action is not registered with that adapter — it won't appear in MCP tool lists, Swagger docs, or CLI help.</p>
+    <p>When <code>isEnabled</code> returns <code>false</code>, the action is not registered with that adapter - it won't appear in MCP tool lists, Swagger docs, or CLI help.</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -515,7 +515,7 @@ if (auth) {
 
   <section id="unit-testing">
     <h3>Unit Testing Actions</h3>
-    <p>Because actions are plain async functions decoupled from any transport, testing them is trivial — no server required:</p>
+    <p>Because actions are plain async functions decoupled from any transport, testing them is trivial - no server required:</p>
     <div class="code-block">
       <div class="code-block-header">
         <span>greet.test.ts</span>
@@ -553,7 +553,7 @@ expect(result.name).toBe('Alice')`)} /></pre>
       </div>
       <pre><code set:html={hl(escapeRaw)} /></pre>
     </div>
-    <p>This lets you access transport-specific features like custom headers, cookies, or MCP metadata when your action truly needs them — while keeping the common case clean.</p>
+    <p>This lets you access transport-specific features like custom headers, cookies, or MCP metadata when your action truly needs them - while keeping the common case clean.</p>
   </section>
 
   <section id="context-by-adapter">
@@ -569,7 +569,7 @@ expect(result.name).toBe('Alice')`)} /></pre>
         <tr><td>MCP (all)</td><td><code>extra</code></td><td><code>ToolExtra</code></td><td>MCP request metadata, session info</td></tr>
       </tbody>
     </table>
-    <p>Use <code>context.getOptional&lt;T&gt;(key)</code> when writing actions that run across multiple adapters — it returns <code>undefined</code> instead of throwing when a key isn't present.</p>
+    <p>Use <code>context.getOptional&lt;T&gt;(key)</code> when writing actions that run across multiple adapters - it returns <code>undefined</code> instead of throwing when a key isn't present.</p>
   </section>
 </DocsLayout>
 

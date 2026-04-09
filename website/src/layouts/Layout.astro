@@ -5,12 +5,25 @@ import SpeedInsights from "@vercel/speed-insights/astro"
 interface Props {
   title?: string
   description?: string
+  keywords?: string[]
+  ogImage?: string
+  slug?: string
+  type?: string
 }
 
+const siteUrl = 'https://www.silkweave.dev'
+
 const {
-  title = 'Silkweave — Define once. Deploy everywhere.',
-  description = 'A TypeScript toolkit for building MCP servers and CLI tools from a single set of Actions. One action, every transport.'
+  title = 'Silkweave - Define once. Deploy everywhere.',
+  description = 'A TypeScript toolkit for building MCP servers and CLI tools from a single set of Actions. One action, every transport.',
+  keywords,
+  ogImage,
+  slug,
+  type = 'website'
 } = Astro.props
+
+const canonicalUrl = slug ? `${siteUrl}/${slug}` : siteUrl
+const ogImageUrl = ogImage ? `${siteUrl}${ogImage}` : undefined
 ---
 
 <!doctype html>
@@ -19,8 +32,10 @@ const {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    {keywords?.length && <meta name="keywords" content={keywords.join(', ')} />}
     <title>{title}</title>
 
+    <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/logo-color.svg" />
     <link rel="apple-touch-icon" href="/logo-color.svg" />
 
@@ -41,8 +56,13 @@ const {
 
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonicalUrl} />
+    {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
   </head>
   <body>
     <slot />

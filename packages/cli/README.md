@@ -1,6 +1,6 @@
 # @silkweave/cli
 
-CLI adapter for [Silkweave](https://github.com/silkweave/silkweave) — turn your actions into a complete command-line application with help text, option parsing, and styled terminal output via clack.
+CLI adapter for [Silkweave](https://github.com/silkweave/silkweave) - turn your actions into a complete command-line application with help text, option parsing, and styled terminal output via clack.
 
 ## Install
 
@@ -63,5 +63,5 @@ $ mytool deploy production --dry-run
 
 ## See Also
 
-- [Silkweave README](https://github.com/silkweave/silkweave) — Full documentation
-- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) — Core library
+- [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation
+- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) - Core library

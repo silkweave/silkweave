@@ -1,6 +1,6 @@
 # @silkweave/vercel
 
-Vercel serverless adapter for [Silkweave](https://github.com/silkweave/silkweave) — deploy your actions as a stateless MCP server on Vercel.
+Vercel serverless adapter for [Silkweave](https://github.com/silkweave/silkweave) - deploy your actions as a stateless MCP server on Vercel.
 
 ## Install
 
@@ -121,6 +121,6 @@ CORS is not handled by the adapter. Use Next.js middleware or Vercel headers con
 
 ## See Also
 
-- [Silkweave README](https://github.com/silkweave/silkweave) — Full documentation
-- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) — Core library
-- [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp) — MCP stdio and HTTP adapters (stateful)
+- [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation
+- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) - Core library
+- [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp) - MCP stdio and HTTP adapters (stateful)

@@ -1,6 +1,6 @@
 # @silkweave/mcp
 
-MCP transport adapters for [Silkweave](https://github.com/silkweave/silkweave) — expose your actions as MCP tools over stdio, Streamable HTTP, or via a CLI proxy client.
+MCP transport adapters for [Silkweave](https://github.com/silkweave/silkweave) - expose your actions as MCP tools over stdio, Streamable HTTP, or via a CLI proxy client.
 
 ## Install
 
@@ -61,7 +61,7 @@ Exposes `POST /mcp` (invoke tools), `GET /mcp` (SSE stream), and `DELETE /mcp` (
 
 ### cliProxy
 
-MCP CLI proxy client — connects to a running HTTP MCP server and invokes tools from the command line.
+MCP CLI proxy client - connects to a running HTTP MCP server and invokes tools from the command line.
 
 ```typescript
 import { silkweave } from '@silkweave/core'
@@ -86,6 +86,6 @@ Logging notifications (`logger.info()`, `logger.progress()`) are sent to the MCP
 
 ## See Also
 
-- [Silkweave README](https://github.com/silkweave/silkweave) — Full documentation
-- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) — Core library
-- [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) — Stateless MCP for Vercel
+- [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation
+- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) - Core library
+- [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) - Stateless MCP for Vercel

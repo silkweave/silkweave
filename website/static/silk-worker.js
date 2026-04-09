@@ -1,4 +1,4 @@
-/* WebGL silk background — runs in a Web Worker via OffscreenCanvas */
+/* WebGL silk background - runs in a Web Worker via OffscreenCanvas */
 
 let gl, canvas, uRes, uTime, animId = 0
 const startTime = performance.now()
@@ -75,7 +75,7 @@ function setup() {
 
   const buf = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, buf)
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW)
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
 
   const aPos = gl.getAttribLocation(prog, 'a_position')
   gl.enableVertexAttribArray(aPos)
@@ -92,7 +92,7 @@ function frame() {
   animId = requestAnimationFrame(frame)
 }
 
-self.onmessage = function(e) {
+self.onmessage = function (e) {
   switch (e.data.type) {
     case 'init':
       canvas = e.data.canvas

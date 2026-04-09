@@ -1,6 +1,6 @@
 # @silkweave/fastify
 
-Fastify REST adapter for [Silkweave](https://github.com/silkweave/silkweave) — expose your actions as a REST API with auto-generated OpenAPI/Swagger documentation.
+Fastify REST adapter for [Silkweave](https://github.com/silkweave/silkweave) - expose your actions as a REST API with auto-generated OpenAPI/Swagger documentation.
 
 ## Install
 
@@ -56,5 +56,5 @@ fastify({
 
 ## See Also
 
-- [Silkweave README](https://github.com/silkweave/silkweave) — Full documentation
-- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) — Core library
+- [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation
+- [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) - Core library

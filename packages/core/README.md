@@ -1,6 +1,6 @@
 # @silkweave/core
 
-Core library for [Silkweave](https://github.com/silkweave/silkweave) — the TypeScript toolkit for building MCP servers and CLI tools from a single set of Actions.
+Core library for [Silkweave](https://github.com/silkweave/silkweave) - the TypeScript toolkit for building MCP servers and CLI tools from a single set of Actions.
 
 ## Install
 
@@ -12,12 +12,12 @@ pnpm add @silkweave/core
 
 This package provides the foundational building blocks that all Silkweave adapters depend on:
 
-- **`silkweave()`** — Fluent builder to wire up adapters and actions
-- **`createAction()`** — Define transport-agnostic actions with Zod input schemas
-- **Adapter types** — `Adapter`, `AdapterGenerator`, `AdapterFactory` interfaces for building custom adapters
-- **Context** — `SilkweaveContext` key-value store with `fork()` for per-adapter/per-request isolation
-- **MCP utilities** — `toolResponse()`, `handleToolError()`, `parseToolResponse()` for MCP response formatting
-- **Zod utilities** — `unwrap()` to recursively unwrap Zod wrapper types
+- **`silkweave()`** - Fluent builder to wire up adapters and actions
+- **`createAction()`** - Define transport-agnostic actions with Zod input schemas
+- **Adapter types** - `Adapter`, `AdapterGenerator`, `AdapterFactory` interfaces for building custom adapters
+- **Context** - `SilkweaveContext` key-value store with `fork()` for per-adapter/per-request isolation
+- **MCP utilities** - `toolResponse()`, `handleToolError()`, `parseToolResponse()` for MCP response formatting
+- **Zod utilities** - `unwrap()` to recursively unwrap Zod wrapper types
 
 ## Usage
 
@@ -81,8 +81,8 @@ type AdapterFactory<T = void> = (options: T) => AdapterGenerator
 
 ## See Also
 
-- [Silkweave README](https://github.com/silkweave/silkweave) — Full documentation
-- [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp) — MCP stdio and HTTP adapters
-- [`@silkweave/fastify`](https://www.npmjs.com/package/@silkweave/fastify) — Fastify REST adapter
-- [`@silkweave/cli`](https://www.npmjs.com/package/@silkweave/cli) — CLI adapter
-- [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) — Vercel serverless adapter
+- [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation
+- [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp) - MCP stdio and HTTP adapters
+- [`@silkweave/fastify`](https://www.npmjs.com/package/@silkweave/fastify) - Fastify REST adapter
+- [`@silkweave/cli`](https://www.npmjs.com/package/@silkweave/cli) - CLI adapter
+- [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) - Vercel serverless adapter

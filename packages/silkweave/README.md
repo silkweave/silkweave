@@ -2,7 +2,7 @@
 
 **Write your logic once. Run it everywhere.**
 
-Silkweave is a TypeScript toolkit that lets you define application logic as portable **Actions** and instantly expose them through any combination of transports — MCP servers (stdio and HTTP), REST APIs with auto-generated OpenAPI docs, and fully-featured CLIs. No glue code required.
+Silkweave is a TypeScript toolkit that lets you define application logic as portable **Actions** and instantly expose them through any combination of transports - MCP servers (stdio and HTTP), REST APIs with auto-generated OpenAPI docs, and fully-featured CLIs. No glue code required.
 
 ```
                      ┌─────────────────────┐
@@ -51,9 +51,9 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
 
 ## Why Silkweave
 
-Building an MCP server usually means wiring up transports, registering tools, serializing responses, and handling errors — for every single tool. If you also want a CLI or REST API for the same logic, you're writing it all again.
+Building an MCP server usually means wiring up transports, registering tools, serializing responses, and handling errors - for every single tool. If you also want a CLI or REST API for the same logic, you're writing it all again.
 
-Silkweave eliminates this duplication. You define an **Action** — a name, a Zod schema, and an async function — and Silkweave handles the rest:
+Silkweave eliminates this duplication. You define an **Action** - a name, a Zod schema, and an async function - and Silkweave handles the rest:
 
 - **MCP adapters** register your actions as MCP tools with proper notifications, progress reporting, and error handling
 - **Fastify adapter** generates a REST API with full OpenAPI/Swagger documentation derived from your Zod schemas
@@ -69,12 +69,12 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 
 | Package | npm | Description |
 |---------|-----|-------------|
-| `@silkweave/core` | [![npm](https://img.shields.io/npm/v/@silkweave/core)](https://www.npmjs.com/package/@silkweave/core) | Core library — actions, adapters, builder, context, logger, utilities |
-| `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters — stdio, streamable HTTP, CLI proxy |
-| `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter — commander + clack terminal UI |
-| `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter — auto-generated OpenAPI/Swagger docs |
-| `@silkweave/vercel` | [![npm](https://img.shields.io/npm/v/@silkweave/vercel)](https://www.npmjs.com/package/@silkweave/vercel) | Vercel serverless adapter — stateless MCP over Streamable HTTP |
-| `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities — pino, clack, and MCP notification support |
+| `@silkweave/core` | [![npm](https://img.shields.io/npm/v/@silkweave/core)](https://www.npmjs.com/package/@silkweave/core) | Core library - actions, adapters, builder, context, logger, utilities |
+| `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
+| `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + clack terminal UI |
+| `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
+| `@silkweave/vercel` | [![npm](https://img.shields.io/npm/v/@silkweave/vercel)](https://www.npmjs.com/package/@silkweave/vercel) | Vercel serverless adapter - stateless MCP over Streamable HTTP |
+| `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - pino, clack, and MCP notification support |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
 
@@ -178,7 +178,7 @@ export const SearchAction = createAction({
 | `description` | `string` | Human-readable description. Shown in MCP tool listings, CLI help, and Swagger docs. |
 | `input` | `z.ZodObject` | A Zod object schema defining the input. `.describe()` on each field provides per-field documentation across all adapters. |
 | `args` | `(keyof I)[]` | *(Optional)* Fields to expose as positional CLI arguments instead of `--options`. Only relevant for the CLI adapter. |
-| `run` | `(input, context) => Promise<O>` | The implementation. Receives validated input and an `SilkweaveContext` with a `logger`. Returns any object — adapters handle serialization. |
+| `run` | `(input, context) => Promise<O>` | The implementation. Receives validated input and an `SilkweaveContext` with a `logger`. Returns any object - adapters handle serialization. |
 
 ### Adapters
 
@@ -204,10 +204,10 @@ cli()
 
 The adapter lifecycle:
 
-1. **Factory** — `stdio()` / `http({ ... })` / etc. captures configuration
-2. **Generator** — Silkweave calls the factory result with `{ name, description, version }` to produce an `Adapter`
-3. **Start** — `adapter.start(actions)` registers all actions and begins listening
-4. **Stop** — `adapter.stop()` tears down gracefully
+1. **Factory** - `stdio()` / `http({ ... })` / etc. captures configuration
+2. **Generator** - Silkweave calls the factory result with `{ name, description, version }` to produce an `Adapter`
+3. **Start** - `adapter.start(actions)` registers all actions and begins listening
+4. **Stop** - `adapter.stop()` tears down gracefully
 
 ### The Silkweave Builder
 
@@ -225,7 +225,7 @@ const app = silkweave({
 
 app
   .adapter(stdio())              // Add an adapter
-  .adapter(http({ ... }))        // Add another — they run in parallel
+  .adapter(http({ ... }))        // Add another - they run in parallel
   .action(SearchAction)          // Mount an action
   .action(GreetAction)           // Mount another
 
@@ -262,7 +262,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 | Return value | `TextContent` JSON response |
 | Thrown errors | Structured error response with name, message, and stack |
 
-MCP logging notifications are wired automatically — `logger.info("message")` in your action sends a `notifications/message` to the MCP client. Progress reporting works via `logger.progress()` when the client provides a progress token.
+MCP logging notifications are wired automatically - `logger.info("message")` in your action sends a `notifications/message` to the MCP client. Progress reporting works via `logger.progress()` when the client provides a progress token.
 
 **Claude Desktop / Claude Code configuration:**
 
@@ -303,7 +303,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 | `GET` | `/mcp` | Establish SSE stream for a session |
 | `DELETE` | `/mcp` | Terminate a session |
 
-The adapter manages session lifecycle automatically — each new `initialize` request creates a new `StreamableHTTPServerTransport` with a UUID session ID. Sessions are cleaned up when the transport closes.
+The adapter manages session lifecycle automatically - each new `initialize` request creates a new `StreamableHTTPServerTransport` with a UUID session ID. Sessions are cleaned up when the transport closes.
 
 CORS is configured out of the box, exposing MCP-specific headers (`Mcp-Session-Id`, `Mcp-Protocol-Version`, `Last-Event-Id`).
 
@@ -399,7 +399,7 @@ $ mytool greet --name "World" --enthusiastic
 
 ### Vercel Serverless
 
-Deploy your actions as a stateless MCP server on Vercel. Each request creates a fresh server instance — no sessions, no persistent connections, fully compatible with serverless constraints.
+Deploy your actions as a stateless MCP server on Vercel. Each request creates a fresh server instance - no sessions, no persistent connections, fully compatible with serverless constraints.
 
 ```typescript
 // api/mcp.ts (Vercel function)
@@ -417,7 +417,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 export default { fetch: handler }
 ```
 
-The `vercel()` function returns a compound object — `adapter` wires into the Silkweave builder, while `handler`/`GET`/`POST`/`DELETE` are the request handler for your Vercel route.
+The `vercel()` function returns a compound object - `adapter` wires into the Silkweave builder, while `handler`/`GET`/`POST`/`DELETE` are the request handler for your Vercel route.
 
 **For Next.js App Router** (`app/api/mcp/route.ts`):
 
@@ -437,7 +437,7 @@ export { GET, POST, DELETE }
 - Uses `WebStandardStreamableHTTPServerTransport` from the MCP SDK in stateless mode (`sessionIdGenerator: undefined`)
 - Each request creates a fresh `McpServer` + transport, registers tools, handles the request, and returns a Web Standard `Response`
 - Logging goes to `process.stderr` (Vercel log drain) and MCP client notifications
-- No CORS handling — use Next.js middleware or `vercel.json` headers
+- No CORS handling - use Next.js middleware or `vercel.json` headers
 
 **`VercelAdapterOptions`:**
 
@@ -506,7 +506,7 @@ await silkweave({ name: 'my-platform', description: 'Multi-transport', version: 
   .start()
 ```
 
-All adapters start concurrently. The MCP stdio server communicates over stdin/stdout while Fastify listens on port 8080 — each serving the exact same actions.
+All adapters start concurrently. The MCP stdio server communicates over stdin/stdout while Fastify listens on port 8080 - each serving the exact same actions.
 
 ### CLI Arguments vs Options
 
@@ -536,7 +536,7 @@ $ mytool deploy production v2.1.0 --dry-run
 ℹ Deploying v2.1.0 to production (dry run)
 ```
 
-Fields listed in `args` become positional arguments in the CLI. All other fields remain as `--options`. The `args` property has no effect on MCP or REST adapters — they always receive all fields as a single input object.
+Fields listed in `args` become positional arguments in the CLI. All other fields remain as `--options`. The `args` property has no effect on MCP or REST adapters - they always receive all fields as a single input object.
 
 ### Complex Input Types
 
@@ -701,11 +701,11 @@ interface ProgressOptions {
 ### Adapter Factories
 
 ```typescript
-// MCP over stdin/stdout — from @silkweave/mcp
+// MCP over stdin/stdout - from @silkweave/mcp
 import { stdio } from '@silkweave/mcp'
 function stdio(): AdapterFactory
 
-// MCP Streamable HTTP — from @silkweave/mcp
+// MCP Streamable HTTP - from @silkweave/mcp
 import { http } from '@silkweave/mcp'
 function http(options: HttpAdapterOptions): AdapterFactory
 interface HttpAdapterOptions {
@@ -714,7 +714,7 @@ interface HttpAdapterOptions {
   // ...plus CreateMcpExpressAppOptions (e.g., allowedHosts)
 }
 
-// Fastify REST API with Swagger — from @silkweave/fastify
+// Fastify REST API with Swagger - from @silkweave/fastify
 import { fastify } from '@silkweave/fastify'
 function fastify(options: FastifyAdapterOptions): AdapterFactory
 interface FastifyAdapterOptions {
@@ -723,11 +723,11 @@ interface FastifyAdapterOptions {
   // ...plus all FastifyHttpOptions (logger, connectionTimeout, etc.)
 }
 
-// CLI via commander + clack — from @silkweave/cli
+// CLI via commander + clack - from @silkweave/cli
 import { cli } from '@silkweave/cli'
 function cli(): AdapterFactory
 
-// Vercel serverless — from @silkweave/vercel
+// Vercel serverless - from @silkweave/vercel
 import { vercel } from '@silkweave/vercel'
 function vercel(options?: VercelAdapterOptions): VercelAdapter
 interface VercelAdapterOptions {

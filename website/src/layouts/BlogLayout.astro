@@ -1,0 +1,233 @@
+---
+import Footer from '../components/Footer.astro'
+import Nav from '../components/Nav.astro'
+import ShareSidebar from '../components/ShareSidebar.astro'
+import Layout from './Layout.astro'
+
+interface Props {
+  title: string
+  description: string
+  keywords?: string[]
+  ogImage?: string
+  slug: string
+  date: Date
+  author?: string
+  socialLinks?: {
+    reddit?: string
+    x?: string
+    linkedin?: string
+  }
+}
+
+const { title, description, keywords, ogImage, slug, date, author, socialLinks } = Astro.props
+
+const siteUrl = 'https://www.silkweave.dev'
+const canonicalUrl = `${siteUrl}/blog/${slug}`
+
+const formattedDate = date.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+})
+---
+
+<Layout
+  title={`${title} - Silkweave`}
+  description={description}
+  keywords={keywords}
+  ogImage={ogImage}
+  slug={`blog/${slug}`}
+  type="article"
+>
+  <Nav />
+  <div class="blog-wrapper">
+    <main class="blog-content">
+      <article>
+        <header class="blog-header">
+          <time datetime={date.toISOString()}>{formattedDate}</time>
+          {author && <span class="blog-author">by {author}</span>}
+          <h1>{title}</h1>
+          <p class="blog-description">{description}</p>
+        </header>
+        <div class="prose">
+          <slot />
+        </div>
+      </article>
+    </main>
+    <aside class="blog-sidebar">
+      <ShareSidebar url={canonicalUrl} title={title} socialLinks={socialLinks} />
+    </aside>
+  </div>
+  <Footer />
+</Layout>
+
+<style>
+  .blog-wrapper {
+    display: flex;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 6rem 1.5rem 0;
+    gap: 3rem;
+  }
+
+  .blog-content {
+    flex: 1;
+    min-width: 0;
+    padding-bottom: 4rem;
+  }
+
+  .blog-sidebar {
+    position: sticky;
+    top: 5rem;
+    width: 200px;
+    flex-shrink: 0;
+    height: fit-content;
+    padding: 1rem 0;
+  }
+
+  .blog-header {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .blog-header time {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .blog-author {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-left: 0.5rem;
+  }
+
+  .blog-header h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-top: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .blog-description {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  /* Prose styles for rendered markdown */
+  .prose {
+    line-height: 1.8;
+    color: var(--text);
+  }
+
+  .prose :global(h2) {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    line-height: 1.3;
+  }
+
+  .prose :global(h3) {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .prose :global(p) {
+    margin-bottom: 1.25rem;
+  }
+
+  .prose :global(ul),
+  .prose :global(ol) {
+    margin-bottom: 1.25rem;
+    padding-left: 1.5rem;
+  }
+
+  .prose :global(li) {
+    margin-bottom: 0.5rem;
+  }
+
+  .prose :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 1.25rem;
+    margin: 1.5rem 0;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .prose :global(pre) {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    margin: 1.5rem 0;
+    tab-size: 2;
+  }
+
+  .prose :global(code) {
+    font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  }
+
+  .prose :global(:not(pre) > code) {
+    background: var(--accent-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+
+  .prose :global(hr) {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
+  }
+
+  .prose :global(a) {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 2px;
+  }
+
+  .prose :global(a:hover) {
+    color: var(--accent-hover);
+    text-decoration-color: var(--accent-hover);
+  }
+
+  .prose :global(strong) {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .prose :global(img) {
+    border-radius: var(--radius);
+    margin: 1.5rem 0;
+  }
+
+  @media (max-width: 860px) {
+    .blog-wrapper {
+      flex-direction: column;
+      padding-top: 5rem;
+    }
+
+    .blog-sidebar {
+      position: relative;
+      top: 0;
+      width: 100%;
+      order: -1;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+    }
+
+    .blog-header h1 {
+      font-size: 1.75rem;
+    }
+  }
+</style>

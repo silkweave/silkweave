@@ -145,7 +145,7 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
   const handleRequest = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
 
-    // Fast rejection — no async work, no allocations for unknown paths
+    // Fast rejection - no async work, no allocations for unknown paths
     if (!validPaths.has(url.pathname)) {
       return new Response('Not Found', { status: 404 })
     }
@@ -174,7 +174,7 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
       }
     }
 
-    // MCP transport — wait for silkweave().start() to complete
+    // MCP transport - wait for silkweave().start() to complete
     await _ready
 
     let requestContext = _context!
