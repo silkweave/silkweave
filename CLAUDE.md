@@ -84,7 +84,9 @@ architectural patterns that are correct for a multi-package library toolkit
 public API exports → "dead" symbols).
 
 Use these instead:
-- `roam fitness` — custom rules in `.roam/fitness.yaml` (CI-friendly, exit 1 on failure)
+- `roam fitness` — metric thresholds + trend guards in `.roam/fitness.yaml` (CI-friendly, exit 1 on failure)
+- `roam rules --ci` — custom architecture rules in `.roam/rules/` (layer violations, adapter isolation)
+- `roam check-rules --profile minimal` — built-in structural rules with false-positive-prone checks excluded
 - `roam complexity --threshold 15` — function-level cognitive complexity
 - `roam vibe-check` — AI rot score (target: < 10)
 - `roam ai-readiness` — agent-friendliness score

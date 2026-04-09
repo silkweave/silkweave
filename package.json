@@ -10,7 +10,8 @@
     "mcp": "cd example && pnpm tsx src/stdio.ts",
     "build": "turbo build",
     "lint": "turbo lint",
-    "check": "turbo check",
+    "roam": "roam index && roam fitness && roam rules --ci",
+    "check": "turbo check && pnpm roam",
     "clean": "turbo clean && rimraf .turbo/cache",
     "prepack": "turbo prepack",
     "publish:all": "pnpm publish -r --access public"

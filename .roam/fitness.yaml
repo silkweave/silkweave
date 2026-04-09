@@ -10,9 +10,13 @@
 #
 # Track these instead:
 #   roam fitness        — these rules (CI-friendly, exit 1 on failure)
+#   roam rules --ci     — custom architecture rules in .roam/rules/ (CI-friendly)
 #   roam complexity     — function-level cognitive complexity
 #   roam vibe-check     — AI rot score (currently 3/100 = healthy)
 #   roam ai-readiness   — agent-friendliness (currently 62/100)
+#
+# For built-in structural rules, use: roam check-rules --profile minimal
+# (avoids false positives from test-file-exists, orphan-symbols, fan-out)
 
 rules:
   # ── Complexity thresholds ─────────────────────────────────────────
@@ -25,14 +29,17 @@ rules:
     reason: "Functions above 40 cognitive complexity must be decomposed. Current worst: createOAuthProxy (36), unwrap (29)."
 
   # ── Cycle control ─────────────────────────────────────────────────
-  # Roam detects 2 SCCs from symbolic reference edges (shared property
-  # names between store implementations), not actual import cycles.
-  # All real import cycles have been fixed. Prevent new ones.
+  # Roam detects 2 SCCs from symbolic reference edges, not actual import
+  # cycles. All real import cycles have been fixed. Prevent new ones.
+  # Known false positives:
+  #   - handleCLIError/parseCLIInput in cli.ts: same-file call-graph
+  #     co-occurrence (registerCommand calls both), not a real cycle
+  #   - auth store implementations: shared property names
   - name: "No new import cycles"
     type: metric
     metric: cycles
     max: 2
-    reason: "All real import cycles are fixed. 2 remaining SCCs are symbolic reference edges in auth stores — not actionable."
+    reason: "All real import cycles are fixed. 2 remaining SCCs are symbolic reference edges — not actionable."
 
   # ── Trend-based regression guards ─────────────────────────────────
   # These catch gradual degradation over time.
