@@ -24,12 +24,15 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
       <div class="posts-list">
         {posts.map(post => (
           <a href={`/blog/${post.data.slug}`} class="post-card">
-            <time datetime={post.data.date.toISOString()}>
-              {post.data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </time>
-            <h2>{post.data.title}</h2>
-            <p>{post.data.description}</p>
-            <span class="read-more">Read more &rarr;</span>
+            {post.data.ogImage && <img src={post.data.ogImage} alt={post.data.title} class="post-card-image" />}
+            <div class="post-card-body">
+              <time datetime={post.data.date.toISOString()}>
+                {post.data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </time>
+              <h2>{post.data.title}</h2>
+              <p>{post.data.description}</p>
+              <span class="read-more">Read more &rarr;</span>
+            </div>
           </a>
         ))}
       </div>
@@ -56,17 +59,28 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
 
   .post-card {
     display: block;
-    padding: 1.5rem;
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     transition: border-color 0.15s, background 0.15s;
     text-decoration: none;
+    overflow: hidden;
   }
 
   .post-card:hover {
     border-color: var(--border-light);
     background: var(--bg-surface-hover);
+  }
+
+  .post-card-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .post-card-body {
+    padding: 1.5rem;
   }
 
   .post-card time {

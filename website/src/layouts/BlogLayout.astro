@@ -48,6 +48,7 @@ const formattedDate = date.toLocaleDateString('en-US', {
           {author && <span class="blog-author">by {author}</span>}
           <h1>{title}</h1>
           <p class="blog-description">{description}</p>
+          {ogImage && <img src={ogImage} alt={title} class="blog-hero" />}
         </header>
         <div class="prose">
           <slot />
@@ -114,6 +115,13 @@ const formattedDate = date.toLocaleDateString('en-US', {
     font-size: 1.1rem;
     color: var(--text-muted);
     line-height: 1.7;
+  }
+
+  .blog-hero {
+    width: 100%;
+    border-radius: var(--radius);
+    margin-top: 1.5rem;
+    border: 1px solid var(--border);
   }
 
   /* Prose styles for rendered markdown */
