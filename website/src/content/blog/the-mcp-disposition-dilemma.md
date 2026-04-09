@@ -5,7 +5,7 @@ date: 2026-04-09
 slug: the-mcp-disposition-dilemma
 author: Silkweave
 keywords: ["mcp", "content disposition", "llm", "context window", "protocol", "annotations", "model context protocol"]
-ogImage: /blog/the-mcp-disposition-dilemma.png
+ogImage: ../../assets/blog/the-mcp-disposition-dilemma.png
 socialLinks:
   reddit: ""
   x: ""

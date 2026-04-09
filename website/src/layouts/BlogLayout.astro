@@ -1,4 +1,6 @@
 ---
+import { Image } from 'astro:assets'
+import type { ImageMetadata } from 'astro'
 import Footer from '../components/Footer.astro'
 import Nav from '../components/Nav.astro'
 import ShareSidebar from '../components/ShareSidebar.astro'
@@ -8,7 +10,7 @@ interface Props {
   title: string
   description: string
   keywords?: string[]
-  ogImage?: string
+  ogImage?: ImageMetadata
   slug: string
   date: Date
   author?: string
@@ -23,6 +25,7 @@ const { title, description, keywords, ogImage, slug, date, author, socialLinks }
 
 const siteUrl = 'https://www.silkweave.dev'
 const canonicalUrl = `${siteUrl}/blog/${slug}`
+const ogImageUrl = ogImage ? ogImage.src : undefined
 
 const formattedDate = date.toLocaleDateString('en-US', {
   year: 'numeric',
@@ -35,7 +38,7 @@ const formattedDate = date.toLocaleDateString('en-US', {
   title={`${title} - Silkweave`}
   description={description}
   keywords={keywords}
-  ogImage={ogImage}
+  ogImage={ogImageUrl}
   slug={`blog/${slug}`}
   type="article"
 >
@@ -48,7 +51,7 @@ const formattedDate = date.toLocaleDateString('en-US', {
           {author && <span class="blog-author">by {author}</span>}
           <h1>{title}</h1>
           <p class="blog-description">{description}</p>
-          {ogImage && <img src={ogImage} alt={title} class="blog-hero" />}
+          {ogImage && <Image src={ogImage} alt={title} class="blog-hero" width={860} />}
         </header>
         <div class="prose">
           <slot />

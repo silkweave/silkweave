@@ -5,6 +5,7 @@ date: 2026-04-09
 slug: the-silkweave-manifest
 author: Silkweave
 keywords: ["silkweave", "mcp", "typescript", "design principles", "ai ecosystem", "manifesto", "lean stack"]
+ogImage: ../../assets/blog/the-silkweave-manifest.png
 socialLinks:
   reddit: ""
   x: ""

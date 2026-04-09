@@ -1,4 +1,5 @@
 ---
+import { Image } from 'astro:assets'
 import { getCollection } from 'astro:content'
 import Footer from '../../components/Footer.astro'
 import Nav from '../../components/Nav.astro'
@@ -24,7 +25,7 @@ const posts = (await getCollection('blog', ({ data }) => !data.draft))
       <div class="posts-list">
         {posts.map(post => (
           <a href={`/blog/${post.data.slug}`} class="post-card">
-            {post.data.ogImage && <img src={post.data.ogImage} alt={post.data.title} class="post-card-image" />}
+            {post.data.ogImage && <Image src={post.data.ogImage} alt={post.data.title} class="post-card-image" width={720} />}
             <div class="post-card-body">
               <time datetime={post.data.date.toISOString()}>
                 {post.data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
