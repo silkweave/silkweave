@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/cli",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Silkweave CLI Adapter",
   "repository": {
     "type": "git",
