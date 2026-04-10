@@ -23,6 +23,7 @@
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
     "@silkweave/logger": "workspace:*",
+    "@silkweave/mcp": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "change-case": "^5.4.4",
     "zod": "^4.3.6"

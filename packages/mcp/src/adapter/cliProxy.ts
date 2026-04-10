@@ -2,7 +2,7 @@ import { intro } from '@clack/prompts'
 import { Client } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { LoggingMessageNotificationSchema, ProgressNotificationSchema } from '@modelcontextprotocol/sdk/types'
-import { AdapterFactory, parseToolResponse, ToolResponse, unwrap } from '@silkweave/core'
+import { AdapterFactory, unwrap } from '@silkweave/core'
 import { createCLILogger } from '@silkweave/logger'
 import { kebabCase } from 'change-case'
 import { Command } from 'commander'
@@ -67,8 +67,7 @@ function registerProxyCommand(
       arguments: input,
       _meta: { progressToken: randomUUID() }
     })
-    const result = parseToolResponse(response as ToolResponse)
-    process.stdout.write(JSON.stringify(result, null, 2))
+    process.stdout.write(JSON.stringify(response))
   })
 }
 

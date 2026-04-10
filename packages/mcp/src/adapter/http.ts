@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, AdapterFactory, handleToolError, SilkweaveContext, SilkweaveOptions, toolResponse } from '@silkweave/core'
+import { Action, AdapterFactory, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
 import cors from 'cors'
@@ -13,6 +13,7 @@ import express, { Express, Request, Response } from 'express'
 import { readFile } from 'fs/promises'
 import { Server } from 'http'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { handleToolError, smartToolResult } from '../util/result.js'
 import { SideloadResource } from '../util/sideload.js'
 
 const authStorage = new AsyncLocalStorage<AuthInfo>()
@@ -102,8 +103,12 @@ function registerTools(server: McpServer, actions: Action[], context: SilkweaveC
         }
       })
       const currentAuth = authStorage.getStore()
-      return action.run(input, context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) }))
-        .then((result) => toolResponse(result))
+      const actionContext = context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })
+      return action.run(input, actionContext)
+        .then((result) => {
+          const data = action.toolResult?.(result, actionContext) ?? smartToolResult(result)
+          return data
+        })
         .catch(handleToolError)
     })
   }

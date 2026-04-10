@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { Action, AdapterFactory, handleToolError, SilkweaveContext, toolResponse } from '@silkweave/core'
+import { Action, AdapterFactory, SilkweaveContext } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
+import { handleToolError, smartToolResult } from '../util/result.js'
 
 function registerTools(server: McpServer, actions: Action[], context: SilkweaveContext) {
   for (const action of actions) {
@@ -24,8 +25,9 @@ function registerTools(server: McpServer, actions: Action[], context: SilkweaveC
           })
         }
       })
-      return action.run(input, context.fork({ logger, extra }))
-        .then((result) => toolResponse(result))
+      const actionContext = context.fork({ logger, extra })
+      return action.run(input, actionContext)
+        .then((result) => action.toolResult?.(result, actionContext) ?? smartToolResult(result))
         .catch(handleToolError)
     })
   }

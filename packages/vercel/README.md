@@ -51,6 +51,7 @@ export { GET, POST, DELETE }
 - Uses `WebStandardStreamableHTTPServerTransport` from the MCP SDK in **stateless mode** (`sessionIdGenerator: undefined`)
 - Each request creates a fresh `McpServer` + transport, registers tools, handles the request, and returns a Web Standard `Response`
 - Actions are registered as MCP tools using `PascalCase` names (same as the stdio and http adapters)
+- Tool results use `smartToolResult()` by default — large payloads (> 4096 chars) are automatically split into a text summary + embedded resource to reduce LLM context bloat. Actions can override this with a custom `toolResult` hook.
 - Logging goes to `process.stderr` (Vercel log drain) and MCP client notifications
 
 ## Options

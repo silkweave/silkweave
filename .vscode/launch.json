@@ -11,6 +11,14 @@
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:action",
+    "cwd": "${workspaceFolder}/example",
+    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/action.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "test:http",
     "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",

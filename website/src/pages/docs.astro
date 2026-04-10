@@ -121,6 +121,39 @@ describe('GreetAction', () => {
   })
 })`
 
+const smartResultRaw = `import { createAction } from '@silkweave/core'
+import { smartToolResult } from '@silkweave/mcp'
+import z from 'zod'
+
+export const UserListAction = createAction({
+  name: 'user-list',
+  description: 'Return a list of users',
+  input: z.object({
+    format: z.enum(['full', 'summary']).default('summary')
+  }),
+  run: async ({ format }, context) => {
+    context.set('format', format)
+    return await fetchUsers()
+  },
+  toolResult: (users, context) => {
+    if (context.get('format') === 'full') {
+      return smartToolResult(users)
+    }
+    // Lean summary for the LLM + full data as embedded resource
+    const summary = users.map(({ id, name }) => ({ id, name }))
+    return {
+      content: [
+        { type: 'text', text: JSON.stringify(summary) },
+        { type: 'resource', resource: {
+          uri: 'mcp://my-app/users.json',
+          mimeType: 'application/json',
+          blob: Buffer.from(JSON.stringify(users)).toString('base64')
+        }}
+      ]
+    }
+  }
+})`
+
 const escapeRaw = `// Fastify adapter: access raw request
 const req = context.get<FastifyRequest>('request')
 const customHeader = req.headers['x-trace-id']
@@ -218,6 +251,7 @@ function hl(raw: string): string {
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: (input: I, context: SilkweaveContext) => Promise<O>
+  toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
 }`)} /></pre>
     </div>
     <ul>
@@ -226,6 +260,7 @@ function hl(raw: string): string {
       <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
       <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
       <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
+      <li><strong><code>toolResult</code></strong> - Optional hook to customize how the return value is formatted as an MCP <code>CallToolResult</code>. Return <code>undefined</code> to use the default <a href="#smart-tool-results"><code>smartToolResult</code></a> behavior. Only affects MCP adapters.</li>
     </ul>
   </section>
 
@@ -390,6 +425,47 @@ export { GET, POST, DELETE }`)} /></pre>
       <li>Uses <code>WebStandardStreamableHTTPServerTransport</code> from the MCP SDK</li>
       <li>Supports OAuth 2.1 and bearer token auth</li>
     </ul>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- SMART TOOL RESULTS                                             -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="smart-tool-results">
+    <h2>Smart Tool Results</h2>
+    <p>When an MCP tool returns a large response, the entire payload is ingested into the LLM's context window. This burns tokens, degrades reasoning quality, and can hit context limits. Silkweave addresses this server-side with <strong>smart tool results</strong>.</p>
+    <p>All MCP adapters (stdio, HTTP, and Vercel) use <code>smartToolResult()</code> by default to format action return values:</p>
+    <ul>
+      <li><strong>Small responses</strong> (&le; 4096 chars) - returned as inline <code>TextContent</code> JSON, same as before</li>
+      <li><strong>Large responses</strong> (&gt; 4096 chars) - automatically split into a short text summary + a base64 <strong>embedded resource</strong>, keeping the LLM's context window lean while preserving full data access</li>
+    </ul>
+    <p>Some MCP clients (e.g. VS Code since December 2025) handle large responses client-side, but most don't. <code>smartToolResult</code> ensures good behavior regardless of client capabilities - it's a server-side best practice that works everywhere.</p>
+  </section>
+
+  <section id="custom-tool-result">
+    <h3>Custom <code>toolResult</code> Hook</h3>
+    <p>Actions can override the default formatting by defining a <code>toolResult</code> hook. This gives you full control over what the LLM sees vs. what gets stored as a resource:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>actions/userList.ts</span>
+        <button class="copy-btn" data-copy-raw={smartResultRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(smartResultRaw)} /></pre>
+    </div>
+    <p>Return <code>undefined</code> from <code>toolResult</code> to fall through to the default <code>smartToolResult</code> behavior. The hook only affects MCP adapters - CLI and Fastify handle serialization independently.</p>
+  </section>
+
+  <section id="result-utilities">
+    <h3>Result Utilities</h3>
+    <p>All result utilities are exported from <code>@silkweave/mcp</code>:</p>
+    <table class="docs-table">
+      <thead><tr><th>Function</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>smartToolResult(data)</code></td><td>Default formatter - automatic embedded resource splitting at 4096 chars</td></tr>
+        <tr><td><code>jsonToolResult(data, isError?)</code></td><td>Simple inline <code>TextContent</code> JSON (no splitting)</td></tr>
+        <tr><td><code>errorToolResult(error)</code></td><td>Format a <code>SilkweaveError</code> as an error result</td></tr>
+        <tr><td><code>handleToolError(error)</code></td><td>Catch-all error handler used by all MCP adapters</td></tr>
+      </tbody>
+    </table>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->

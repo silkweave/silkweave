@@ -39,6 +39,7 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
   - [CLI](#cli)
   - [Vercel Serverless](#vercel-serverless)
 - [Logging and Progress](#logging-and-progress)
+- [Smart Tool Results](#smart-tool-results)
 - [Advanced Patterns](#advanced-patterns)
   - [Multiple Adapters Simultaneously](#multiple-adapters-simultaneously)
   - [CLI Arguments vs Options](#cli-arguments-vs-options)
@@ -179,6 +180,7 @@ export const SearchAction = createAction({
 | `input` | `z.ZodObject` | A Zod object schema defining the input. `.describe()` on each field provides per-field documentation across all adapters. |
 | `args` | `(keyof I)[]` | *(Optional)* Fields to expose as positional CLI arguments instead of `--options`. Only relevant for the CLI adapter. |
 | `run` | `(input, context) => Promise<O>` | The implementation. Receives validated input and an `SilkweaveContext` with a `logger`. Returns any object - adapters handle serialization. |
+| `toolResult` | `(response, context) => CallToolResult \| undefined` | *(Optional)* Custom MCP result formatting. Return `undefined` to fall through to the default `smartToolResult` behavior. See [Smart Tool Results](#smart-tool-results). |
 
 ### Adapters
 
@@ -259,8 +261,10 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 | `name: 'searchDocs'` | Tool name: `SearchDocs` (PascalCase) |
 | `description` | Tool description |
 | `input` (Zod schema) | `inputSchema` (JSON Schema via Zod) |
-| Return value | `TextContent` JSON response |
-| Thrown errors | Structured error response with name, message, and stack |
+| Return value | `CallToolResult` via `smartToolResult` or custom `toolResult` hook |
+| Thrown errors | Structured error response via `handleToolError` |
+
+By default, MCP adapters use `smartToolResult()` to format return values — responses ≤ 4096 chars are returned as inline JSON, while larger payloads are automatically split into a text summary + base64 embedded resource to reduce LLM context bloat. Actions can override this with a custom [`toolResult` hook](#smart-tool-results).
 
 MCP logging notifications are wired automatically - `logger.info("message")` in your action sends a `notifications/message` to the MCP client. Progress reporting works via `logger.progress()` when the client provides a progress token.
 
@@ -486,6 +490,69 @@ run: async (input, { logger }) => {
 
 ---
 
+## Smart Tool Results
+
+MCP adapters (stdio, HTTP, and Vercel) use `smartToolResult()` by default to format action return values. This is a server-side best practice for managing LLM context bloat:
+
+- **Small responses** (≤ 4096 chars): returned as inline `TextContent` JSON
+- **Large responses** (> 4096 chars): split into a short text summary + a base64 **embedded resource**, keeping the LLM's context window lean while preserving full data access
+
+Some MCP clients (e.g. VS Code since December 2025) handle this client-side for all tool calls, but most clients don't — `smartToolResult` ensures good behavior regardless of client capabilities.
+
+### Custom `toolResult` Hook
+
+Actions can override the default formatting by defining a `toolResult` hook:
+
+```typescript
+import { createAction } from '@silkweave/core'
+import { smartToolResult } from '@silkweave/mcp'
+import z from 'zod'
+
+export const UserListAction = createAction({
+  name: 'user-list',
+  description: 'Return a list of users',
+  input: z.object({
+    format: z.enum(['full', 'summary']).default('summary')
+  }),
+  run: async ({ format }, context) => {
+    context.set('format', format)
+    return await fetchUsers()
+  },
+  toolResult: (users, context) => {
+    if (context.get('format') === 'full') {
+      return smartToolResult(users)  // Use default smart splitting
+    }
+    // Return a lean summary as text + full data as embedded resource
+    const summary = users.map(({ id, name }) => ({ id, name }))
+    return {
+      content: [
+        { type: 'text', text: JSON.stringify(summary) },
+        { type: 'resource', resource: {
+          uri: 'mcp://my-app/users.json',
+          mimeType: 'application/json',
+          blob: Buffer.from(JSON.stringify(users)).toString('base64')
+        }}
+      ]
+    }
+  }
+})
+```
+
+Return `undefined` from `toolResult` to fall through to the default `smartToolResult` behavior. The hook only affects MCP adapters — CLI and Fastify adapters handle serialization independently.
+
+### MCP Result Utilities
+
+All result utilities are exported from `@silkweave/mcp`:
+
+| Function | Description |
+|----------|-------------|
+| `smartToolResult(data)` | Default formatter — automatic embedded resource splitting at 4096 chars |
+| `jsonToolResult(data, isError?)` | Simple inline `TextContent` JSON (no splitting) |
+| `errorToolResult(error)` | Format a `SilkweaveError` as an error result |
+| `handleToolError(error)` | Catch-all error handler used by all MCP adapters |
+
+---
+
 ## Advanced Patterns
 
 ### Multiple Adapters Simultaneously
@@ -673,6 +740,7 @@ interface Action<I, O> {
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: (input: I, context: SilkweaveContext) => Promise<O>
+  toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
 }
 ```
 

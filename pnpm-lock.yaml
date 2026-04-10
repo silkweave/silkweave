@@ -418,6 +418,9 @@ importers:
       '@silkweave/logger':
         specifier: workspace:*
         version: link:../logger
+      '@silkweave/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       change-case:
         specifier: ^5.4.4
         version: 5.4.4

@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, AdapterGenerator, handleToolError, SilkweaveContext, SilkweaveOptions, toolResponse } from '@silkweave/core'
+import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
+import { handleToolError, smartToolResult } from '@silkweave/mcp'
 import { capitalCase, pascalCase } from 'change-case'
 
 export interface VercelAdapterOptions {
@@ -51,8 +52,9 @@ function registerTools(server: McpServer, actions: Action[], requestContext: Sil
           })
         }
       })
-      return action.run(input, requestContext.fork({ logger, extra }))
-        .then((result) => toolResponse(result))
+      const actionContext = requestContext.fork({ logger, extra })
+      return action.run(input, actionContext)
+        .then((result) => action.toolResult?.(result, actionContext) ?? smartToolResult(result))
         .catch(handleToolError)
     })
   }

@@ -29,7 +29,7 @@ pnpm mcp
 
 The core pattern is **Action → Adapter → Silkweave**:
 
-- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod input schema and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context.
+- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod input schema and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads).
 - **Adapter** (`packages/core/src/util/adapter.ts`): Translates actions into a specific transport. `AdapterFactory<T>` takes config options, returns an `AdapterGenerator` that takes `SilkweaveOptions` and produces an `Adapter` with `start(actions)` / `stop()`.
 - **Silkweave** (`packages/core/src/lib/silkweave.ts`): Fluent builder - `silkweave(opts).adapter(generator).action(action).start()`.
 
@@ -61,9 +61,13 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 ### Key Utilities (in @silkweave/core)
 
 - `unwrap()` in `packages/core/src/util/zod.ts` - recursively unwraps Zod wrapper types (optional, nullable, default, readonly) to get the base type and metadata. Used by the CLI adapter for option generation.
-- `toolResponse()` / `handleToolError()` in `packages/core/src/util/mcp.ts` - wraps results/errors as MCP `TextContent` JSON. `handleToolError` is shared across all MCP adapters.
 - `buildLogLevels()` in `packages/core/src/util/logger.ts` - builds a log-level record from a single callback function.
 - `buildCLILogger()` / `parseCLIInput()` / `handleCLIError()` in `packages/core/src/util/cli.ts` - CLI logging and input parsing utilities shared by `@silkweave/cli` and `@silkweave/mcp`'s cliProxy.
+
+### MCP Result Utilities (in @silkweave/mcp)
+
+- `smartToolResult()` in `packages/mcp/src/util/result.ts` - default response formatter. Responses ≤ 4096 chars are returned as `TextContent` JSON; larger payloads are automatically split into a short text summary + base64 embedded resource to reduce LLM context bloat.
+- `jsonToolResult()` / `errorToolResult()` / `handleToolError()` in `packages/mcp/src/util/result.ts` - lower-level helpers for constructing `CallToolResult` objects. Used internally by all MCP adapters and available for custom `toolResult` hooks.
 
 ## Tooling
 
@@ -119,5 +123,13 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 - version_bump: yes (aligned across all packages)
   + `pnpm -r exec pnpm version x.x.x --no-git-tag-version`
 - publish: yes (manual - prompt to run `! pnpm publish:all`)
-- docs: per-package README.md + root CLAUDE.md as index
+- docs: per-package README.md + root CLAUDE.md as index + website docs page
 - frontend_smoke: N/A
+
+## Docs Checklist
+
+When making changes to features, APIs, or architecture, update docs in **all three layers**:
+
+1. **CLAUDE.md** (root) - architecture overview, key utilities, package inventory
+2. **Per-package README.md** - API reference, usage examples, options tables
+3. **Website docs** (`website/src/pages/docs.astro`) - user-facing documentation including code examples, Action interface, adapter reference, and sidebar nav (`website/src/layouts/DocsLayout.astro`)
