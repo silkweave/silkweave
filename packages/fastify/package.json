@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/fastify",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Silkweave Fastify REST Adapter",
   "repository": {
     "type": "git",
