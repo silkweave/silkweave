@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
+import { type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { SilkweaveError } from '@silkweave/core'
 import { randomUUID } from 'node:crypto'
 

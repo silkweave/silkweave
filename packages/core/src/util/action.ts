@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types'
+import { type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import z from 'zod'
 import { SilkweaveContext } from './context.js'
 

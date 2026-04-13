@@ -1,7 +1,7 @@
 import { intro } from '@clack/prompts'
 import { Client } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { LoggingMessageNotificationSchema, ProgressNotificationSchema } from '@modelcontextprotocol/sdk/types'
+import { LoggingMessageNotificationSchema, ProgressNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
 import { AdapterFactory, unwrap } from '@silkweave/core'
 import { createCLILogger } from '@silkweave/logger'
 import { kebabCase } from 'change-case'
