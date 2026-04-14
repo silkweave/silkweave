@@ -13,7 +13,7 @@ pnpm add @silkweave/core
 This package provides the foundational building blocks that all Silkweave adapters depend on:
 
 - **`silkweave()`** - Fluent builder to wire up adapters and actions
-- **`createAction()`** - Define transport-agnostic actions with Zod input schemas
+- **`createAction()`** - Define transport-agnostic actions with Zod input/output schemas
 - **Adapter types** - `Adapter`, `AdapterGenerator`, `AdapterFactory` interfaces for building custom adapters
 - **Context** - `SilkweaveContext` key-value store with `fork()` for per-adapter/per-request isolation
 - **Zod utilities** - `unwrap()` to recursively unwrap Zod wrapper types
@@ -61,6 +61,7 @@ Returns a builder with `.adapter()`, `.action()`, `.actions()`, `.set()`, and `.
 | `name` | `string` | Unique action identifier |
 | `description` | `string` | Human-readable description |
 | `input` | `z.ZodObject` | Zod schema for input validation |
+| `output` | `z.ZodObject` | Optional Zod schema for the return type (used by typegen and Fastify OpenAPI) |
 | `args` | `(keyof I)[]` | Fields to expose as CLI positional arguments |
 | `isEnabled` | `(context) => boolean` | Gate action availability per adapter |
 | `run` | `(input, context) => Promise<O>` | The action implementation |
@@ -86,3 +87,4 @@ type AdapterFactory<T = void> = (options: T) => AdapterGenerator
 - [`@silkweave/fastify`](https://www.npmjs.com/package/@silkweave/fastify) - Fastify REST adapter
 - [`@silkweave/cli`](https://www.npmjs.com/package/@silkweave/cli) - CLI adapter
 - [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) - Vercel serverless adapter
+- [`@silkweave/typegen`](https://www.npmjs.com/package/@silkweave/typegen) - Build-time type generation

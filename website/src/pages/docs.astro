@@ -276,6 +276,7 @@ function hl(raw: string): string {
   name: string
   description: string
   input: z.ZodType<I>
+  output?: z.ZodType<O>
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: (input: I, context: SilkweaveContext) => Promise<O>
@@ -285,6 +286,7 @@ function hl(raw: string): string {
     <ul>
       <li><strong><code>name</code></strong> - Identifier used for routing (kebab-case for CLI, PascalCase for MCP tools, URL path for Fastify).</li>
       <li><strong><code>input</code></strong> - Zod object schema. Drives validation, CLI option generation, and OpenAPI docs.</li>
+      <li><strong><code>output</code></strong> - Optional Zod object schema for the return type. Used by the <a href="#adapter-typegen">typegen adapter</a> to generate typed response interfaces and by Fastify for OpenAPI response schemas.</li>
       <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
       <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
       <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>

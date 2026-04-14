@@ -29,7 +29,7 @@ pnpm mcp
 
 The core pattern is **Action → Adapter → Silkweave**:
 
-- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod input schema and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads).
+- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod `input` schema, an optional Zod `output` schema, and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. The `output` schema is used by the typegen adapter to generate typed response interfaces. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads).
 - **Adapter** (`packages/core/src/util/adapter.ts`): Translates actions into a specific transport. `AdapterFactory<T>` takes config options, returns an `AdapterGenerator` that takes `SilkweaveOptions` and produces an `Adapter` with `start(actions)` / `stop()`.
 - **Silkweave** (`packages/core/src/lib/silkweave.ts`): Fluent builder - `silkweave(opts).adapter(generator).action(action).start()`.
 
