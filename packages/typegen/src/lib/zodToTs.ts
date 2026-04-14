@@ -98,7 +98,7 @@ const typeHandlers: Record<string, TypeHandler> = {
 
 export function printNode(node: ts.Node): string {
   const sourceFile = ts.createSourceFile('typegen.d.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS)
-  const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+  const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, omitTrailingSemicolon: true })
   return printer.printNode(ts.EmitHint.Unspecified, node, sourceFile)
 }
 

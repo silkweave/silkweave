@@ -52,6 +52,7 @@ fastify({
 |--------|------|---------|-------------|
 | `host` | `string` | `undefined` | Bind address |
 | `port` | `number` | `undefined` | Listen port |
+| `cors` | `FastifyCorsOptions \| boolean` | `undefined` | CORS config. `false` to disable, `true`/omit for permissive defaults (`origin: '*'`), or a [@fastify/cors](https://www.npmjs.com/package/@fastify/cors) options object. |
 | *...* | | | Any `FastifyHttpOptions` |
 
 ## See Also

@@ -58,6 +58,7 @@ Exposes `POST /mcp` (invoke tools), `GET /mcp` (SSE stream), and `DELETE /mcp` (
 | `host` | `string` | Bind address |
 | `port` | `number` | Listen port |
 | `allowedHosts` | `string[]` | Allowed hosts for DNS rebinding protection |
+| `cors` | `CorsOptions \| boolean` | CORS config. `false` to disable, `true`/omit for permissive defaults (`origin: '*'`), or a [cors](https://www.npmjs.com/package/cors) options object. MCP-required headers are always exposed. |
 
 ### cliProxy
 

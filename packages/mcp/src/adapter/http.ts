@@ -7,7 +7,7 @@ import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, 
 import { Action, AdapterFactory, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
-import cors from 'cors'
+import cors, { CorsOptions } from 'cors'
 import { randomUUID } from 'crypto'
 import express, { Express, Request, Response } from 'express'
 import { readFile } from 'fs/promises'
@@ -18,10 +18,15 @@ import { SideloadResource } from '../util/sideload.js'
 
 const authStorage = new AsyncLocalStorage<AuthInfo>()
 
+/** Headers required by the MCP protocol that must always be exposed */
+const MCP_REQUIRED_HEADERS = ['WWW-Authenticate', 'Mcp-Session-Id', 'Last-Event-Id', 'Mcp-Protocol-Version']
+
 export interface HttpAdapterOptions extends CreateMcpExpressAppOptions {
   host: string
   port: number
   auth?: AuthConfig
+  /** CORS configuration. `false` to disable, `true`/`undefined` for permissive defaults, or a CorsOptions object. */
+  cors?: CorsOptions | boolean
 }
 
 function mountOAuthRoutes(app: Express, auth: AuthConfig): Set<string> {
@@ -202,11 +207,20 @@ function mountMcpTransport(
   app.get('/mcp/resource/:id', handleSessionStream)
 }
 
-export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, auth, ...mcpOptions }) => {
+export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, auth, cors: corsConfig, ...mcpOptions }) => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'http' })
     const app = createMcpExpressApp({ ...mcpOptions, host })
-    app.use(cors({ exposedHeaders: ['WWW-Authenticate', 'Mcp-Session-Id', 'Last-Event-Id', 'Mcp-Protocol-Version'], origin: '*' }))
+
+    if (corsConfig !== false) {
+      const userConfig = corsConfig === true || corsConfig === undefined ? {} : corsConfig
+      const userExposed = userConfig.exposedHeaders
+      const exposedHeaders = [
+        ...MCP_REQUIRED_HEADERS,
+        ...(Array.isArray(userExposed) ? userExposed : userExposed ? [userExposed] : [])
+      ]
+      app.use(cors({ origin: '*', ...userConfig, exposedHeaders }))
+    }
 
     if (auth?.authorizationServers?.length && auth.resourceUrl) {
       app.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {

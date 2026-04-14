@@ -1,3 +1,4 @@
+import type { FastifyCorsOptions } from '@fastify/cors'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
 import { AdapterFactory, SilkweaveContext, SilkweaveError } from '@silkweave/core'
 import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
@@ -22,6 +23,8 @@ export interface FastifyAdapterOptions extends FastifyHttpOptions<Server, Fastif
   host?: string
   port?: number
   auth?: AuthConfig
+  /** CORS configuration. `false` to disable, `true`/`undefined` for permissive defaults, or a FastifyCorsOptions object. */
+  cors?: FastifyCorsOptions | boolean
 }
 
 function toOAuthReq(request: FastifyRequest): OAuthRequest {
@@ -95,13 +98,18 @@ function createActionLogger(instance: FastifyInstance): Logger {
   }
 }
 
-export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, auth, ...fastifyOptions }) => {
+export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, auth, cors: corsConfig, ...fastifyOptions }) => {
   const instance = fastifyInstance(fastifyOptions)
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'fastify' })
     return {
       context,
       start: async (actions) => {
+        if (corsConfig !== false) {
+          const userConfig = corsConfig === true || corsConfig === undefined ? {} : corsConfig
+          await instance.register(import('@fastify/cors'), { origin: '*', ...userConfig })
+        }
+
         await instance.register(import('@fastify/swagger'), {
           openapi: {
             info: {

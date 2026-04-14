@@ -393,7 +393,8 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
   .action(GreetAction)
   .start()`)} /></pre>
     </div>
-    <p>Options: <code>host</code>, <code>port</code>, <code>auth</code> (see <a href="#authentication">Authentication</a>), plus any <code>CreateMcpExpressAppOptions</code>.</p>
+    <p>Options: <code>host</code>, <code>port</code>, <code>auth</code> (see <a href="#authentication">Authentication</a>), <code>cors</code>, plus any <code>CreateMcpExpressAppOptions</code>.</p>
+    <p><strong>CORS:</strong> By default, CORS is enabled with <code>origin: '*'</code>. Pass <code>cors: false</code> to disable, or a <a href="https://www.npmjs.com/package/cors">CorsOptions</a> object to customize. MCP-required headers are always exposed regardless of config.</p>
   </section>
 
   <section id="adapter-fastify">
@@ -412,6 +413,7 @@ await silkweave({ name: 'my-api', version: '1.0.0' })
     <ul>
       <li>Zod schemas are converted to JSON Schema for OpenAPI docs</li>
       <li>Supports <code>auth</code> option for bearer token / OAuth protection</li>
+      <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults (<code>origin: '*'</code>), or a <a href="https://www.npmjs.com/package/@fastify/cors">FastifyCorsOptions</a> object</li>
       <li>Errors are mapped to HTTP status codes automatically (see <a href="#error-handling">Error Handling</a>)</li>
     </ul>
   </section>

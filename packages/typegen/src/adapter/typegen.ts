@@ -1,5 +1,5 @@
 import { AdapterFactory } from '@silkweave/core'
-import { writeFile, mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { generateDts } from '../lib/generateDts.js'
 
