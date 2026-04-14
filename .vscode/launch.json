@@ -35,6 +35,14 @@
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:typegen",
+    "cwd": "${workspaceFolder}/example",
+    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/typegen.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "test:http-oauth",
     "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",

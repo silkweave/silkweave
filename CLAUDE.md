@@ -9,7 +9,7 @@ Silkweave is a TypeScript toolkit for building MCP (Model Context Protocol) serv
 ## Commands
 
 ```bash
-pnpm build          # Build all packages with tsup (ESM output to build/)
+pnpm build          # Build all packages with tsdown (ESM output to build/)
 pnpm check          # Lint + typecheck all packages
 pnpm clean          # Clean all build outputs and turbo cache
 

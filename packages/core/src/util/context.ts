@@ -8,6 +8,7 @@ export interface SilkweaveContext {
 }
 
 export function createContext(store: Record<string, unknown> = {}): SilkweaveContext {
+  console.info('works')
   return {
     keys: () => {
       return Object.keys(store)
@@ -17,6 +18,7 @@ export function createContext(store: Record<string, unknown> = {}): SilkweaveCon
     },
     get: <T>(key: string): T => {
       const value = store[key]
+      console.info('works')
       if (value == null) { throw new Error(`Invalid context key: ${key}`) }
       return value as T
     },

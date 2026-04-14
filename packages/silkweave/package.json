@@ -10,39 +10,43 @@
   "type": "module",
   "exports": {
     "./auth": {
-      "types": "./build/auth.d.ts",
-      "default": "./build/auth.js"
+      "types": "./build/auth.d.mts",
+      "default": "./build/auth.mjs"
     },
     "./cli": {
-      "types": "./build/cli.d.ts",
-      "default": "./build/cli.js"
+      "types": "./build/cli.d.mts",
+      "default": "./build/cli.mjs"
     },
     "./core": {
-      "types": "./build/core.d.ts",
-      "default": "./build/core.js"
+      "types": "./build/core.d.mts",
+      "default": "./build/core.mjs"
     },
     "./fastify": {
-      "types": "./build/fastify.d.ts",
-      "default": "./build/fastify.js"
+      "types": "./build/fastify.d.mts",
+      "default": "./build/fastify.mjs"
     },
     "./logger": {
-      "types": "./build/logger.d.ts",
-      "default": "./build/logger.js"
+      "types": "./build/logger.d.mts",
+      "default": "./build/logger.mjs"
     },
     "./mcp": {
-      "types": "./build/mcp.d.ts",
-      "default": "./build/mcp.js"
+      "types": "./build/mcp.d.mts",
+      "default": "./build/mcp.mjs"
+    },
+    "./typegen": {
+      "types": "./build/typegen.d.mts",
+      "default": "./build/typegen.mjs"
     },
     "./vercel": {
-      "types": "./build/vercel.d.ts",
-      "default": "./build/vercel.js"
+      "types": "./build/vercel.d.mts",
+      "default": "./build/vercel.mjs"
     }
   },
   "scripts": {
     "clean": "rimraf build",
-    "build": "tsup",
+    "build": "tsdown",
     "prepack": "pnpm clean && pnpm build",
-    "watch": "tsup --watch",
+    "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"
@@ -54,6 +58,7 @@
     "@silkweave/fastify": "workspace:*",
     "@silkweave/logger": "workspace:*",
     "@silkweave/mcp": "workspace:*",
+    "@silkweave/typegen": "workspace:*",
     "@silkweave/vercel": "workspace:*"
   },
   "devDependencies": {
@@ -61,7 +66,7 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^22.0.0",
     "rimraf": "^6.1.3",
-    "tsup": "^8.5.1",
+    "tsdown": "^0.21.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"

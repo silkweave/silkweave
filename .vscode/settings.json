@@ -16,6 +16,7 @@
     "packages/logger",
     "packages/silkweave",
     "packages/mcp",
+    "packages/typegen",
     "packages/vercel"
   ],
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",

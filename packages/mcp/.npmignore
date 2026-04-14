@@ -6,4 +6,4 @@ CLAUDE.md
 eslint.config.mjs
 pnpm-workspace.yaml
 tsconfig.json
-tsup.config.ts
+tsdown.config.ts

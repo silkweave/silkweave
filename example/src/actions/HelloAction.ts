@@ -13,6 +13,9 @@ export const HelloAction = createAction({
     name: z.string(),
     type: z.enum(['cat', 'dog'])
   }),
+  output: z.object({
+    message: z.string()
+  }),
   args: ['name'],
   isEnabled: (context) => {
     const adapter = context.get<string>('adapter')

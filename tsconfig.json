@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "example" },
+    { "path": "packages/auth" },
+    { "path": "packages/cli" },
+    { "path": "packages/core" },
+    { "path": "packages/fastify" },
+    { "path": "packages/logger" },
+    { "path": "packages/mcp" },
+    { "path": "packages/typegen" },
+    { "path": "website" }
+  ]
+}

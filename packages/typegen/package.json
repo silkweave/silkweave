@@ -1,22 +1,24 @@
 {
-  "name": "@silkweave/logger",
+  "name": "@silkweave/typegen",
   "version": "1.4.1",
-  "description": "Silkweave Logger",
+  "description": "Silkweave Type Generator",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/silkweave/silkweave.git",
-    "directory": "packages/logger"
+    "directory": "packages/typegen"
   },
   "type": "module",
   "main": "src/index.ts",
   "publishConfig": {
     "main": "build/index.mjs",
-    "exports": { ".": "./build/index.mjs" },
+    "exports": {
+      ".": "./build/index.mjs"
+    },
     "types": "./build/index.d.ts"
   },
   "scripts": {
     "clean": "rimraf build",
-    "build": "tsdown && tsc -b",
+    "build": "tsdown",
     "prepack": "pnpm clean && pnpm build",
     "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit",
@@ -24,8 +26,10 @@
     "check": "pnpm lint && pnpm typecheck"
   },
   "dependencies": {
-    "@clack/prompts": "^1.0.1",
-    "pino": "^9.6.0",
+    "@silkweave/core": "workspace:*",
+    "@silkweave/mcp": "workspace:*",
+    "change-case": "^5.4.4",
+    "ts-morph": "^28.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

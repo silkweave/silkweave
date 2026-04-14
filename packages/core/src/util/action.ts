@@ -7,6 +7,7 @@ export interface Action<I extends object = any, O extends object = any> {
   name: string
   description: string
   input: z.ZodType<I> & { shape: Record<string, z.ZodTypeAny> }
+  output?: z.ZodType<O> & { shape: Record<string, z.ZodTypeAny> }
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: (input: I, context: SilkweaveContext) => Promise<O>

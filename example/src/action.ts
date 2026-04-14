@@ -1,9 +1,10 @@
 import { createContext } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
-import { UserListAction } from './actions/UserListAction.js'
+import { UserAction } from './actions/UserAction.js'
 
 async function main() {
-  const _response = await UserListAction.run({ responseType: 'smart' }, createContext({ logger: createLogger() }))
+  const response = await UserAction.run({ state: 'test' }, createContext({ logger: createLogger() }))
+  console.info(response)
 }
 
 main()
