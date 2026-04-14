@@ -35,10 +35,13 @@ export function silkweave(options: SilkweaveOptions): Silkweave {
     },
     start: async () => {
       await Promise.all(adapters.map((adapter) => {
-        return adapter.start(actions.filter((action) => {
-          if (!action.isEnabled) { return true }
-          return action.isEnabled(adapter.context)
-        }))
+        const filtered = adapter.allActions
+          ? actions
+          : actions.filter((action) => {
+            if (!action.isEnabled) { return true }
+            return action.isEnabled(adapter.context)
+          })
+        return adapter.start(filtered)
       }))
       return builder
     }

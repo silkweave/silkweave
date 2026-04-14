@@ -38,6 +38,7 @@
     "**/.symlinks": true,
     "**/.plugin_symlinks": true,
     "**/node_modules": true,
+    "**/tsconfig.tsbuildinfo": true,
     "**/build": true,
     "**/.turbo": true,
     "**/.astro": true,

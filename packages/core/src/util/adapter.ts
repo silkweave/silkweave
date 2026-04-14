@@ -9,6 +9,7 @@ export interface SilkweaveOptions {
 
 export interface Adapter {
   context: SilkweaveContext
+  allActions?: boolean
   start(actions: Action[]): Promise<void>
   stop(): Promise<void>
 }
