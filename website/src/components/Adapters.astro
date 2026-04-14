@@ -110,6 +110,29 @@ export default { fetch: handler }`,
   .<span class="token-function">start</span>()
 
 <span class="token-keyword">export default</span> { <span class="token-property">fetch</span>: handler }`
+  },
+  {
+    id: 'typegen',
+    label: 'Typegen',
+    pkg: '@silkweave/typegen',
+    raw: `import { silkweave } from '@silkweave/core'
+import { typegen } from '@silkweave/typegen'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(typegen({ path: 'types/actions.d.ts' }))
+  .action(GreetAction)
+  .start()
+// Generates: export interface GreetInput { name: string }`,
+    code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { typegen } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/typegen'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-server'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(<span class="token-function">typegen</span>({ <span class="token-property">path</span>: <span class="token-string">'types/actions.d.ts'</span> }))
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+  .<span class="token-function">start</span>()
+<span class="token-comment">// Generates: export interface GreetInput { name: string }</span>`
   }
 ]
 ---
@@ -117,7 +140,7 @@ export default { fetch: handler }`,
 <section id="adapters" class="adapters">
   <div class="container">
     <p class="section-label">Adapters</p>
-    <h2 class="section-title">Same action. Five transports.</h2>
+    <h2 class="section-title">Same action. Six adapters.</h2>
     <p class="section-desc">
       Swap one line to change how your action is served. The business logic stays identical.
     </p>

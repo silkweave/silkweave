@@ -164,6 +164,33 @@ const cmd = context.get<Command>('command')
 // MCP adapters: access MCP extra metadata
 const extra = context.get<ToolExtra>('extra')`
 
+const typegenRaw = `import { silkweave } from '@silkweave/core'
+import { typegen } from '@silkweave/typegen'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(typegen({ path: 'types/actions.d.ts' }))
+  .action(GreetAction)
+  .start()`
+
+const typegenOutputRaw = `export interface GreetInput {
+    name: string;
+}
+
+export interface GreetOutput {
+    message: string;
+}`
+
+const typegenMultiRaw = `import { silkweave } from '@silkweave/core'
+import { stdio } from '@silkweave/mcp'
+import { typegen } from '@silkweave/typegen'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())
+  .adapter(typegen({ path: 'types/actions.d.ts' }))
+  .action(GreetAction)
+  .start()`
+
 /* ── highlighted code blocks ─────────────────────────────────────── */
 
 function hl(raw: string): string {
@@ -206,6 +233,7 @@ function hl(raw: string): string {
         <tr><td><code>@silkweave/fastify</code></td><td>Fastify REST API with auto-generated Swagger UI</td></tr>
         <tr><td><code>@silkweave/cli</code></td><td>CLI adapter with Commander + Clack prompts</td></tr>
         <tr><td><code>@silkweave/vercel</code></td><td>Stateless MCP over Vercel / Web Standard serverless</td></tr>
+        <tr><td><code>@silkweave/typegen</code></td><td>Build-time <code>.d.ts</code> generation from action Zod schemas</td></tr>
         <tr><td><code>@silkweave/auth</code></td><td>OAuth 2.1 proxy, bearer token validation</td></tr>
       </tbody>
     </table>
@@ -281,6 +309,7 @@ function hl(raw: string): string {
         <tr><td><code>fastify()</code></td><td><code>@silkweave/fastify</code></td><td>REST API + Swagger UI</td></tr>
         <tr><td><code>cli()</code></td><td><code>@silkweave/cli</code></td><td>CLI via Commander + Clack</td></tr>
         <tr><td><code>vercel()</code></td><td><code>@silkweave/vercel</code></td><td>Stateless MCP (Web Standard)</td></tr>
+        <tr><td><code>typegen()</code></td><td><code>@silkweave/typegen</code></td><td>Build-time <code>.d.ts</code> type generation</td></tr>
       </tbody>
     </table>
   </section>
@@ -425,6 +454,57 @@ export { GET, POST, DELETE }`)} /></pre>
       <li>Uses <code>WebStandardStreamableHTTPServerTransport</code> from the MCP SDK</li>
       <li>Supports OAuth 2.1 and bearer token auth</li>
     </ul>
+  </section>
+
+  <section id="adapter-typegen">
+    <h3>Type Generation</h3>
+    <p>The <code>typegen()</code> adapter generates <code>.d.ts</code> interface declarations from your action Zod schemas at build time. It uses the TypeScript compiler API to produce correct, well-formatted output with zero runtime cost.</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>typegen.ts</span>
+        <button class="copy-btn" data-copy-raw={typegenRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(typegenRaw)} /></pre>
+    </div>
+    <p>This produces a <code>.d.ts</code> file with typed interfaces for each action's input and output:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>types/actions.d.ts (generated)</span></div>
+      <pre><code set:html={hl(typegenOutputRaw)} /></pre>
+    </div>
+    <ul>
+      <li><strong><code>path</code></strong> - Output file path for the generated <code>.d.ts</code> file. Directories are created automatically.</li>
+      <li>Generates <code>{'{'}PascalName{'}'}{'{'}Input|Output{'}'}</code> interfaces per action (e.g. <code>GreetInput</code>, <code>GreetOutput</code>).</li>
+      <li>Output interfaces are only generated when the action defines an <code>output</code> schema.</li>
+      <li>Uses <code>allActions: true</code> to bypass <code>isEnabled</code> filtering - types are generated for every registered action regardless of runtime guards.</li>
+    </ul>
+    <h4>Combining with runtime adapters</h4>
+    <p>Chain <code>typegen()</code> alongside your runtime adapter. The typegen adapter writes the <code>.d.ts</code> file on start and has no other effect:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={typegenMultiRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(typegenMultiRaw)} /></pre>
+    </div>
+    <h4>Supported Zod types</h4>
+    <table class="docs-table">
+      <thead><tr><th>Zod type</th><th>TypeScript output</th></tr></thead>
+      <tbody>
+        <tr><td><code>z.string()</code></td><td><code>string</code></td></tr>
+        <tr><td><code>z.number()</code></td><td><code>number</code></td></tr>
+        <tr><td><code>z.boolean()</code></td><td><code>boolean</code></td></tr>
+        <tr><td><code>z.enum(['a', 'b'])</code></td><td><code>'a' | 'b'</code></td></tr>
+        <tr><td><code>z.literal('x')</code></td><td><code>'x'</code></td></tr>
+        <tr><td><code>z.array(z.string())</code></td><td><code>string[]</code></td></tr>
+        <tr><td><code>z.object({'{'}...{'}'})</code></td><td><code>{'{'}...{'}'}</code> (nested interface)</td></tr>
+        <tr><td><code>z.string().optional()</code></td><td><code>string | undefined</code></td></tr>
+        <tr><td><code>z.string().nullable()</code></td><td><code>string | null</code></td></tr>
+        <tr><td><code>z.string().default('x')</code></td><td><code>string</code> (optional field)</td></tr>
+        <tr><td><code>z.union([...])</code></td><td><code>A | B</code></td></tr>
+        <tr><td><code>z.record(z.string())</code></td><td><code>{'{'}[key: string]: string{'}'}</code></td></tr>
+        <tr><td><code>z.tuple([...])</code></td><td><code>[A, B]</code></td></tr>
+      </tbody>
+    </table>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->

@@ -127,6 +127,7 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 - publish: yes (manual - prompt to run `! pnpm publish:all`)
 - docs: per-package README.md + root CLAUDE.md as index + website docs page
 - frontend_smoke: N/A
+- extra: Update our website (landing page and docs) with new or changed features
 
 ## Docs Checklist
 
