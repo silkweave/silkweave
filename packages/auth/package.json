@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/auth",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Silkweave Auth - Bearer token and OAuth 2.1 support for MCP servers",
   "repository": {
     "type": "git",
@@ -11,7 +11,9 @@
   "main": "src/index.ts",
   "publishConfig": {
     "main": "build/index.mjs",
-    "exports": { ".": "./build/index.mjs" },
+    "exports": {
+      ".": "./build/index.mjs"
+    },
     "types": "./build/index.d.ts"
   },
   "scripts": {

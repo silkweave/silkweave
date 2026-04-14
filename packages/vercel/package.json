@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/vercel",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Silkweave Vercel Serverless Adapter",
   "repository": {
     "type": "git",
@@ -11,7 +11,9 @@
   "main": "src/index.ts",
   "publishConfig": {
     "main": "build/index.mjs",
-    "exports": { ".": "./build/index.mjs" },
+    "exports": {
+      ".": "./build/index.mjs"
+    },
     "types": "./build/index.d.ts"
   },
   "scripts": {
