@@ -2,8 +2,8 @@ import { createRedisStore, google } from '@silkweave/auth'
 import { silkweave } from '@silkweave/core'
 import { vercel } from '@silkweave/vercel'
 import { Redis } from '@upstash/redis'
-import { CalculateAction } from '../actions/calculate.js'
-import { GreetAction } from '../actions/greet.js'
+import { CalculateAction } from '../../actions/calculate.js'
+import { GreetAction } from '../../actions/greet.js'
 
 const { adapter, handler } = vercel({
   auth: google({
@@ -31,4 +31,4 @@ await silkweave({ name: 'silkweave-demo', description: 'Silkweave Vercel Demo', 
   .action(CalculateAction)
   .start()
 
-export default { fetch: handler }
+export { handler }

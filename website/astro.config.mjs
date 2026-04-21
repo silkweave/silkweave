@@ -4,7 +4,7 @@ import { defineConfig } from 'astro/config'
 
 export default defineConfig({
   output: 'server',
-  adapter: vercel(),
+  adapter: vercel({ maxDuration: 60 }),
   site: 'https://www.silkweave.dev',
   outDir: './build',
   publicDir: './static',
