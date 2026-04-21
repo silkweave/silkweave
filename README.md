@@ -5,20 +5,24 @@
 Silkweave is a TypeScript toolkit that lets you define application logic as portable **Actions** and instantly expose them through any combination of transports - MCP servers (stdio and HTTP), REST APIs with auto-generated OpenAPI docs, and fully-featured CLIs. No glue code required.
 
 ```
-                     ┌─────────────────────┐
-                     │       Action         │
-                     │  name + zod schema   │
-                     │  + async run()       │
-                     └──────────┬──────────┘
-                                │
-         ┌──────────────┬───────┼───────┬──────────────┐
-         │              │       │       │              │
-  ┌──────▼──────┐ ┌─────▼─────┐ │ ┌─────▼──────┐ ┌────▼─────┐
-  │ MCP (stdio) │ │   Fastify │ │ │    CLI     │ │  Vercel  │
-  │ MCP (http)  │ │  REST API │ │ │ commander  │ │serverless│
-  │             │ │ + Swagger │ │ │  + clack   │ │  MCP     │
-  └─────────────┘ └───────────┘ │ └────────────┘ └──────────┘
-                                │
+                  ┌───────────────────────────────────┐
+                  │              ACTIONS              │
+                  │  name + zod schema + async run()  │
+                  └─────────────────┬─────────────────┘
+                                    │
+ ADAPTER  ┌────────────────┬────────┼────────┬────────────────┐
+          │                │        │        │                │
+  ┌───────▼──────┐ ┌───────▼──────┐ │ ┌──────▼───────┐ ┌──────▼───────┐
+  │ MCP          │ │ API          │ │ │ CLI          │ │ VERCEL       │
+  │ Http/Stdio   │ │ tRPC/Fastify │ │ │ Commander    │ │ Serverless   │
+  └──────────────┘ └──────────────┘ │ └──────────────┘ └──────────────┘
+                                    │
+ FEATURE    ┌───────────────────────┼───────────────────────┐
+            │                       │                       │
+  ┌─────────▼─────────┐   ┌─────────▼─────────┐   ┌─────────▼─────────┐
+  │ AUTHENTICATION    │   │ CONTEXT BAG       │   │ TYPE GENERATION   │
+  │ Oauth2/Bearer/JWT │   │ Typed/Extensible  │   │ Input/Output DTS  │
+  └───────────────────┘   └───────────────────┘   └───────────────────┘
 ```
 
 ---
