@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Silkweave is a TypeScript toolkit for building MCP (Model Context Protocol) servers and CLI tools from a single set of "Actions". Define an action once, then expose it via multiple adapters (MCP stdio, MCP HTTP, Fastify REST API, or CLI).
+Silkweave is a TypeScript toolkit for building MCP (Model Context Protocol) servers and CLI tools from a single set of "Actions". Define an action once, then expose it via multiple adapters (MCP stdio, MCP HTTP, Fastify REST API, tRPC, or CLI).
 
 ## Commands
 
@@ -19,6 +19,7 @@ pnpm tsx example/src/http.ts     # MCP streamable HTTP server on :8080
 pnpm tsx example/src/fastify.ts  # Fastify REST API with Swagger on :8080
 pnpm tsx example/src/http-auth.ts # MCP HTTP with bearer token auth on :8080
 pnpm tsx example/src/http-oauth.ts # MCP HTTP with Google OAuth 2.1 on :8080
+pnpm tsx example/src/trpc.ts     # tRPC standalone HTTP server on :8080/trpc/
 pnpm tsx example/src/cli.ts      # CLI mode
 
 # MCP Inspector (connects to example stdio via .mcp.json)
@@ -29,9 +30,9 @@ pnpm mcp
 
 The core pattern is **Action → Adapter → Silkweave**:
 
-- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod `input` schema, an optional Zod `output` schema, and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. The `output` schema is used by the typegen adapter to generate typed response interfaces. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads).
+- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod `input` schema, an optional Zod `output` schema, and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. The `output` schema is used by the typegen and tRPC adapters to generate typed response interfaces. An optional `kind: 'query' | 'mutation'` field (default `'mutation'`) controls how the action is exposed over tRPC - queries are GET-cacheable, mutations are POST. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads). `Action<I, O, N, K>` is generic over input/output types, the literal `name`, and `kind` - literal types are preserved through `createAction()` so the `Silkweave<Actions>` builder can thread action types to type-aware adapters like tRPC.
 - **Adapter** (`packages/core/src/util/adapter.ts`): Translates actions into a specific transport. `AdapterFactory<T>` takes config options, returns an `AdapterGenerator` that takes `SilkweaveOptions` and produces an `Adapter` with `start(actions)` / `stop()`.
-- **Silkweave** (`packages/core/src/lib/silkweave.ts`): Fluent builder - `silkweave(opts).adapter(generator).action(action).start()`.
+- **Silkweave** (`packages/core/src/lib/silkweave.ts`): Fluent builder - `silkweave(opts).adapter(generator).action(action).start()`. `Silkweave<Actions extends Record<string, Action>>` is generic over accumulated actions so `typeof server` carries action type info forward; type-aware adapters (e.g. `@silkweave/trpc`'s `InferTrpcRouter<typeof server>`) extract this for end-to-end type safety.
 
 ### Packages
 
@@ -42,6 +43,7 @@ The core pattern is **Action → Adapter → Silkweave**:
 | `@silkweave/mcp` | `packages/mcp` | MCP adapters - stdio, streamable HTTP, CLI proxy |
 | `@silkweave/cli` | `packages/cli` | CLI adapter - commander + clack terminal UI |
 | `@silkweave/fastify` | `packages/fastify` | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
+| `@silkweave/trpc` | `packages/trpc` | tRPC adapter - end-to-end type-safe procedures via `InferTrpcRouter<typeof server>` |
 | `@silkweave/vercel` | `packages/vercel` | Vercel serverless adapter - stateless MCP over Streamable HTTP |
 | `@silkweave/typegen` | `packages/typegen` | Type generator - emits `.d.ts` interfaces from action Zod schemas using the TypeScript compiler API |
 | `@silkweave/examples` | `example` | Example usage of all adapters |
@@ -54,17 +56,27 @@ The core pattern is **Action → Adapter → Silkweave**:
 | `http` | `@silkweave/mcp` | `packages/mcp/src/adapter/http.ts` | MCP Streamable HTTP (`express` + session management) |
 | `cliProxy` | `@silkweave/mcp` | `packages/mcp/src/adapter/cliProxy.ts` | MCP CLI proxy client (`commander` + `StreamableHTTPClientTransport`) |
 | `fastify` | `@silkweave/fastify` | `packages/fastify/src/adapter/fastify.ts` | REST API with Swagger UI via `@scalar/fastify-api-reference` |
+| `trpc` | `@silkweave/trpc` | `packages/trpc/src/adapter/trpc.ts` | Standalone tRPC HTTP server (`@trpc/server/adapters/standalone`) with fully-typed `AppRouter` inference |
+| `trpcFetch` | `@silkweave/trpc` | `packages/trpc/src/adapter/fetch.ts` | Fetch-compatible tRPC handler (`@trpc/server/adapters/fetch`) for Astro/Vercel/Cloudflare serverless runtimes |
 | `cli` | `@silkweave/cli` | `packages/cli/src/adapter/cli.ts` | CLI via `commander` with `@clack/prompts` output |
 | `vercel` | `@silkweave/vercel` | `packages/vercel/src/adapter/vercel.ts` | Stateless MCP Streamable HTTP (`WebStandardStreamableHTTPServerTransport`) |
 | `typegen` | `@silkweave/typegen` | `packages/typegen/src/adapter/typegen.ts` | Build-time `.d.ts` generation from action Zod schemas (`allActions: true`) |
 
-MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` names. The CLI adapter uses `kebab-case` for commands and maps Zod types to CLI options/arguments. The `typegen` adapter uses `allActions: true` to bypass `isEnabled` filtering and generate types for all registered actions.
+MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` names. The CLI adapter uses `kebab-case` for commands and maps Zod types to CLI options/arguments. The `typegen` adapter uses `allActions: true` to bypass `isEnabled` filtering and generate types for all registered actions. The `trpc` adapter registers each action as a tRPC procedure at `camelCase(action.name)`, dispatching `action.kind` to `.query()` or `.mutation()`; the exported `InferTrpcRouter<typeof server>` type extracts a fully-typed `AppRouter` for `createTRPCClient<AppRouter>()`.
 
 ### Key Utilities (in @silkweave/core)
 
 - `unwrap()` in `packages/core/src/util/zod.ts` - recursively unwraps Zod wrapper types (optional, nullable, default, readonly) to get the base type and metadata. Used by the CLI adapter for option generation.
 - `buildLogLevels()` in `packages/core/src/util/logger.ts` - builds a log-level record from a single callback function.
 - `buildCLILogger()` / `parseCLIInput()` / `handleCLIError()` in `packages/core/src/util/cli.ts` - CLI logging and input parsing utilities shared by `@silkweave/cli` and `@silkweave/mcp`'s cliProxy.
+
+### tRPC Utilities (in @silkweave/trpc)
+
+- `InferTrpcRouter<S>` in `packages/trpc/src/lib/inferRouter.ts` - type helper that extracts a `TRPCBuiltRouter` type from a `Silkweave<Actions>` instance. Maps each action to a `TRPCQueryProcedure` or `TRPCMutationProcedure` keyed by `camelCase(action.name)`, with input/output types inferred from the Zod schemas and the `run()` return type. The `Silkweave<Actions>` generic preserves literal action names and kinds through `.action()` calls, so `typeof server` carries the router shape.
+- `buildRouter(actions)` in `packages/trpc/src/lib/buildRouter.ts` - runtime counterpart to `InferTrpcRouter`. Builds the tRPC router from an `Action[]` array using `initTRPC.context<TrpcHandlerContext>().create()`. Shared by both `trpc()` (standalone HTTP) and `trpcFetch()` (fetch handler).
+- `createActionLogger()` / `resolveAuth()` in `packages/trpc/src/lib/createContext.ts` - shared helpers for the per-request silkweave context (logger injection and optional bearer-token validation). Used by both tRPC adapters.
+- `trpcFetch(options?)` in `packages/trpc/src/adapter/fetch.ts` - returns `{ adapter, handler, GET, POST }` for Web Standard runtimes (Astro, Vercel serverless, Cloudflare Workers). The internal `_ready` promise gates the handler until `server.start()` has built the router, guarding against cold-start races. CORS must be handled by the host framework.
+- `mapError(error)` in `packages/trpc/src/lib/errors.ts` - converts `SilkweaveError` (via `statusCode`), `ZodError` (to `BAD_REQUEST`), or any other thrown value to a `TRPCError` with the appropriate code.
 
 ### MCP Result Utilities (in @silkweave/mcp)
 

@@ -14,10 +14,14 @@
     "prepack": "pnpm clean && pnpm build"
   },
   "dependencies": {
+    "@astrojs/vercel": "^10.0.4",
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
     "@silkweave/logger": "workspace:*",
+    "@silkweave/trpc": "workspace:*",
     "@silkweave/vercel": "workspace:*",
+    "@trpc/client": "^11.16.0",
+    "@trpc/server": "^11.16.0",
     "@upstash/redis": "^1.37.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",

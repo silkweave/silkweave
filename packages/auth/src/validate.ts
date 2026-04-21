@@ -32,8 +32,8 @@ export async function validateToken(
   let authInfo: AuthInfo | undefined
   try {
     authInfo = await config.verifyToken(token, context)
-  } catch (_e) {
-    const err = invalidToken()
+  } catch (error) {
+    const err = invalidToken(error instanceof Error ? error.message : 'Invalid token')
     return buildErrorResult(err, resourceMetadataUrl)
   }
 

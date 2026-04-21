@@ -35,6 +35,14 @@
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:trpc",
+    "cwd": "${workspaceFolder}/example",
+    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/trpc.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "test:typegen",
     "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
@@ -47,6 +55,15 @@
     "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
     "args": ["src/http-oauth.ts"],
+    "outputCapture": "std",
+    "envFile": "${workspaceFolder}/.env"
+  }, {
+    "type": "node",
+    "request": "launch",
+    "name": "website:astro:dev",
+    "cwd": "${workspaceFolder}/website",
+    "program": "${workspaceFolder}/node_modules/astro/bin/astro.mjs",
+    "args": ["dev"],
     "outputCapture": "std",
     "envFile": "${workspaceFolder}/.env"
   }]

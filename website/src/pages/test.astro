@@ -1,0 +1,334 @@
+---
+import Footer from '../components/Footer.astro'
+import Nav from '../components/Nav.astro'
+import Layout from '../layouts/Layout.astro'
+---
+
+<Layout title="tRPC Test - Silkweave" description="Live tRPC client test page - call Silkweave actions running on Vercel Functions." slug="test">
+  <Nav />
+  <main class="test-main">
+    <div class="container">
+      <div class="page-header">
+        <p class="section-label">Live Demo</p>
+        <h1>tRPC Test</h1>
+        <p class="lede">
+          This page wires up a real <code>createTRPCClient&lt;AppRouter&gt;()</code> against the
+          <code>/api/trpc</code> endpoint served by <code>@silkweave/trpc</code>'s <code>trpcFetch()</code> handler
+          running on Vercel Functions. Click a button to dispatch the action; the raw JSON response
+          from the server is shown below.
+        </p>
+      </div>
+
+      <section class="test-section">
+        <div class="test-section-header">
+          <h2>greet</h2>
+          <span class="badge badge-mutation">mutation</span>
+        </div>
+        <div class="controls">
+          <label class="field">
+            <span>name</span>
+            <input id="greet-name" type="text" value="Silkweave" />
+          </label>
+          <button id="greet-btn" class="btn btn-primary" type="button">Call greet.mutate()</button>
+        </div>
+        <div class="result-block">
+          <div class="result-block-header"><span>Response</span></div>
+          <pre class="result" id="greet-result">Click the button to dispatch the mutation.</pre>
+        </div>
+      </section>
+
+      <section class="test-section">
+        <div class="test-section-header">
+          <h2>calculate</h2>
+          <span class="badge badge-mutation">mutation</span>
+        </div>
+        <div class="controls">
+          <label class="field">
+            <span>a</span>
+            <input id="calc-a" type="number" value="12" />
+          </label>
+          <label class="field">
+            <span>operation</span>
+            <select id="calc-op">
+              <option value="add">add</option>
+              <option value="subtract">subtract</option>
+              <option value="multiply">multiply</option>
+              <option value="divide">divide</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>b</span>
+            <input id="calc-b" type="number" value="30" />
+          </label>
+          <button id="calc-btn" class="btn btn-primary" type="button">Call calculate.mutate()</button>
+        </div>
+        <div class="result-block">
+          <div class="result-block-header"><span>Response</span></div>
+          <pre class="result" id="calc-result">Click the button to dispatch the mutation.</pre>
+        </div>
+      </section>
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<script>
+  import { createTRPCClient, httpBatchLink, TRPCClientError } from '@trpc/client'
+import type { AppRouter } from '../server/silkweave.ts'
+
+  const client = createTRPCClient<AppRouter>({
+    links: [httpBatchLink({ url: '/api/trpc' })]
+  })
+
+  function show(el: HTMLElement, payload: unknown, isError = false) {
+    el.textContent = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)
+    el.classList.toggle('is-error', isError)
+  }
+
+  function errorPayload(error: unknown) {
+    if (error instanceof TRPCClientError) {
+      return {
+        code: error.data?.code,
+        httpStatus: error.data?.httpStatus,
+        message: error.message,
+        path: error.data?.path
+      }
+    }
+    return { message: error instanceof Error ? error.message : String(error) }
+  }
+
+  const greetBtn = document.getElementById('greet-btn') as HTMLButtonElement
+  const greetInput = document.getElementById('greet-name') as HTMLInputElement
+  const greetResult = document.getElementById('greet-result')!
+  greetBtn.addEventListener('click', async () => {
+    greetBtn.disabled = true
+    show(greetResult, 'Loading...')
+    try {
+      const result = await client.greet.mutate({ name: greetInput.value })
+      show(greetResult, result)
+    } catch (error) {
+      show(greetResult, errorPayload(error), true)
+    } finally {
+      greetBtn.disabled = false
+    }
+  })
+
+  const calcBtn = document.getElementById('calc-btn') as HTMLButtonElement
+  const calcOp = document.getElementById('calc-op') as HTMLSelectElement
+  const calcA = document.getElementById('calc-a') as HTMLInputElement
+  const calcB = document.getElementById('calc-b') as HTMLInputElement
+  const calcResult = document.getElementById('calc-result')!
+  calcBtn.addEventListener('click', async () => {
+    calcBtn.disabled = true
+    show(calcResult, 'Loading...')
+    try {
+      const result = await client.calculate.mutate({
+        operation: calcOp.value as 'add' | 'subtract' | 'multiply' | 'divide',
+        a: Number(calcA.value),
+        b: Number(calcB.value)
+      })
+      show(calcResult, result)
+    } catch (error) {
+      show(calcResult, errorPayload(error), true)
+    } finally {
+      calcBtn.disabled = false
+    }
+  })
+</script>
+
+<style>
+  .test-main {
+    min-height: 100vh;
+    padding: 6rem 1.5rem 4rem;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .page-header {
+    margin-bottom: 3rem;
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+
+  .lede code {
+    font-size: 0.85em;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+  }
+
+  .test-section {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .test-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .test-section-header h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 100px;
+    border: 1px solid transparent;
+  }
+
+  .badge-mutation {
+    color: var(--accent);
+    background: var(--accent-bg);
+    border-color: rgba(99, 102, 241, 0.25);
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+    margin-bottom: 1rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .field span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+  }
+
+  .field input,
+  .field select {
+    background: var(--bg-code);
+    border: 1px solid var(--border-light);
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    min-width: 8rem;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus,
+  .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.15s;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--accent-dim);
+    color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .result-block {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .result-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.9rem;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .result {
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--text);
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 3rem;
+  }
+
+  .result.is-error {
+    color: #fca5a5;
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 1.75rem; }
+    .controls { flex-direction: column; align-items: stretch; }
+    .btn-primary { justify-content: center; }
+  }
+</style>

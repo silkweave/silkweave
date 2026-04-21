@@ -4,19 +4,26 @@ import { createContext } from '../util/context.js'
 
 export type { SilkweaveOptions } from '../util/adapter.js'
 
-export interface Silkweave {
-  set: <T>(key: string, value: T) => Silkweave
-  adapter: (generator: AdapterGenerator) => Silkweave
-  action: (action: Action) => Silkweave
-  actions: (actions: Action[]) => Silkweave
-  start: () => Promise<Silkweave>
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Silkweave<Actions extends Record<string, Action> = {}> {
+  set: <T>(key: string, value: T) => Silkweave<Actions>
+  adapter: (generator: AdapterGenerator) => Silkweave<Actions>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  action: <A extends Action<any, any, string, any>>(
+    action: A
+  ) => Silkweave<Actions & Record<A['name'], A>>
+  actions: <Arr extends readonly Action[]>(
+    actions: Arr
+  ) => Silkweave<Actions & { [K in Arr[number] as K['name']]: K }>
+  start: () => Promise<Silkweave<Actions>>
 }
 
 export function silkweave(options: SilkweaveOptions): Silkweave {
   const adapters: Adapter[] = []
   const actions: Action[] = []
   const context = createContext()
-  const builder: Silkweave = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const builder: Silkweave<any> = {
     set: (key, value) => {
       context.set(key, value)
       return builder

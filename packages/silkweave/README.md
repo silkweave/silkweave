@@ -264,7 +264,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 | Return value | `CallToolResult` via `smartToolResult` or custom `toolResult` hook |
 | Thrown errors | Structured error response via `handleToolError` |
 
-By default, MCP adapters use `smartToolResult()` to format return values — responses ≤ 4096 chars are returned as inline JSON, while larger payloads are automatically split into a text summary + base64 embedded resource to reduce LLM context bloat. Actions can override this with a custom [`toolResult` hook](#smart-tool-results).
+By default, MCP adapters use `smartToolResult()` to format return values. Responses ≤ 4096 chars are returned as inline JSON, while larger payloads are automatically split into a text summary + base64 embedded resource to reduce LLM context bloat. Actions can override this with a custom [`toolResult` hook](#smart-tool-results).
 
 MCP logging notifications are wired automatically - `logger.info("message")` in your action sends a `notifications/message` to the MCP client. Progress reporting works via `logger.progress()` when the client provides a progress token.
 
@@ -497,7 +497,7 @@ MCP adapters (stdio, HTTP, and Vercel) use `smartToolResult()` by default to for
 - **Small responses** (≤ 4096 chars): returned as inline `TextContent` JSON
 - **Large responses** (> 4096 chars): split into a short text summary + a base64 **embedded resource**, keeping the LLM's context window lean while preserving full data access
 
-Some MCP clients (e.g. VS Code since December 2025) handle this client-side for all tool calls, but most clients don't — `smartToolResult` ensures good behavior regardless of client capabilities.
+Some MCP clients (e.g. VS Code since December 2025) handle this client-side for all tool calls, but most clients don't. `smartToolResult` ensures good behavior regardless of client capabilities.
 
 ### Custom `toolResult` Hook
 
@@ -538,7 +538,7 @@ export const UserListAction = createAction({
 })
 ```
 
-Return `undefined` from `toolResult` to fall through to the default `smartToolResult` behavior. The hook only affects MCP adapters — CLI and Fastify adapters handle serialization independently.
+Return `undefined` from `toolResult` to fall through to the default `smartToolResult` behavior. The hook only affects MCP adapters. CLI and Fastify adapters handle serialization independently.
 
 ### MCP Result Utilities
 
@@ -546,7 +546,7 @@ All result utilities are exported from `@silkweave/mcp`:
 
 | Function | Description |
 |----------|-------------|
-| `smartToolResult(data)` | Default formatter — automatic embedded resource splitting at 4096 chars |
+| `smartToolResult(data)` | Default formatter with automatic embedded resource splitting at 4096 chars |
 | `jsonToolResult(data, isError?)` | Simple inline `TextContent` JSON (no splitting) |
 | `errorToolResult(error)` | Format a `SilkweaveError` as an error result |
 | `handleToolError(error)` | Catch-all error handler used by all MCP adapters |

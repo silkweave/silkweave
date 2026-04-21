@@ -17,6 +17,7 @@
     "packages/silkweave",
     "packages/mcp",
     "packages/typegen",
+    "packages/trpc",
     "packages/vercel"
   ],
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",
@@ -42,7 +43,8 @@
     "**/build": true,
     "**/.turbo": true,
     "**/.astro": true,
-    "**/.roam": true
+    "**/.roam": true,
+    "**/.vercel": true
   },
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,

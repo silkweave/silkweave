@@ -418,6 +418,81 @@ await silkweave({ name: 'my-api', version: '1.0.0' })
     </ul>
   </section>
 
+  <section id="adapter-trpc">
+    <h3>tRPC</h3>
+    <p>The <code>trpc()</code> adapter exposes each action as a fully-typed tRPC procedure on a standalone HTTP server. The returned <code>Silkweave&lt;Actions&gt;</code> instance carries action type info through <code>.action()</code> calls, so <code>InferTrpcRouter&lt;typeof server&gt;</code> produces a complete <code>AppRouter</code> type for end-to-end client inference. No code generation, no generated <code>.d.ts</code> files.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>server.ts</span></div>
+      <pre><code set:html={hl(`import { silkweave } from '@silkweave/core'
+import { trpc, type InferTrpcRouter } from '@silkweave/trpc'
+
+const server = silkweave({ name: 'my-api', version: '1.0.0' })
+  .adapter(trpc({ port: 8080 }))
+  .action(GreetAction)
+  .action(ListThingsAction)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+
+await server.start()`)} /></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>client.ts</span></div>
+      <pre><code set:html={hl(`import { createTRPCClient, httpBatchLink } from '@trpc/client'
+import type { AppRouter } from './server.js'
+
+const client = createTRPCClient<AppRouter>({
+  links: [httpBatchLink({ url: 'http://localhost:8080/trpc' })]
+})
+
+const hi = await client.greet.mutate({ name: 'World' })
+//    ^? { message: string }
+
+const things = await client.listThings.query({ contains: 'saw' })
+//    ^? { items: string[] }`)} /></pre>
+    </div>
+    <ul>
+      <li>Action names convert to <code>camelCase</code> procedure keys: <code>list-things</code> &rarr; <code>client.listThings</code></li>
+      <li>Set <code>kind: 'query'</code> on an action to expose it as a cacheable <code>.query()</code> (GET); default is <code>.mutation()</code> (POST). The literal kind is preserved through <code>createAction</code>, so calling <code>.mutate()</code> on a query is a compile-time error.</li>
+      <li>Supports <code>auth</code> option for bearer token / OAuth protection (see <a href="#authentication">Authentication</a>)</li>
+      <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults, or a <a href="https://www.npmjs.com/package/cors">CorsOptions</a> object</li>
+      <li>Options: <code>host</code>, <code>port</code>, <code>endpoint</code> (default <code>/trpc/</code>), <code>cors</code>, <code>auth</code></li>
+      <li>Thrown <code>SilkweaveError</code> maps to the matching <code>TRPCError</code> code; Zod validation errors become <code>BAD_REQUEST</code></li>
+    </ul>
+
+    <h4>Serverless / fetch handler (<code>trpcFetch</code>)</h4>
+    <p>For Astro API routes, Vercel Functions, Cloudflare Workers, or any Web Standard runtime, use <code>trpcFetch()</code> instead of <code>trpc()</code>. It returns a fetch-compatible <code>(Request) =&gt; Promise&lt;Response&gt;</code> handler instead of binding a port.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>src/server/silkweave.ts</span></div>
+      <pre><code set:html={hl(`import { silkweave } from '@silkweave/core'
+import { trpcFetch, type InferTrpcRouter } from '@silkweave/trpc'
+import { GreetAction } from './actions/greet.js'
+
+const { adapter, handler } = trpcFetch({ endpoint: '/api/trpc' })
+
+export const server = silkweave({ name: 'my-api', version: '1.0.0' })
+  .adapter(adapter)
+  .action(GreetAction)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+export { handler }
+
+await server.start()   // builds the router; no listen()`)} /></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>src/pages/api/trpc/[trpc].ts (Astro)</span></div>
+      <pre><code set:html={hl(`import type { APIRoute } from 'astro'
+import { handler } from '../../../server/silkweave.js'
+
+export const GET: APIRoute = ({ request }) => handler(request)
+export const POST: APIRoute = ({ request }) => handler(request)`)} /></pre>
+    </div>
+    <ul>
+      <li>Options: <code>endpoint</code> (default <code>/trpc</code>), <code>auth</code>. No <code>cors</code> option. Configure CORS in your host framework (Astro middleware, <code>vercel.json</code>, Worker headers)</li>
+      <li>Internal <code>_ready</code> promise gates the handler until <code>server.start()</code> completes, guarding against cold-start races on serverless</li>
+      <li>Returns <code>{'{'} adapter, handler, GET, POST {'}'}</code>; <code>GET</code>/<code>POST</code> are aliases for the primary <code>handler</code> so you can export them directly in Astro-style route files</li>
+    </ul>
+  </section>
+
   <section id="adapter-cli">
     <h3>CLI</h3>
     <p>The <code>cli()</code> adapter exposes each action as a CLI command using Commander with beautiful Clack terminal UI.</p>

@@ -92,7 +92,7 @@ By default, all MCP adapters use `smartToolResult()` to format action return val
 - **Small responses** (≤ 4096 chars): returned as inline `TextContent` JSON
 - **Large responses** (> 4096 chars): split into a short text summary + a base64 **embedded resource**, keeping the LLM's context window lean while preserving full data access
 
-This is a server-side best practice for managing context bloat. Some MCP clients (e.g. VS Code since December 2025) handle this client-side for all tool calls, but most clients don't — `smartToolResult` ensures good behavior regardless of client capabilities.
+This is a server-side best practice for managing context bloat. Some MCP clients (e.g. VS Code since December 2025) handle this client-side for all tool calls, but most clients don't. `smartToolResult` ensures good behavior regardless of client capabilities.
 
 ### Custom `toolResult` Hook
 

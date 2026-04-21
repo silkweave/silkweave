@@ -64,6 +64,33 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
   .<span class="token-function">start</span>()`
   },
   {
+    id: 'trpc',
+    label: 'tRPC',
+    pkg: '@silkweave/trpc',
+    raw: `import { silkweave } from '@silkweave/core'
+import { trpc, type InferTrpcRouter } from '@silkweave/trpc'
+import { GreetAction } from './actions/greet.js'
+
+const server = silkweave({ name: 'my-api', version: '1.0.0' })
+  .adapter(trpc({ port: 8080 }))
+  .action(GreetAction)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+
+await server.start()`,
+    code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
+<span class="token-keyword">import</span> { trpc, <span class="token-keyword">type</span> InferTrpcRouter } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/trpc'</span>
+<span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
+
+<span class="token-keyword">const</span> server = <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-api'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
+  .<span class="token-function">adapter</span>(<span class="token-function">trpc</span>({ <span class="token-property">port</span>: <span class="token-number">8080</span> }))
+  .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)
+
+<span class="token-keyword">export type</span> AppRouter = <span class="token-function">InferTrpcRouter</span>&lt;<span class="token-keyword">typeof</span> server&gt;
+
+<span class="token-keyword">await</span> server.<span class="token-function">start</span>()`
+  },
+  {
     id: 'cli',
     label: 'CLI',
     pkg: '@silkweave/cli',
@@ -140,7 +167,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 <section id="adapters" class="adapters">
   <div class="container">
     <p class="section-label">Adapters</p>
-    <h2 class="section-title">Same action. Six adapters.</h2>
+    <h2 class="section-title">Same action. Seven adapters.</h2>
     <p class="section-desc">
       Swap one line to change how your action is served. The business logic stays identical.
     </p>
