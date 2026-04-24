@@ -1,4 +1,4 @@
-import { type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import { EmbeddedResource, type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { SilkweaveError } from '@silkweave/core'
 import { randomUUID } from 'node:crypto'
 
@@ -47,4 +47,9 @@ export function handleToolError(error: unknown): CallToolResult {
   } else {
     return jsonToolResult({ success: false, name: 'Unknown error', message: 'An unknown error occurred', error }, true)
   }
+}
+
+export function parseResourceMessage({ resource }: EmbeddedResource) {
+  const text = ('blob' in resource) ? Buffer.from(resource.blob, 'base64').toString('utf-8') : resource.text
+  return text
 }

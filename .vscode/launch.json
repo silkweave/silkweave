@@ -11,6 +11,14 @@
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:cli-proxy",
+    "cwd": "${workspaceFolder}/example",
+    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/cli-proxy.ts", "user-list", "--response-type", "smart"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "test:action",
     "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",

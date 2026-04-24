@@ -13,7 +13,7 @@ import express, { Express, Request, Response } from 'express'
 import { readFile } from 'fs/promises'
 import { Server } from 'http'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { handleToolError, smartToolResult } from '../util/result.js'
+import { handleToolError, jsonToolResult, smartToolResult } from '../util/result.js'
 import { SideloadResource } from '../util/sideload.js'
 
 const authStorage = new AsyncLocalStorage<AuthInfo>()
@@ -109,12 +109,18 @@ function registerTools(server: McpServer, actions: Action[], context: SilkweaveC
       })
       const currentAuth = authStorage.getStore()
       const actionContext = context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })
-      return action.run(input, actionContext)
-        .then((result) => {
-          const data = action.toolResult?.(result, actionContext) ?? smartToolResult(result)
-          return data
-        })
-        .catch(handleToolError)
+      const disposition = extra._meta?.disposition
+      return action.run(input, actionContext).then((result) => {
+        if (action.toolResult) {
+          const response = action.toolResult(result, actionContext)
+          if (response) { return response }
+        }
+        if (disposition === 'json') {
+          return jsonToolResult(result)
+        } else {
+          return smartToolResult(result)
+        }
+      }).catch(handleToolError)
     })
   }
 }
