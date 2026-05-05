@@ -6,7 +6,7 @@ import DocsLayout from '../layouts/DocsLayout.astro'
 const installRaw = `pnpm add @silkweave/core @silkweave/mcp zod`
 
 const actionRaw = `import { createAction } from '@silkweave/core'
-import z from 'zod'
+import z from 'zod/v4'
 
 export const GreetAction = createAction({
   name: 'greet',
@@ -123,7 +123,7 @@ describe('GreetAction', () => {
 
 const smartResultRaw = `import { createAction } from '@silkweave/core'
 import { smartToolResult } from '@silkweave/mcp'
-import z from 'zod'
+import z from 'zod/v4'
 
 export const UserListAction = createAction({
   name: 'user-list',

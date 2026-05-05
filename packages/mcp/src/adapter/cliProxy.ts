@@ -7,7 +7,7 @@ import { createCLILogger } from '@silkweave/logger'
 import { kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { randomUUID } from 'crypto'
-import { z } from 'zod'
+import { z } from 'zod/v4'
 import { JSONSchema } from 'zod/v4/core'
 import { parseResourceMessage } from '../util/result.js'
 

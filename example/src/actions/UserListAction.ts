@@ -1,7 +1,7 @@
 import { createAction } from '@silkweave/core'
 import { jsonToolResult, smartToolResult } from '@silkweave/mcp'
 import { readFileSync } from 'fs'
-import z from 'zod'
+import z from 'zod/v4'
 
 interface User {
   id: string

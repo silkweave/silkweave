@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { z } from 'zod'
+import { z } from 'zod/v4'
 
 export interface UnwrapResult {
   defaultValue?: any

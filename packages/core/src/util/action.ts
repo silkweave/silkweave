@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import z from 'zod'
+import z from 'zod/v4'
 import { SilkweaveContext } from './context.js'
 
 export type ActionKind = 'query' | 'mutation'

@@ -1,7 +1,7 @@
 import { createAction } from '@silkweave/core'
 import { Logger } from '@silkweave/logger'
 import { createSideloadResource } from '@silkweave/mcp'
-import z from 'zod'
+import z from 'zod/v4'
 
 export const TaskAction = createAction({
   name: 'task',

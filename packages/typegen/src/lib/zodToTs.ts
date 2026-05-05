@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ts, { factory as f } from 'typescript'
-import { z } from 'zod'
+import { z } from 'zod/v4'
 
 export function zodToTs(schema: z.ZodTypeAny): ts.TypeNode {
   const def = (schema as any)._zod.def

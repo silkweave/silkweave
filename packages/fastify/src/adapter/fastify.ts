@@ -4,7 +4,7 @@ import { AdapterFactory, SilkweaveContext, SilkweaveError } from '@silkweave/cor
 import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { Server } from 'http'
-import z from 'zod'
+import z from 'zod/v4'
 
 type FastifyLogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
 

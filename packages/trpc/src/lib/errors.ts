@@ -1,6 +1,6 @@
 import { SilkweaveError } from '@silkweave/core'
 import { TRPCError } from '@trpc/server'
-import { z } from 'zod'
+import { z } from 'zod/v4'
 
 type TRPCErrorCode = TRPCError['code']
 

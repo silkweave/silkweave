@@ -108,7 +108,7 @@ Create an action:
 
 ```typescript
 // actions/greet.ts
-import z from 'zod'
+import z from 'zod/v4'
 import { createAction } from '@silkweave/core'
 
 export const GreetAction = createAction({
@@ -151,7 +151,7 @@ That's it. Your action is now an MCP tool called `Greet` that any MCP client (Cl
 An Action is the fundamental unit of logic in Silkweave. It is completely transport-agnostic.
 
 ```typescript
-import z from 'zod'
+import z from 'zod/v4'
 import { createAction } from '@silkweave/core'
 
 export const SearchAction = createAction({
@@ -506,7 +506,7 @@ Actions can override the default formatting by defining a `toolResult` hook:
 ```typescript
 import { createAction } from '@silkweave/core'
 import { smartToolResult } from '@silkweave/mcp'
-import z from 'zod'
+import z from 'zod/v4'
 
 export const UserListAction = createAction({
   name: 'user-list',

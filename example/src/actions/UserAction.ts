@@ -1,6 +1,6 @@
 import { AuthInfo } from '@silkweave/auth'
 import { createAction } from '@silkweave/core'
-import z from 'zod'
+import z from 'zod/v4'
 
 export const UserAction = createAction({
   name: 'user',

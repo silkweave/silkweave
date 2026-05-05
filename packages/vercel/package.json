@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/vercel",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Silkweave Vercel Serverless Adapter",
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
     "@silkweave/mcp": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "change-case": "^5.4.4",
-    "zod": "^4.3.6"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

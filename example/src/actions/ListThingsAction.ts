@@ -1,5 +1,5 @@
 import { createAction } from '@silkweave/core'
-import z from 'zod'
+import z from 'zod/v4'
 
 const THINGS = ['hammer', 'saw', 'wrench', 'screwdriver', 'drill']
 

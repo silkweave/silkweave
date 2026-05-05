@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/core",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Silkweave Core",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@silkweave/logger": "workspace:*",
-    "zod": "^4.3.6"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

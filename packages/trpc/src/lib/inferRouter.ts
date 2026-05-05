@@ -1,17 +1,12 @@
 import { Action, Silkweave } from '@silkweave/core'
-import type {
-  AnyTRPCRootTypes,
-  TRPCBuiltRouter,
-  TRPCMutationProcedure,
-  TRPCQueryProcedure
-} from '@trpc/server'
-import type { z } from 'zod'
+import type { AnyTRPCRootTypes, TRPCBuiltRouter, TRPCMutationProcedure, TRPCQueryProcedure } from '@trpc/server'
+import type { z } from 'zod/v4'
 
 type CamelCase<S extends string> = S extends `${infer A}-${infer B}`
   ? `${A}${Capitalize<CamelCase<B>>}`
-  : S extends `${infer A}_${infer B}`
+  : (S extends `${infer A}_${infer B}`
     ? `${A}${Capitalize<CamelCase<B>>}`
-    : S
+    : S)
 
 type ActionToProcedure<A extends Action> = 'query' extends NonNullable<A['kind']>
   ? TRPCQueryProcedure<{

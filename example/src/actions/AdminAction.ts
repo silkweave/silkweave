@@ -1,6 +1,6 @@
 import { createAction } from '@silkweave/core'
 import { Logger } from '@silkweave/logger'
-import z from 'zod'
+import z from 'zod/v4'
 
 export const AdminAction = createAction({
   name: 'admin',

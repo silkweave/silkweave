@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/trpc",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Silkweave tRPC Adapter",
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
     "@trpc/server": "^11.7.1",
     "change-case": "^5.4.4",
     "cors": "^2.8.5",
-    "zod": "^4.3.6"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

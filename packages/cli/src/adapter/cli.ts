@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { intro, log } from '@clack/prompts'
-import { Action, AdapterFactory, SilkweaveError, SilkweaveOptions, unwrap } from '@silkweave/core'
+import { Action, AdapterFactory, SilkweaveContext, SilkweaveError, SilkweaveOptions, unwrap } from '@silkweave/core'
 import { createCLILogger } from '@silkweave/logger'
-import { SilkweaveContext } from '@silkweave/core'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
-import z from 'zod'
+import z from 'zod/v4'
 
 function handleCLIError(error: unknown) {
   if (error instanceof SilkweaveError) {

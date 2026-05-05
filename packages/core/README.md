@@ -22,7 +22,7 @@ This package provides the foundational building blocks that all Silkweave adapte
 
 ```typescript
 import { silkweave, createAction } from '@silkweave/core'
-import z from 'zod'
+import z from 'zod/v4'
 
 const GreetAction = createAction({
   name: 'greet',

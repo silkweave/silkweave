@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/fastify",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Silkweave Fastify REST Adapter",
   "repository": {
     "type": "git",
@@ -33,7 +33,7 @@
     "@silkweave/core": "workspace:*",
     "@silkweave/logger": "workspace:*",
     "fastify": "^5.8.2",
-    "zod": "^4.3.6"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
