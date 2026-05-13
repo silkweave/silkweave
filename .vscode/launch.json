@@ -68,9 +68,17 @@
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:nestjs",
+    "cwd": "${workspaceFolder}/example",
+    "runtimeArgs": ["--import", "@swc-node/register/esm-register"],
+    "program": "${workspaceFolder}/example/src/nestjs.ts",
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "website:astro:dev",
     "cwd": "${workspaceFolder}/website",
-    "program": "${workspaceFolder}/node_modules/astro/bin/astro.mjs",
+    "program": "${workspaceFolder}/website/node_modules/astro/bin/astro.mjs",
     "args": ["dev"],
     "outputCapture": "std",
     "envFile": "${workspaceFolder}/.env"

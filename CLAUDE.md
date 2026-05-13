@@ -45,6 +45,7 @@ The core pattern is **Action → Adapter → Silkweave**:
 | `@silkweave/fastify` | `packages/fastify` | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
 | `@silkweave/trpc` | `packages/trpc` | tRPC adapter - end-to-end type-safe procedures via `InferTrpcRouter<typeof server>` |
 | `@silkweave/vercel` | `packages/vercel` | Vercel serverless adapter - stateless MCP over Streamable HTTP |
+| `@silkweave/nestjs` | `packages/nestjs` | NestJS adapter - method/class decorators (`@Action`, `@Actions`) discovered via DI, mounted as REST/tRPC/MCP routes on Nest's HTTP server |
 | `@silkweave/typegen` | `packages/typegen` | Type generator - emits `.d.ts` interfaces from action Zod schemas using the TypeScript compiler API |
 | `@silkweave/examples` | `example` | Example usage of all adapters |
 
@@ -60,6 +61,7 @@ The core pattern is **Action → Adapter → Silkweave**:
 | `trpcFetch` | `@silkweave/trpc` | `packages/trpc/src/adapter/fetch.ts` | Fetch-compatible tRPC handler (`@trpc/server/adapters/fetch`) for Astro/Vercel/Cloudflare serverless runtimes |
 | `cli` | `@silkweave/cli` | `packages/cli/src/adapter/cli.ts` | CLI via `commander` with `@clack/prompts` output |
 | `vercel` | `@silkweave/vercel` | `packages/vercel/src/adapter/vercel.ts` | Stateless MCP Streamable HTTP (`WebStandardStreamableHTTPServerTransport`) |
+| `rest`, `trpc`, `mcp` | `@silkweave/nestjs` | `packages/nestjs/src/adapter/{rest,trpc,mcp}.ts` | NestJS adapters that mount on Nest's HTTP server; `@Action` methods discovered via `DiscoveryService` |
 | `typegen` | `@silkweave/typegen` | `packages/typegen/src/adapter/typegen.ts` | Build-time `.d.ts` generation from action Zod schemas (`allActions: true`) |
 
 MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` names. The CLI adapter uses `kebab-case` for commands and maps Zod types to CLI options/arguments. The `typegen` adapter uses `allActions: true` to bypass `isEnabled` filtering and generate types for all registered actions. The `trpc` adapter registers each action as a tRPC procedure at `camelCase(action.name)`, dispatching `action.kind` to `.query()` or `.mutation()`; the exported `InferTrpcRouter<typeof server>` type extracts a fully-typed `AppRouter` for `createTRPCClient<AppRouter>()`.
@@ -82,6 +84,15 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 
 - `smartToolResult()` in `packages/mcp/src/util/result.ts` - default response formatter. Responses ≤ 4096 chars are returned as `TextContent` JSON; larger payloads are automatically split into a short text summary + base64 embedded resource to reduce LLM context bloat.
 - `jsonToolResult()` / `errorToolResult()` / `handleToolError()` in `packages/mcp/src/util/result.ts` - lower-level helpers for constructing `CallToolResult` objects. Used internally by all MCP adapters and available for custom `toolResult` hooks.
+- `createMcpExpressHandler()` in `packages/mcp/src/lib/handler.ts` - builds the Express sub-app exposing MCP Streamable HTTP, OAuth routes, and bearer-token auth. Shared by `http()` (server-owning) and `@silkweave/nestjs`'s `mcp()` (mounts on Nest's HTTP server).
+
+### NestJS Utilities (in @silkweave/nestjs)
+
+- `@Action(options)` (`packages/nestjs/src/decorator/action.ts`) - method decorator that registers an Action on a Nest provider. Compiles `transports[]` allowlist into the core `Action.isEnabled` mechanism.
+- `@Actions(prefix?)` (`packages/nestjs/src/decorator/actions.ts`) - class decorator that prefixes every method-level action name. Accepts `string` shorthand or `{ prefix, transports }`.
+- `ActionDiscovery` (`packages/nestjs/src/lib/discovery.ts`) - walks every Nest provider via `DiscoveryService` + `MetadataScanner`, builds core `Action[]` from `@Action` metadata, wraps each invocation with guard resolution.
+- `runGuards()` (`packages/nestjs/src/lib/guards.ts`) - reads `@UseGuards()` metadata from method+class, resolves guard instances via `ModuleRef`, runs `canActivate()` against a `SilkweaveExecutionContext`.
+- `reserveSlot()` (`packages/nestjs/src/lib/slot.ts`) - mounts a placeholder middleware on Nest's HTTP server during `OnModuleInit` (before Nest's 404 catch-all is installed) and returns a setter callback used in `OnApplicationBootstrap` to populate the real handler. This is the key to the adapter's lifecycle correctness.
 
 ## Tooling
 

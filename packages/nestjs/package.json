@@ -1,43 +1,54 @@
 {
-  "name": "@silkweave/example",
+  "name": "@silkweave/nestjs",
   "version": "1.8.0",
-  "description": "Silkweave Examples",
+  "description": "Silkweave NestJS Adapter",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/silkweave/silkweave.git",
-    "directory": "example"
+    "directory": "packages/nestjs"
   },
   "type": "module",
+  "main": "src/index.ts",
+  "publishConfig": {
+    "main": "build/index.mjs",
+    "exports": {
+      ".": "./build/index.mjs"
+    },
+    "types": "./build/index.d.ts"
+  },
   "scripts": {
+    "clean": "rimraf build",
+    "build": "tsdown",
+    "prepack": "pnpm clean && pnpm build",
+    "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"
   },
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0"
+  },
   "dependencies": {
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/platform-express": "^11.0.0",
     "@silkweave/auth": "workspace:*",
-    "@silkweave/cli": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "@silkweave/fastify": "workspace:*",
     "@silkweave/logger": "workspace:*",
     "@silkweave/mcp": "workspace:*",
-    "@silkweave/nestjs": "workspace:*",
     "@silkweave/trpc": "workspace:*",
-    "@silkweave/typegen": "workspace:*",
-    "@silkweave/vercel": "workspace:*",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
-    "silkweave": "workspace:*",
+    "@trpc/server": "^11.7.1",
+    "change-case": "^5.4.4",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
     "@stylistic/eslint-plugin": "^5.10.0",
-    "@swc-node/register": "^1.11.1",
     "@types/node": "^22.0.0",
+    "reflect-metadata": "^0.2.2",
     "rimraf": "^6.1.3",
+    "rxjs": "^7.8.1",
+    "tsdown": "^0.21.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"

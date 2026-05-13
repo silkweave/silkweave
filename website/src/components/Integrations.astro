@@ -1,0 +1,196 @@
+---
+const integrations = [
+  {
+    id: 'standalone',
+    label: 'Standalone',
+    logo: '/logo-color.svg',
+    logoAlt: 'Silkweave',
+    status: 'Stable',
+    summary: 'Compose the fluent builder yourself. Pick whichever adapters fit; run it as a Node process, container, or serverless function.',
+    bullets: [
+      'Chain unlimited adapters; one action served everywhere',
+      'Per-action <code>isEnabled</code> filtering across transports',
+      'Drop into Astro / Vercel / Workers via fetch handlers'
+    ],
+    href: '/docs#integration-standalone'
+  },
+  {
+    id: 'nestjs',
+    label: 'NestJS',
+    logo: '/nestjs.svg',
+    logoAlt: 'NestJS',
+    status: 'Stable',
+    summary: 'Define actions as method decorators on Nest providers. Mounts as REST, tRPC, and MCP on your running Nest server, with native guards and DI.',
+    bullets: [
+      '<code>@Action</code> / <code>@Actions</code> decorators, <code>DiscoveryService</code>-driven',
+      '<code>@UseGuards()</code> fires on every HTTP-backed transport',
+      'Per-action <code>transports</code> allowlist (REST, tRPC, MCP)'
+    ],
+    href: '/docs#integration-nestjs'
+  },
+  {
+    id: 'nextjs',
+    label: 'Next.js',
+    logo: '/nextjs.svg',
+    logoAlt: 'Next.js',
+    status: 'Coming soon',
+    summary: 'App Router route helpers that mount actions as MCP and tRPC endpoints, sharing the Next request context. Today: use <code>trpcFetch()</code> and <code>vercel()</code> in route handlers.',
+    bullets: [
+      'File-based MCP routes (planned)',
+      'App-Router-shaped tRPC + MCP helpers (planned)',
+      'Use <code>trpcFetch</code> / <code>vercel</code> today'
+    ],
+    href: '/docs#integration-nextjs'
+  }
+]
+---
+
+<section id="integrations" class="integrations">
+  <div class="container">
+    <p class="section-label">Integrations</p>
+    <h2 class="section-title">Drop into your framework of choice.</h2>
+    <p class="section-desc">
+      Adapters are one transport each. Integrations compose them with the conventions of a host framework — decorators, DI, file-based routing — so Silkweave feels native.
+    </p>
+
+    <div class="integration-grid">
+      {integrations.map((i) => (
+        <a href={i.href} class={`integration-card ${i.status === 'Coming soon' ? 'soon' : ''}`}>
+          <div class="integration-header">
+            <img src={i.logo} alt={i.logoAlt} class="integration-logo" width="40" height="40" />
+            <h3 class="integration-name">{i.label}</h3>
+            <span class={`integration-status ${i.status === 'Coming soon' ? 'soon' : 'stable'}`}>{i.status}</span>
+          </div>
+          <p class="integration-summary" set:html={i.summary} />
+          <ul class="integration-bullets">
+            {i.bullets.map((b) => <li set:html={b} />)}
+          </ul>
+          <span class="integration-link">Read the docs →</span>
+        </a>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .integrations {
+    border-top: 1px solid var(--border);
+  }
+
+  .integration-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-top: 2rem;
+  }
+
+  .integration-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background: var(--surface, rgba(255, 255, 255, 0.02));
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 0.5rem);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+
+  .integration-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .integration-card.soon {
+    opacity: 0.85;
+  }
+
+  .integration-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .integration-logo {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+  }
+
+  .integration-name {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .integration-status {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+  }
+
+  .integration-status.stable {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-bg, rgba(255, 255, 255, 0.04));
+  }
+
+  .integration-status.soon {
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .integration-summary {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .integration-bullets {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .integration-bullets li {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    padding-left: 1rem;
+    position: relative;
+  }
+
+  .integration-bullets li::before {
+    content: '·';
+    position: absolute;
+    left: 0.25rem;
+    color: var(--accent);
+  }
+
+  .integration-link {
+    margin-top: auto;
+    padding-top: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .integration-card code {
+    font-size: 0.78rem;
+    padding: 0.05rem 0.3rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 3px;
+  }
+</style>

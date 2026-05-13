@@ -587,6 +587,147 @@ export { GET, POST, DELETE }`)} /></pre>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- INTEGRATIONS                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <section id="integrations">
+    <h2>Integrations</h2>
+    <p>Adapters are the low-level primitives — one Action maps to one wire format. <strong>Integrations</strong> sit one level up: they compose adapters with the conventions of a host framework (DI containers, decorators, file-based routing, lifecycle hooks) so Silkweave feels native to that framework.</p>
+    <p>Pick the integration that matches the shape of your app:</p>
+    <table class="docs-table">
+      <thead><tr><th>Integration</th><th>When to use</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><a href="#integration-standalone"><strong>Standalone</strong></a></td>
+          <td>You own your <code>main.ts</code>. Compose <code>silkweave().adapter(...).action(...).start()</code> directly with the adapters from <a href="#adapter-reference">Adapter Reference</a>.</td>
+          <td>Stable</td>
+        </tr>
+        <tr>
+          <td><a href="#integration-nestjs"><strong>NestJS</strong></a></td>
+          <td>You're building on NestJS modules + DI. Define actions as method decorators on providers; expose them simultaneously over REST, tRPC, and MCP on Nest's running HTTP server.</td>
+          <td>Stable</td>
+        </tr>
+        <tr>
+          <td><a href="#integration-nextjs"><strong>Next.js</strong></a></td>
+          <td>You're building on the Next.js App Router. File-based route helpers for MCP and tRPC, sharing your Next request context.</td>
+          <td>Coming soon</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="integration-standalone">
+    <h3><img src="/logo-color.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Standalone</h3>
+    <p>The default. Compose the fluent builder yourself, pick whichever adapters fit, run it however you like — Node entrypoint, Docker container, serverless function, anywhere a Node process can boot.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>main.ts</span></div>
+      <pre><code set:html={hl(`import { silkweave } from '@silkweave/core'
+import { http } from '@silkweave/mcp'
+import { fastify } from '@silkweave/fastify'
+import { GreetAction } from './actions/greet.js'
+
+await silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(http({ host: 'localhost', port: 8080 }))   // MCP Streamable HTTP
+  .adapter(fastify({ port: 8081 }))                   // REST + Swagger
+  .action(GreetAction)
+  .start()`)} /></pre>
+    </div>
+    <ul>
+      <li>Chain as many adapters as you need; the same actions are exposed on every transport (filterable per-action via <code>isEnabled</code>).</li>
+      <li>For serverless runtimes, use the fetch-handler adapters (<a href="#adapter-trpc"><code>trpcFetch</code></a>, <a href="#adapter-vercel"><code>vercel</code></a>) instead of server-binding ones.</li>
+      <li>Full reference: <a href="#adapter-reference">Adapter Reference</a> ↑</li>
+    </ul>
+  </section>
+
+  <section id="integration-nestjs">
+    <h3><img src="/nestjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> NestJS</h3>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes Actions defined as <strong>method decorators on Nest providers</strong>, then mounts them simultaneously as REST routes, tRPC procedures, and MCP tools — all on Nest's running HTTP server, so guards, interceptors, DI, and lifecycle hooks stay coherent.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>install</span></div>
+      <pre><code set:html={hl(`pnpm add @silkweave/core @silkweave/nestjs @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata`)} /></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>users.actions.ts</span></div>
+      <pre><code set:html={hl(`import { Injectable, UseGuards } from '@nestjs/common'
+import { type SilkweaveContext } from '@silkweave/core'
+import { Action, Actions } from '@silkweave/nestjs'
+import z from 'zod/v4'
+
+const ListInput = z.object({ activeOnly: z.coerce.boolean().optional() })
+
+@Injectable()
+@Actions('users')                       // optional class prefix
+export class UserActions {
+  constructor(private readonly db: DbService) {}
+
+  @Action({
+    description: 'List users',
+    input: ListInput,
+    kind: 'query'                        // GET in REST, .query() in tRPC
+  })
+  list(input: z.infer<typeof ListInput>, _ctx: SilkweaveContext) {
+    return this.db.listUsers(input.activeOnly)
+  }
+
+  @UseGuards(AdminGuard)                 // native Nest guards work
+  @Action({
+    description: 'Ban a user',
+    input: z.object({ id: z.string(), reason: z.string() }),
+    transports: ['rest', 'trpc']         // hide from MCP tools
+  })
+  ban(input, _ctx) { return this.db.ban(input.id, input.reason) }
+}`)} /></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>app.module.ts</span></div>
+      <pre><code set:html={hl(`import { Module } from '@nestjs/common'
+import { mcp, rest, SilkweaveModule, trpc } from '@silkweave/nestjs'
+
+@Module({
+  imports: [
+    SilkweaveModule.forRoot({
+      silkweave: { name: 'my-app', description: 'My App', version: '1.0.0' },
+      adapters: [
+        rest({ basePath: '/api' }),
+        trpc({ basePath: '/trpc' }),
+        mcp({ basePath: '/' })
+      ]
+    })
+  ],
+  providers: [UserActions, AdminGuard]
+})
+export class AppModule {}`)} /></pre>
+    </div>
+    <p>The <code>users.list</code> action is now reachable at <code>GET /api/users/list</code> (REST), <code>client.usersList.query(...)</code> (tRPC), and as the <code>UsersList</code> MCP tool. The <code>users.ban</code> action skips MCP per its <code>transports</code> allowlist and is gated by the Nest guard on every transport.</p>
+    <h4>Action name → transport path</h4>
+    <table class="docs-table">
+      <thead><tr><th>Action name</th><th>REST</th><th>tRPC</th><th>MCP tool</th></tr></thead>
+      <tbody>
+        <tr><td><code>hello</code></td><td><code>/hello</code></td><td><code>hello</code></td><td><code>Hello</code></td></tr>
+        <tr><td><code>users.list</code></td><td><code>/users/list</code></td><td><code>usersList</code></td><td><code>UsersList</code></td></tr>
+        <tr><td><code>posts.get-by-id</code></td><td><code>/posts/get-by-id</code></td><td><code>postsGetById</code></td><td><code>PostsGetById</code></td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>Adapters mount placeholder middleware slots in <code>OnModuleInit</code> (before Nest's 404 catch-all is installed), then populate the real handlers in <code>OnApplicationBootstrap</code> after <code>@Action</code> discovery completes.</li>
+      <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on every HTTP-backed transport. Action methods are normal Nest providers — inject services via the constructor.</li>
+      <li>Use <code>z.coerce.boolean()</code> / <code>z.coerce.number()</code> for fields read from REST query strings.</li>
+      <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev — plain <code>tsx</code> doesn't emit decorator metadata.</li>
+      <li>Default platform is <code>@nestjs/platform-express</code>. For <code>@nestjs/platform-fastify</code>, register <code>@fastify/express</code> first.</li>
+    </ul>
+    <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nestjs#readme"><code>@silkweave/nestjs</code> README</a>.</p>
+  </section>
+
+  <section id="integration-nextjs">
+    <h3><img src="/nextjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Next.js <span class="badge-soon">coming soon</span></h3>
+    <p><code>@silkweave/nextjs</code> will provide App Router route helpers that mount your actions as MCP and tRPC endpoints at the file-system path of your choice, sharing the Next request context (headers, cookies, server actions). Until it ships, target Next.js with the standalone adapters today:</p>
+    <ul>
+      <li><strong>tRPC:</strong> use <a href="#adapter-trpc"><code>trpcFetch()</code></a> in a Route Handler — its <code>{'{ GET, POST }'}</code> exports drop straight into <code>app/api/trpc/[...trpc]/route.ts</code>.</li>
+      <li><strong>MCP:</strong> use <a href="#adapter-vercel"><code>vercel()</code></a> — its <code>{'{ GET, POST, DELETE }'}</code> exports are App-Router-compatible. Stateless and Edge-runtime-friendly.</li>
+    </ul>
+    <p>Follow progress: <a href="https://github.com/silkweave/silkweave/issues">github.com/silkweave/silkweave/issues</a>.</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- SMART TOOL RESULTS                                             -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <section id="smart-tool-results">
@@ -910,6 +1051,29 @@ expect(result.name).toBe('Alice')`)} /></pre>
 
   .docs-table code {
     font-size: 0.82rem;
+  }
+
+  .integration-heading-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    vertical-align: -7px;
+    margin-right: 0.4rem;
+  }
+
+  .badge-soon {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    background: var(--accent-bg, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    vertical-align: middle;
   }
 </style>
 
