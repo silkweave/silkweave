@@ -146,7 +146,7 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 - test: skip
 - push: yes
 - version_bump: yes (aligned across all packages)
-  + `pnpm -r exec pnpm version x.x.x --no-git-tag-version`
+  + `pnpm -r exec npm version 1.9.0 --no-git-tag-version --force`
 - publish: yes (manual - prompt to run `! pnpm publish:all`)
 - docs: per-package README.md + root CLAUDE.md as index + website docs page
 - frontend_smoke: N/A
