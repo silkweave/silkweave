@@ -27,8 +27,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@silkweave/logger": "workspace:*",
-    "zod": "^3.25.0"
+    "@silkweave/logger": "workspace:*"
+  },
+  "peerDependencies": {
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -39,6 +41,7 @@
     "tsdown": "^0.21.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "zod": "^4.0.0"
   }
 }
