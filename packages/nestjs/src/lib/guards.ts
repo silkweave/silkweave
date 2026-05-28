@@ -24,7 +24,7 @@ export function collectGuards(
 async function resolveGuard(ref: GuardRef, moduleRef: ModuleRef): Promise<CanActivate> {
   if (typeof ref === 'function') {
     try {
-      return moduleRef.get(ref, { strict: false })
+      return await moduleRef.get(ref, { strict: false })
     } catch {
       return moduleRef.create(ref)
     }
@@ -59,6 +59,6 @@ export async function runGuards(
       throw new ForbiddenException('Forbidden resource')
     }
   }
-  // Reflector kept in the signature for future use (e.g., per-guard metadata) — unused here.
+  // Reflector kept in the signature for future use (e.g., per-guard metadata) - unused here.
   void reflector
 }

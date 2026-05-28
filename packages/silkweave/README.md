@@ -39,6 +39,8 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
   - [CLI](#cli)
   - [Vercel Serverless](#vercel-serverless)
 - [Logging and Progress](#logging-and-progress)
+- [Streaming Actions](#streaming-actions)
+- [Plug into Vercel AI SDK](#plug-into-vercel-ai-sdk)
 - [Smart Tool Results](#smart-tool-results)
 - [Advanced Patterns](#advanced-patterns)
   - [Multiple Adapters Simultaneously](#multiple-adapters-simultaneously)
@@ -75,6 +77,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + clack terminal UI |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
 | `@silkweave/vercel` | [![npm](https://img.shields.io/npm/v/@silkweave/vercel)](https://www.npmjs.com/package/@silkweave/vercel) | Vercel serverless adapter - stateless MCP over Streamable HTTP |
+| `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - `createChatAction()` + `silkweaveTransport()` for `useChat` over tRPC subscriptions |
 | `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - pino, clack, and MCP notification support |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
@@ -92,8 +95,11 @@ pnpm add @silkweave/core @silkweave/cli
 # Vercel serverless MCP
 pnpm add @silkweave/core @silkweave/vercel
 
+# Vercel AI SDK chat (useChat over tRPC subscriptions)
+pnpm add @silkweave/core @silkweave/trpc @silkweave/ai ai @ai-sdk/anthropic
+
 # All of the above
-pnpm add @silkweave/core @silkweave/mcp @silkweave/cli @silkweave/fastify @silkweave/vercel
+pnpm add @silkweave/core @silkweave/mcp @silkweave/cli @silkweave/fastify @silkweave/vercel @silkweave/ai
 ```
 
 ---
@@ -488,6 +494,132 @@ run: async (input, { logger }) => {
 | `critical` | `notifications/message` | `logger.fatal()` | `log.error()` |
 | `progress` | `notifications/progress` | `logger.trace()` | `console.info()` |
 
+`logger.progress()` is for **numeric progress reporting** (e.g. "step 3 of 10") inside an otherwise-buffered action. For per-chunk **data streaming**, define the action as a streaming action - see the next section.
+
+---
+
+## Streaming Actions
+
+A streaming action returns multiple chunks over the lifetime of a single invocation instead of one buffered result. Declare a `chunk` Zod schema and write `run` as an `async function*`:
+
+```typescript
+import { createAction } from '@silkweave/core'
+import z from 'zod/v4'
+
+export const GenerateMessagesAction = createAction({
+  name: 'generate-messages',
+  description: 'Stream a series of generated messages about a topic',
+  input: z.object({
+    topic: z.string().describe('The topic to generate messages about'),
+    count: z.number().int().min(1).max(50).default(5)
+  }),
+  chunk: z.object({
+    index: z.number().int(),
+    text: z.string()
+  }),
+  run: async function* ({ topic, count }, { logger }) {
+    logger.info(`Streaming ${count} messages about "${topic}"`)
+    for (let i = 0; i < count; i += 1) {
+      yield { index: i, text: `Message ${i + 1} about ${topic}` }
+    }
+  }
+})
+```
+
+Adapters detect streaming actions via `isStreamingAction()` at registration time and switch to per-chunk wire delivery. The action itself is unchanged across transports - the same generator runs whether it's reached over MCP, HTTP, tRPC, or the CLI.
+
+### How each adapter delivers chunks
+
+| Adapter | Wire format | How a client opts in | Buffered fallback |
+|---------|-------------|---------------------|-------------------|
+| **MCP stdio** (`@silkweave/mcp`) | `notifications/progress` - one notification per chunk, with the JSON-stringified chunk in the `message` field and a 1-based `progress` counter | Client sends `_meta.progressToken` in the tool call (MCP SDK does this automatically when the host subscribes) | Action runs to completion; chunks are buffered and returned as the final `CallToolResult` |
+| **MCP HTTP** (`@silkweave/mcp`) | Same - `notifications/progress` carried on the session's SSE stream | Same - `_meta.progressToken` | Same |
+| **MCP Vercel** (`@silkweave/vercel`) | Same - `notifications/progress` over Streamable HTTP | Same | Same |
+| **Fastify REST** (`@silkweave/fastify`) | `text/event-stream` (SSE: `data: <json>\n\n`, terminated by `event: done`) **or** `application/x-ndjson` (one JSON chunk per line) | `Accept: text/event-stream` or `Accept: application/x-ndjson` | `200 OK` with the buffered chunk array as JSON |
+| **tRPC** (`@silkweave/trpc`) | Action is registered as a tRPC **`.subscription()`** whose async generator yields chunks directly | Streaming action ⇒ always a subscription, regardless of `kind` | n/a - the consumer iterates the subscription |
+| **CLI** (`@silkweave/cli`) | NDJSON on stdout (one JSON chunk per line, backpressure-aware via `stdout.write` + `drain`) | Streaming action ⇒ always streamed | n/a |
+
+Backpressure is wired end-to-end: each adapter awaits the wire-level write (SSE drain, stdout drain, MCP notification ack) before pulling the next value from your generator. Slow consumers throttle the action rather than buffering chunks unboundedly in memory.
+
+### What streaming means for AI/MCP clients
+
+This is the part that most often surprises people, and it's worth being explicit about.
+
+**On the wire**, MCP `notifications/progress` is standard protocol - your server emits one notification per chunk, and any compliant MCP client receives them as they're produced.
+
+**What the client does with them is up to the client.** Most LLM-driven MCP hosts today (Claude Code, Cursor, generic chat UIs) consume progress notifications for **UI rendering** - spinners, status text, progress bars in the terminal or chat - and **not** as incremental data fed into the model's context. From the model's perspective, an MCP tool call is still atomic: invoke → wait → single aggregated result.
+
+So the chunks reach the wire correctly; **in-flight model visibility depends on host behavior**, not on your server. Today, you can rely on chunks being:
+
+- Delivered to the host process
+- Surfaced as UI affordances (spinner text, progress bars) - visible to the human user
+- Useful for resumability and cancellation (`Last-Event-ID`, abort signals)
+
+You generally **cannot** rely on the host feeding chunks into the model's context as they arrive. The model will see the buffered result when the call returns.
+
+**If you need per-chunk model visibility today**, prefer transports where streaming is part of the consumer contract rather than a side channel:
+
+- **Fastify SSE/NDJSON** - your consumer (a frontend, a worker, another agent) iterates chunks directly
+- **tRPC subscriptions** - typed async-iterable client-side; trivial to fan out chunk-by-chunk
+- **CLI NDJSON** - pipe `your-tool generate-messages | jq` and process each line
+
+These flip the architecture so the consumer drives chunk handling, which keeps the model in the loop without depending on host-specific MCP behavior.
+
+---
+
+## Plug into Vercel AI SDK
+
+The [`@silkweave/ai`](https://www.npmjs.com/package/@silkweave/ai) package bridges Vercel AI SDK's `useChat` hook to a Silkweave streaming action over a tRPC subscription. No `/api/chat` route, no AI SDK Data Stream Protocol - `useChat` consumes plain `UIMessageChunk` objects directly from your tRPC client.
+
+```bash
+pnpm add @silkweave/ai @silkweave/core @silkweave/trpc ai @ai-sdk/anthropic
+```
+
+**Server** - `createChatAction` wraps `streamText` in a Silkweave streaming action whose `chunk` schema is `UIMessageChunk`. The tRPC adapter sees it's streaming and registers it as a `.subscription()` automatically:
+
+```typescript
+import { silkweave } from '@silkweave/core'
+import { trpc, type InferTrpcRouter } from '@silkweave/trpc'
+import { createChatAction } from '@silkweave/ai'
+import { anthropic } from '@ai-sdk/anthropic'
+
+const ChatAction = createChatAction({
+  model: anthropic('claude-haiku-4-5'),
+  system: 'You are a helpful assistant.'
+})
+
+const server = silkweave({ name: 'chat', description: 'AI Chat', version: '1.0.0' })
+  .adapter(trpc({ port: 8081 }))
+  .action(ChatAction)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+
+await server.start()
+```
+
+**Client** - `silkweaveTransport` is a custom `ChatTransport` for `useChat` that wraps any subscribe-style function into the `ReadableStream<UIMessageChunk>` the hook expects:
+
+```typescript
+import { useChat } from '@ai-sdk/react'
+import { silkweaveTransport } from '@silkweave/ai'
+import { trpc } from './trpc-client'
+
+const transport = silkweaveTransport(trpc.chat.subscribe)
+
+export function Chat() {
+  const { messages, sendMessage } = useChat({ transport })
+  // ... your UI; ai-elements components work out of the box
+}
+```
+
+That's the entire integration. Type safety flows from `AppRouter` through `useChat`; AI SDK's frontend hook is none the wiser that it's not talking to a `DefaultChatTransport` HTTP endpoint.
+
+**Caveats:**
+- `reconnectToStream` returns `null` - no stream resume after disconnect. Fine for most cases; production chat with persistence would need server-side stream replay
+- `httpSubscriptionLink` uses SSE (GET), so large message arrays serialized into the query string will hit URL length limits. Switch to `wsLink` (WebSocket) for production
+
+See [`examples/ai/`](../../examples/ai) in the repo for a complete Vite + React + Tailwind chat app.
+
 ---
 
 ## Smart Tool Results
@@ -825,10 +957,10 @@ pnpm build
 pnpm check
 
 # Run example servers
-pnpm tsx example/src/stdio.ts    # MCP stdio server
-pnpm tsx example/src/http.ts     # MCP streamable HTTP server on :8080
-pnpm tsx example/src/fastify.ts  # Fastify REST API with Swagger on :8080
-pnpm tsx example/src/cli.ts      # CLI mode
+pnpm -F @silkweave/example-mcp stdio       # MCP stdio server
+pnpm -F @silkweave/example-mcp http        # MCP streamable HTTP server on :8080
+pnpm -F @silkweave/example-fastify dev     # Fastify REST API with Swagger on :8080
+pnpm -F @silkweave/example-cli dev         # CLI mode
 ```
 
 Requires Node.js >= 18.

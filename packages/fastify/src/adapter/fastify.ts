@@ -1,7 +1,8 @@
 import type { FastifyCorsOptions } from '@fastify/cors'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { AdapterFactory, SilkweaveContext, SilkweaveError } from '@silkweave/core'
+import { Action, ActionStreamRun, AdapterFactory, isStreamingAction, runStreamingAction, SilkweaveContext, SilkweaveError } from '@silkweave/core'
 import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
+import { once } from 'events'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { Server } from 'http'
 import z from 'zod/v4'
@@ -88,6 +89,55 @@ function mountAuthMiddleware(instance: FastifyInstance, auth: AuthConfig, oauthP
   })
 }
 
+type StreamFormat = 'sse' | 'ndjson'
+
+function pickStreamFormat(acceptHeader: string | undefined): StreamFormat | null {
+  if (!acceptHeader) { return null }
+  if (acceptHeader.includes('text/event-stream')) { return 'sse' }
+  if (acceptHeader.includes('application/x-ndjson') || acceptHeader.includes('application/ndjson')) { return 'ndjson' }
+  return null
+}
+
+async function streamAction(
+  reply: FastifyReply,
+  format: StreamFormat,
+  action: Action,
+  input: object,
+  context: SilkweaveContext
+): Promise<void> {
+  reply.raw.setHeader('Content-Type', format === 'sse' ? 'text/event-stream' : 'application/x-ndjson')
+  reply.raw.setHeader('Cache-Control', 'no-cache, no-transform')
+  reply.raw.setHeader('Connection', 'keep-alive')
+  reply.raw.flushHeaders?.()
+  reply.hijack()
+  const streamRun = action.run as ActionStreamRun<object, unknown>
+  const iter = streamRun(input, context)
+  try {
+    for await (const chunk of iter) {
+      const payload = JSON.stringify(chunk)
+      const line = format === 'sse' ? `data: ${payload}\n\n` : `${payload}\n`
+      if (!reply.raw.write(line)) {
+        await once(reply.raw, 'drain')
+      }
+    }
+    if (format === 'sse') {
+      reply.raw.write('event: done\ndata: {}\n\n')
+    }
+  } catch (error) {
+    const payload = JSON.stringify({
+      error: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : 'Error'
+    })
+    if (format === 'sse') {
+      reply.raw.write(`event: error\ndata: ${payload}\n\n`)
+    } else {
+      reply.raw.write(`${payload}\n`)
+    }
+  } finally {
+    reply.raw.end()
+  }
+}
+
 function createActionLogger(instance: FastifyInstance): Logger {
   return {
     ...buildLogLevels((level, data) => {
@@ -119,7 +169,7 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
             }
           }
         })
-        await instance.register(import('@scalar/fastify-api-reference'), { routePrefix: '/' as `/${string}` })
+        await instance.register(import('@scalar/fastify-api-reference'), { routePrefix: '/' })
 
         if (auth?.authorizationServers?.length && auth.resourceUrl) {
           instance.get('/.well-known/oauth-protected-resource', () => {
@@ -147,7 +197,8 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
         const logger = createActionLogger(instance)
 
         for (const action of actions) {
-          const schema = action.input.toJSONSchema()
+          const schema = z.toJSONSchema(action.input) as { properties?: Record<string, unknown>; required?: string[] }
+          const streaming = isStreamingAction(action)
           instance.post(`/${action.name}`, {
             schema: {
               description: action.description,
@@ -160,9 +211,18 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
                 200: { description: 'Successful response' }
               }
             }
-          }, (request) => {
+          }, async (request, reply) => {
             const authInfo = auth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
-            return action.run(request.body, context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) }))
+            const actionContext = context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) })
+            if (streaming) {
+              const format = pickStreamFormat(request.headers.accept)
+              if (format) {
+                await streamAction(reply, format, action, request.body as object, actionContext)
+                return reply
+              }
+              return runStreamingAction(action, request.body as object, actionContext)
+            }
+            return action.run(request.body, actionContext)
           })
         }
         await instance.listen({ host, port })

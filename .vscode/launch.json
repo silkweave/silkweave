@@ -3,75 +3,91 @@
   "configurations": [{
     "type": "node",
     "request": "launch",
-    "name": "test:cli",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["src/cli.ts"],
-    "outputCapture": "std"
-  }, {
-    "type": "node",
-    "request": "launch",
-    "name": "test:cli-proxy",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["src/cli-proxy.ts", "user-list", "--response-type", "smart"],
-    "outputCapture": "std"
-  }, {
-    "type": "node",
-    "request": "launch",
-    "name": "test:action",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "name": "test:core",
+    "cwd": "${workspaceFolder}/examples/core",
+    "program": "${workspaceFolder}/examples/core/node_modules/tsx/dist/cli.cjs",
     "args": ["src/action.ts"],
     "outputCapture": "std"
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:cli",
+    "cwd": "${workspaceFolder}/examples/cli",
+    "program": "${workspaceFolder}/examples/cli/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/cli.ts", "hello", "--type", "dog", "joseph"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
+    "name": "test:cli-proxy",
+    "cwd": "${workspaceFolder}/examples/mcp",
+    "program": "${workspaceFolder}/examples/mcp/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/cli-proxy.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
+    "name": "test:stdio",
+    "cwd": "${workspaceFolder}/examples/mcp",
+    "program": "${workspaceFolder}/examples/mcp/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/stdio.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "test:http",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "cwd": "${workspaceFolder}/examples/mcp",
+    "program": "${workspaceFolder}/examples/mcp/node_modules/tsx/dist/cli.cjs",
     "args": ["src/http.ts"],
     "outputCapture": "std"
   }, {
     "type": "node",
     "request": "launch",
     "name": "test:http-auth",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "cwd": "${workspaceFolder}/examples/mcp",
+    "program": "${workspaceFolder}/examples/mcp/node_modules/tsx/dist/cli.cjs",
     "args": ["src/http-auth.ts"],
     "outputCapture": "std"
   }, {
     "type": "node",
     "request": "launch",
-    "name": "test:trpc",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["src/trpc.ts"],
-    "outputCapture": "std"
-  }, {
-    "type": "node",
-    "request": "launch",
-    "name": "test:typegen",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["src/typegen.ts"],
-    "outputCapture": "std"
-  }, {
-    "type": "node",
-    "request": "launch",
     "name": "test:http-oauth",
-    "cwd": "${workspaceFolder}/example",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "cwd": "${workspaceFolder}/examples/mcp",
+    "program": "${workspaceFolder}/examples/mcp/node_modules/tsx/dist/cli.cjs",
     "args": ["src/http-oauth.ts"],
     "outputCapture": "std",
     "envFile": "${workspaceFolder}/.env"
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:fastify",
+    "cwd": "${workspaceFolder}/examples/fastify",
+    "program": "${workspaceFolder}/examples/fastify/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/fastify.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
+    "name": "test:trpc",
+    "cwd": "${workspaceFolder}/examples/trpc",
+    "program": "${workspaceFolder}/examples/trpc/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/trpc.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
+    "name": "test:typegen",
+    "cwd": "${workspaceFolder}/examples/typegen",
+    "program": "${workspaceFolder}/examples/typegen/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/typegen.ts"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "test:nestjs",
-    "cwd": "${workspaceFolder}/example",
+    "cwd": "${workspaceFolder}/examples/nestjs",
     "runtimeArgs": ["--import", "@swc-node/register/esm-register"],
-    "program": "${workspaceFolder}/example/src/nestjs.ts",
+    "program": "${workspaceFolder}/examples/nestjs/src/main.ts",
     "outputCapture": "std"
   }, {
     "type": "node",

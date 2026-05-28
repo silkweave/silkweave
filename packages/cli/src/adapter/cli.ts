@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { intro, log } from '@clack/prompts'
-import { Action, AdapterFactory, SilkweaveContext, SilkweaveError, SilkweaveOptions, unwrap } from '@silkweave/core'
+import { Action, ActionRun, ActionStreamRun, AdapterFactory, isStreamingAction, SilkweaveContext, SilkweaveError, SilkweaveOptions, unwrap } from '@silkweave/core'
 import { createCLILogger } from '@silkweave/logger'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
+import { once } from 'events'
 import z from 'zod/v4'
 
 function handleCLIError(error: unknown) {
@@ -58,6 +59,17 @@ function addCliOption(command: Command, key: string, type: z.ZodType, defaultVal
   }
 }
 
+async function runStreamingCommand(action: Action, input: object, context: SilkweaveContext) {
+  const streamRun = action.run as ActionStreamRun<object, unknown>
+  const iter = streamRun(input, context)
+  for await (const chunk of iter) {
+    const line = JSON.stringify(chunk) + '\n'
+    if (!process.stdout.write(line)) {
+      await once(process.stdout, 'drain')
+    }
+  }
+}
+
 function registerCommand(program: Command, action: Action, options: SilkweaveOptions, context: SilkweaveContext) {
   const command = program.command(kebabCase(action.name)).description(action.description)
   const shape = action.input.shape
@@ -68,8 +80,14 @@ function registerCommand(program: Command, action: Action, options: SilkweaveOpt
   command.action((...args) => {
     const logger = createCLILogger()
     const input = parseCLIInput(action, args)
+    const actionContext = context.fork({ logger, command })
+    if (isStreamingAction(action)) {
+      runStreamingCommand(action, input, actionContext).catch(handleCLIError)
+      return
+    }
     intro(`${options.name} - ${action.name}`)
-    action.run(input, context.fork({ logger, command })).then((result) => {
+    const runFn = action.run as ActionRun<object, object>
+    runFn(input, actionContext).then((result) => {
       logger.info(JSON.stringify(result, null, 2))
     }).catch(handleCLIError)
   })

@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
+import { Action, ActionRun, AdapterGenerator, isStreamingAction, runStreamingAction, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { handleToolError, smartToolResult } from '@silkweave/mcp'
 import { capitalCase, pascalCase } from 'change-case'
@@ -53,9 +53,25 @@ function registerTools(server: McpServer, actions: Action[], requestContext: Sil
         }
       })
       const actionContext = requestContext.fork({ logger, extra })
-      return action.run(input, actionContext)
-        .then((result) => action.toolResult?.(result, actionContext) ?? smartToolResult(result))
-        .catch(handleToolError)
+      const progressToken = extra._meta?.progressToken
+      try {
+        let result: object | object[]
+        if (isStreamingAction(action)) {
+          result = await runStreamingAction(action, input, actionContext, progressToken
+            ? async (chunk, index) => {
+              await extra.sendNotification({
+                method: 'notifications/progress',
+                params: { progressToken, progress: index + 1, message: JSON.stringify(chunk) }
+              })
+            }
+            : undefined)
+        } else {
+          result = await (action.run as ActionRun<object, object>)(input, actionContext)
+        }
+        return action.toolResult?.(result, actionContext) ?? smartToolResult(result)
+      } catch (error) {
+        return handleToolError(error)
+      }
     })
   }
 }

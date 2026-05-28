@@ -2,13 +2,11 @@ import { intro } from '@clack/prompts'
 import { Client } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { ContentBlock, LoggingMessageNotificationSchema, ProgressNotificationSchema, ToolResultContent } from '@modelcontextprotocol/sdk/types.js'
-import { AdapterFactory, unwrap } from '@silkweave/core'
+import { AdapterFactory } from '@silkweave/core'
 import { createCLILogger } from '@silkweave/logger'
 import { kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { randomUUID } from 'crypto'
-import { z } from 'zod/v4'
-import { JSONSchema } from 'zod/v4/core'
 import { parseResourceMessage } from '../util/result.js'
 
 export type CLIFormatterFn = (message: ContentBlock, index: number, messages: ContentBlock[]) => string | undefined
@@ -18,22 +16,51 @@ export interface CliProxyOptions {
   formatter?: CLIFormatterFn
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function addCliOption(command: Command, key: string, type: z.ZodType, defaultValue: any) {
-  const description = type.description
-  const flag = kebabCase(key)
-  if (type instanceof z.ZodBoolean) {
-    command.option(`--${flag}`, description, defaultValue)
-    command.option(`--no-${flag}`)
-  } else if (type instanceof z.ZodNumber) {
-    command.option(`--${flag} <number>`, description, defaultValue)
-  } else if (type instanceof z.ZodString || type instanceof z.ZodEnum) {
-    command.option(`--${flag} <string>`, description, defaultValue)
-  } else if (type instanceof z.ZodObject || type instanceof z.ZodRecord || type instanceof z.ZodArray) {
-    command.option(`--${flag} <json>`, description ?? '', JSON.parse, defaultValue)
-  } else {
-    throw new Error(`Invalid zod type: ${type.def.type}`)
+interface JsonSchemaProperty {
+  type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | string
+  description?: string
+  default?: unknown
+  enum?: unknown[]
+}
+
+interface JsonSchemaObject {
+  type?: 'object'
+  properties?: Record<string, JsonSchemaProperty>
+  required?: string[]
+}
+
+function coerce(value: unknown, type: JsonSchemaProperty['type']): unknown {
+  if (value === undefined) { return undefined }
+  if (type === 'number' || type === 'integer') {
+    const n = Number(value)
+    return Number.isNaN(n) ? value : n
   }
+  return value
+}
+
+function addCliOption(command: Command, key: string, prop: JsonSchemaProperty) {
+  const flag = kebabCase(key)
+  const description = prop.description
+  const defaultValue = prop.default
+  const type = prop.type
+  if (type === 'boolean') {
+    command.option(`--${flag}`, description, defaultValue as boolean | undefined)
+    command.option(`--no-${flag}`)
+    return
+  }
+  if (type === 'number' || type === 'integer') {
+    command.option(`--${flag} <number>`, description, defaultValue as string | undefined)
+    return
+  }
+  if (type === 'string' || prop.enum) {
+    command.option(`--${flag} <string>`, description, defaultValue as string | undefined)
+    return
+  }
+  if (type === 'object' || type === 'array') {
+    command.option(`--${flag} <json>`, description ?? '', JSON.parse, defaultValue as never)
+    return
+  }
+  throw new Error(`Unsupported JSON Schema type for CLI option "${key}": ${type ?? 'undefined'}`)
 }
 
 const defaultFormatter: CLIFormatterFn = (message) => {
@@ -44,7 +71,6 @@ const defaultFormatter: CLIFormatterFn = (message) => {
   } else {
     return JSON.stringify(message)
   }
-
 }
 
 export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = defaultFormatter }) => {
@@ -71,14 +97,12 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = def
           const name = kebabCase(tool.name)
           const command = program.command(name)
           if (tool.description) { command.description(tool.description) }
-          const schema = z.fromJSONSchema(tool.inputSchema as JSONSchema.JSONSchema)
-          if (!(schema instanceof z.ZodObject)) { throw new Error('Invalid schema') }
-          const shape = schema.shape
-          for (const key of Object.keys(shape)) {
-            const [type, { defaultValue }] = unwrap(shape[key])
-            addCliOption(command, key, type, defaultValue)
+          const schema = tool.inputSchema as JsonSchemaObject
+          const properties = schema.properties ?? {}
+          for (const key of Object.keys(properties)) {
+            addCliOption(command, key, properties[key])
           }
-          command.action(async (args) => {
+          command.action(async (args: Record<string, unknown>) => {
             const { silent } = program.opts<{ silent: boolean }>()
             const logger = createCLILogger()
             if (!silent) {
@@ -90,7 +114,11 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = def
                 logger.info({ progress, total, message })
               })
             }
-            const input = await schema.parseAsync(args)
+            const input: Record<string, unknown> = {}
+            for (const key of Object.keys(properties)) {
+              const value = args[key]
+              if (value !== undefined) { input[key] = coerce(value, properties[key]?.type) }
+            }
             const response = await client.callTool({
               name: tool.name,
               arguments: input,
@@ -105,7 +133,7 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = def
         await program.parseAsync()
         await transport.close()
       },
-      stop: async () => { }
+      stop: async () => { /* noop */ }
     }
   }
 }

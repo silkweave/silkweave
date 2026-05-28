@@ -20,7 +20,7 @@ export function unwrap(
     return unwrap(type.unwrap() as z.ZodTypeAny, result)
   } else if (type instanceof z.ZodReadonly) {
     result.isReadOnly = true
-    return unwrap(type.unwrap() as z.ZodTypeAny, result)
+    return unwrap(type.def.innerType as z.ZodTypeAny, result)
   } else if (type instanceof z.ZodDefault) {
     result.defaultValue = typeof type.def.defaultValue === 'function'
       ? type.def.defaultValue()

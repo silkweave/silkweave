@@ -1,6 +1,6 @@
 import type { ArgumentsHost, ContextType, ExecutionContext, Type } from '@nestjs/common'
 
-/** Subset of `HttpArgumentsHost` we need — re-declared inline to avoid deep `@nestjs/common/interfaces` imports. */
+/** Subset of `HttpArgumentsHost` we need - re-declared inline to avoid deep `@nestjs/common/interfaces` imports. */
 interface HttpHost {
   getRequest<T = unknown>(): T
   getResponse<T = unknown>(): T
@@ -28,8 +28,8 @@ export class SilkweaveExecutionContext implements ExecutionContext, ArgumentsHos
     private readonly args: unknown[],
     private readonly classRef: Type<unknown>,
     private readonly handler: (...handlerArgs: unknown[]) => unknown,
-    private readonly contextType: string = 'http'
-  ) {}
+    private readonly contextType = 'http'
+  ) { }
 
   getType<T extends string = ContextType>(): T {
     return this.contextType as T

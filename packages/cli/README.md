@@ -61,6 +61,24 @@ const DeployAction = createAction({
 $ mytool deploy production --dry-run
 ```
 
+## Streaming Actions
+
+Actions defined with a `chunk` schema and an `async function*` `run` (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) stream output as **NDJSON on stdout** - one JSON-encoded chunk per line. The clack intro/progress UI is bypassed for streaming commands so the output is pipe-friendly.
+
+```bash
+$ mytool generate-messages --topic weather --count 3
+{"index":0,"text":"Message 1 about weather"}
+{"index":1,"text":"Message 2 about weather"}
+{"index":2,"text":"Message 3 about weather"}
+
+$ mytool generate-messages --topic weather --count 100 | jq -r '.text' | head -5
+Message 1 about weather
+Message 2 about weather
+...
+```
+
+Backpressure is honoured: each chunk write awaits `stdout`'s `drain` event when the buffer is full, so the action throttles itself if a downstream pipe is slow.
+
 ## See Also
 
 - [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation

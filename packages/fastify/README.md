@@ -32,6 +32,37 @@ Each action becomes a `POST /{action.name}` route. Zod schemas are converted to 
 | `name: 'search'` | `POST /search` | `{ "query": "...", "limit": 10 }` |
 | `name: 'greet'` | `POST /greet` | `{ "name": "World" }` |
 
+## Streaming Actions
+
+Actions defined with a `chunk` schema and an `async function*` `run` (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) are exposed on the same `POST /{action.name}` route, but the response shape depends on the request's `Accept` header:
+
+| `Accept` header | Response format |
+|---|---|
+| `text/event-stream` | Server-Sent Events. One `data: <chunk-json>\n\n` block per yielded chunk, terminated with `event: done\ndata: {}\n\n`. Errors come through as `event: error\ndata: <error-json>\n\n`. |
+| `application/x-ndjson` (or `application/ndjson`) | Newline-delimited JSON. One JSON chunk per line; errors are written as a final JSON line and the stream is closed. |
+| anything else (or omitted) | Buffered fallback - the action runs to completion and the chunks are returned as a JSON array with `200 OK`. |
+
+Backpressure flows end-to-end: the adapter awaits `socket.drain` between chunks before pulling the next value from your generator, so a slow client throttles the action rather than buffering chunks unboundedly.
+
+```bash
+# SSE
+curl -N -H 'Accept: text/event-stream' \
+  -H 'Content-Type: application/json' \
+  -d '{"topic":"weather","count":5}' \
+  http://localhost:8080/generate-messages
+
+# NDJSON
+curl -N -H 'Accept: application/x-ndjson' \
+  -H 'Content-Type: application/json' \
+  -d '{"topic":"weather","count":5}' \
+  http://localhost:8080/generate-messages
+
+# Buffered
+curl -H 'Content-Type: application/json' \
+  -d '{"topic":"weather","count":5}' \
+  http://localhost:8080/generate-messages
+```
+
 ## Options
 
 `FastifyAdapterOptions` extends Fastify's native `FastifyHttpOptions`, so any Fastify config is supported:

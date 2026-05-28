@@ -1,0 +1,47 @@
+{
+  "name": "@silkweave/example-ai",
+  "version": "1.9.1",
+  "description": "Silkweave + Vercel AI SDK + tRPC subscriptions chat example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"pnpm dev:server\" \"pnpm dev:web\"",
+    "dev:server": "tsx watch --tsconfig tsconfig.server.json server/server.ts",
+    "dev:web": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
+    "lint": "eslint",
+    "check": "pnpm typecheck"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.0",
+    "@ai-sdk/react": "^2.0.0",
+    "@silkweave/ai": "workspace:*",
+    "@silkweave/core": "workspace:*",
+    "@silkweave/trpc": "workspace:*",
+    "@trpc/client": "^11.7.1",
+    "@trpc/server": "^11.7.1",
+    "ai": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.0.0",
+    "dotenv": "^17.4.2",
+    "eslint": "^10.4.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vite": "^6.0.0"
+  }
+}

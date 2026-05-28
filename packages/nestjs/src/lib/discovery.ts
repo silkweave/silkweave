@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, type Type } from '@nestjs/common'
 import { DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
 import { createAction, type Action, type SilkweaveContext } from '@silkweave/core'
@@ -22,7 +23,7 @@ export class ActionDiscovery {
     private readonly scanner: MetadataScanner,
     private readonly reflector: Reflector,
     private readonly moduleRef: ModuleRef
-  ) {}
+  ) { }
 
   /**
    * Walk every Nest provider, find methods annotated with `@Action`, and build
@@ -64,18 +65,17 @@ export class ActionDiscovery {
     const reflector = this.reflector
 
     // Cast at the createAction boundary to bridge dual-zod-version installs
-    // (zod@3.25 + zod@4.x can both be present transitively). Runtime is fine —
-    // they share the same /v4 surface — but the structural types are distinct.
-    type CreateActionArg = Parameters<typeof createAction>[0]
+    // (zod@3.25 + zod@4.x can both be present transitively). Runtime is fine -
+    // they share the same /v4 surface - but the structural types are distinct.
     return createAction({
       name,
       description: d.meta.description,
-      input: d.meta.input as unknown as CreateActionArg['input'],
-      output: d.meta.output as unknown as CreateActionArg['output'],
+      input: d.meta.input,
+      output: d.meta.output,
       kind: d.meta.kind ?? 'mutation',
-      args: d.meta.args as CreateActionArg['args'],
+      args: d.meta.args,
       isEnabled,
-      toolResult: d.meta.toolResult as CreateActionArg['toolResult'],
+      toolResult: d.meta.toolResult,
       run: async (input: object, context: SilkweaveContext): Promise<object> => {
         if (guards.length > 0) {
           const request = context.getOptional<unknown>('request')

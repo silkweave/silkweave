@@ -164,6 +164,82 @@ const cmd = context.get<Command>('command')
 // MCP adapters: access MCP extra metadata
 const extra = context.get<ToolExtra>('extra')`
 
+const aiSdkServerRaw = `import { silkweave } from '@silkweave/core'
+import { trpc, type InferTrpcRouter } from '@silkweave/trpc'
+import { createChatAction } from '@silkweave/ai'
+import { anthropic } from '@ai-sdk/anthropic'
+
+const ChatAction = createChatAction({
+  model: anthropic('claude-haiku-4-5'),
+  system: 'You are a helpful assistant.'
+})
+
+const server = silkweave({ name: 'chat', description: 'AI Chat', version: '1.0.0' })
+  .adapter(trpc({ host: 'localhost', port: 8081 }))
+  .action(ChatAction)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+
+await server.start()`
+
+const aiSdkClientRaw = `import { createTRPCClient, httpSubscriptionLink, httpBatchLink, splitLink } from '@trpc/client'
+import type { AppRouter } from '../server/server.js'
+
+export const trpc = createTRPCClient<AppRouter>({
+  links: [
+    splitLink({
+      condition: (op) => op.type === 'subscription',
+      true: httpSubscriptionLink({ url: '/trpc' }),
+      false: httpBatchLink({ url: '/trpc' })
+    })
+  ]
+})`
+
+const aiSdkDiagramRaw = `streamText() ─► toUIMessageStream() ─► yield chunk
+                                          │
+                              [silkweave streaming action]
+                                          │
+                                  [tRPC subscription]
+                                          │
+                                          ▼
+ReadableStream<UIMessageChunk> ◄─ silkweaveTransport ─◄ trpc.chat.subscribe
+                                          │
+                                          ▼
+                                    useChat({ transport })`
+
+const aiSdkUseChatRaw = `import { useChat } from '@ai-sdk/react'
+import { silkweaveTransport } from '@silkweave/ai'
+import { trpc } from './trpc'
+
+const transport = silkweaveTransport(trpc.chat.subscribe)
+
+export function Chat() {
+  const { messages, sendMessage, status, stop } = useChat({ transport })
+  // ... your UI (ai-elements works as-is)
+}`
+
+const streamingActionRaw = `import { createAction } from '@silkweave/core'
+import z from 'zod/v4'
+
+export const GenerateMessagesAction = createAction({
+  name: 'generate-messages',
+  description: 'Stream a series of messages about a topic',
+  input: z.object({
+    topic: z.string(),
+    count: z.number().int().min(1).max(50).default(5)
+  }),
+  chunk: z.object({
+    index: z.number().int(),
+    text: z.string()
+  }),
+  run: async function* ({ topic, count }, { logger }) {
+    logger.info('streaming ' + count + ' messages')
+    for (let i = 0; i < count; i += 1) {
+      yield { index: i, text: 'Message ' + (i + 1) + ' about ' + topic }
+    }
+  }
+})`
+
 const typegenRaw = `import { silkweave } from '@silkweave/core'
 import { typegen } from '@silkweave/typegen'
 import { GreetAction } from './actions/greet.js'
@@ -272,14 +348,18 @@ function hl(raw: string): string {
     <p>An <strong>Action</strong> is a named operation with a Zod input schema and an async handler. Actions are completely transport-agnostic - they know nothing about HTTP, stdio, or CLI.</p>
     <div class="code-block">
       <div class="code-block-header"><span>Action interface</span></div>
-      <pre><code set:html={hl(`interface Action<I, O> {
+      <pre><code set:html={hl(`interface Action<I, O, Chunk = never> {
   name: string
   description: string
   input: z.ZodType<I>
-  output?: z.ZodType<O>
+  output?: z.ZodType<O>             // buffered actions
+  chunk?: z.ZodType<Chunk>          // streaming actions
+  kind?: 'query' | 'mutation'       // tRPC dispatch
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
-  run: (input: I, context: SilkweaveContext) => Promise<O>
+  run:
+    | ((input: I, context: SilkweaveContext) => Promise<O>)
+    | ((input: I, context: SilkweaveContext) => AsyncGenerator<Chunk>)
   toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
 }`)} /></pre>
     </div>
@@ -287,6 +367,7 @@ function hl(raw: string): string {
       <li><strong><code>name</code></strong> - Identifier used for routing (kebab-case for CLI, PascalCase for MCP tools, URL path for Fastify).</li>
       <li><strong><code>input</code></strong> - Zod object schema. Drives validation, CLI option generation, and OpenAPI docs.</li>
       <li><strong><code>output</code></strong> - Optional Zod object schema for the return type. Used by the <a href="#adapter-typegen">typegen adapter</a> to generate typed response interfaces and by Fastify for OpenAPI response schemas.</li>
+      <li><strong><code>chunk</code></strong> - Optional Zod schema for individual chunks yielded by a streaming <code>run</code> (an <code>async function*</code>). Presence of this field plus a generator <code>run</code> marks the action as <a href="#streaming">streaming</a>; adapters then switch to per-chunk wire delivery.</li>
       <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
       <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
       <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
@@ -354,6 +435,62 @@ function hl(raw: string): string {
     <p>Use <code>context.get&lt;T&gt;(key)</code> when the key is guaranteed to exist (throws if missing). Use <code>context.getOptional&lt;T&gt;(key)</code> for keys that may not be present (returns <code>undefined</code>).</p>
   </section>
 
+  <section id="streaming">
+    <h3>Streaming Actions</h3>
+    <p>A streaming action returns multiple chunks over the lifetime of a single invocation instead of one buffered result. Declare a <code>chunk</code> Zod schema and write <code>run</code> as an <code>async function*</code>:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>actions/generate-messages.ts</span>
+        <button class="copy-btn" data-copy-raw={streamingActionRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(streamingActionRaw)} /></pre>
+    </div>
+    <p>The action itself is unchanged across transports - the same generator runs whether it's invoked over MCP, HTTP, tRPC, or the CLI. Adapters detect streaming actions via <code>isStreamingAction()</code> at registration time and switch to per-chunk wire delivery, with backpressure wired end-to-end (each chunk write awaits the wire-level drain before pulling the next value from your generator).</p>
+
+    <h4>How each adapter delivers chunks</h4>
+    <table class="docs-table">
+      <thead><tr><th>Adapter</th><th>Wire format</th><th>How a client opts in</th><th>Buffered fallback</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>MCP (<code>stdio</code>, <code>http</code>, <code>vercel</code>)</td>
+          <td>MCP <code>notifications/progress</code> - one notification per chunk, JSON-stringified into the <code>message</code> field</td>
+          <td>Client sends <code>_meta.progressToken</code> with the tool call (the MCP SDK does this automatically when the host registers a progress listener)</td>
+          <td>Tool resolves with the buffered chunk array as the <code>CallToolResult</code></td>
+        </tr>
+        <tr>
+          <td>Fastify REST</td>
+          <td><code>text/event-stream</code> (SSE: <code>data: &lt;json&gt;\n\n</code> per chunk, ending with <code>event: done</code>) <strong>or</strong> <code>application/x-ndjson</code> (one JSON chunk per line)</td>
+          <td><code>Accept: text/event-stream</code> or <code>Accept: application/x-ndjson</code></td>
+          <td><code>200 OK</code> with the chunk array as a JSON body</td>
+        </tr>
+        <tr>
+          <td>tRPC (<code>trpc</code>, <code>trpcFetch</code>)</td>
+          <td>tRPC <code>.subscription()</code> whose async generator yields chunks directly; consumer iterates with <code>client.foo.subscribe(...)</code></td>
+          <td>Streaming action ⇒ always a subscription (regardless of <code>kind</code>)</td>
+          <td>n/a - the consumer drives chunk delivery</td>
+        </tr>
+        <tr>
+          <td>CLI</td>
+          <td>NDJSON on stdout (one JSON chunk per line, pipe-friendly)</td>
+          <td>Streaming action ⇒ always streamed</td>
+          <td>n/a</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>What streaming means for AI/MCP clients</h4>
+    <p>This is the part that most often surprises people, and it's worth being explicit about.</p>
+    <p><strong>On the wire</strong>, MCP <code>notifications/progress</code> is standard protocol - your server emits one notification per chunk, and any compliant MCP client receives them as they're produced.</p>
+    <p><strong>What the client does with them is up to the client.</strong> Most LLM-driven MCP hosts today (Claude Code, Cursor, generic chat UIs) consume progress notifications for <strong>UI rendering</strong> - spinners, status text, progress bars in the terminal or chat - and <strong>not</strong> as incremental data fed into the model's context. From the model's perspective, an MCP tool call is still atomic: invoke → wait → single aggregated result.</p>
+    <p>So the chunks reach the wire correctly; <strong>in-flight model visibility depends on host behavior</strong>, not on your server. Today, you can rely on chunks being delivered to the host, surfaced as UI affordances (spinner text, progress bars) visible to the human user, and useful for resumability/cancellation. You generally <strong>cannot</strong> rely on the host feeding chunks into the model's context as they arrive.</p>
+    <p><strong>If you need per-chunk model visibility today</strong>, prefer transports where streaming is part of the consumer contract rather than a side channel:</p>
+    <ul>
+      <li><strong>Fastify SSE/NDJSON</strong> - your consumer (a frontend, a worker, another agent) iterates chunks directly</li>
+      <li><strong>tRPC subscriptions</strong> - typed async-iterable client-side; trivial to fan out chunk-by-chunk</li>
+      <li><strong>CLI NDJSON</strong> - <code>your-tool generate-messages | jq</code> processes each line as it arrives</li>
+    </ul>
+  </section>
+
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- ADAPTER REFERENCE                                              -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -377,7 +514,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
     <ul>
       <li>Action names are converted to PascalCase for MCP tool names</li>
       <li>Logging is forwarded via MCP <code>notifications/message</code></li>
-      <li>Progress is reported via MCP <code>notifications/progress</code></li>
+      <li>Progress is reported via MCP <code>notifications/progress</code> (and <a href="#streaming">streaming actions</a> deliver one notification per chunk when the client sends <code>_meta.progressToken</code>; see the AI-host caveat in that section)</li>
     </ul>
   </section>
 
@@ -395,6 +532,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
     </div>
     <p>Options: <code>host</code>, <code>port</code>, <code>auth</code> (see <a href="#authentication">Authentication</a>), <code>cors</code>, plus any <code>CreateMcpExpressAppOptions</code>.</p>
     <p><strong>CORS:</strong> By default, CORS is enabled with <code>origin: '*'</code>. Pass <code>cors: false</code> to disable, or a <a href="https://www.npmjs.com/package/cors">CorsOptions</a> object to customize. MCP-required headers are always exposed regardless of config.</p>
+    <p><strong>Streaming:</strong> <a href="#streaming">Streaming actions</a> deliver each chunk as a <code>notifications/progress</code> on the session's SSE stream when the client opts in with <code>_meta.progressToken</code>. The tool call still resolves with the buffered chunk array as the final <code>CallToolResult</code>; clients that don't opt in receive only that buffered result.</p>
   </section>
 
   <section id="adapter-fastify">
@@ -415,6 +553,7 @@ await silkweave({ name: 'my-api', version: '1.0.0' })
       <li>Supports <code>auth</code> option for bearer token / OAuth protection</li>
       <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults (<code>origin: '*'</code>), or a <a href="https://www.npmjs.com/package/@fastify/cors">FastifyCorsOptions</a> object</li>
       <li>Errors are mapped to HTTP status codes automatically (see <a href="#error-handling">Error Handling</a>)</li>
+      <li><a href="#streaming">Streaming actions</a>: content negotiation on <code>Accept</code> picks SSE (<code>text/event-stream</code>), NDJSON (<code>application/x-ndjson</code>), or buffered JSON</li>
     </ul>
   </section>
 
@@ -453,6 +592,7 @@ const things = await client.listThings.query({ contains: 'saw' })
     <ul>
       <li>Action names convert to <code>camelCase</code> procedure keys: <code>list-things</code> &rarr; <code>client.listThings</code></li>
       <li>Set <code>kind: 'query'</code> on an action to expose it as a cacheable <code>.query()</code> (GET); default is <code>.mutation()</code> (POST). The literal kind is preserved through <code>createAction</code>, so calling <code>.mutate()</code> on a query is a compile-time error.</li>
+      <li><a href="#streaming">Streaming actions</a> (those with a <code>chunk</code> schema + async-generator <code>run</code>) are registered as tRPC <code>.subscription()</code> procedures whose async generators yield chunks directly - client code consumes them with <code>client.foo.subscribe(input, {'{'} onData, onError, onComplete {'}'})</code></li>
       <li>Supports <code>auth</code> option for bearer token / OAuth protection (see <a href="#authentication">Authentication</a>)</li>
       <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults, or a <a href="https://www.npmjs.com/package/cors">CorsOptions</a> object</li>
       <li>Options: <code>host</code>, <code>port</code>, <code>endpoint</code> (default <code>/trpc/</code>), <code>cors</code>, <code>auth</code></li>
@@ -510,6 +650,7 @@ await silkweave({ name: 'my-tool', version: '1.0.0' })
       <li>Action names become kebab-case commands</li>
       <li>Zod types map to CLI options: <code>z.string()</code> &rarr; <code>--name &lt;string&gt;</code>, <code>z.boolean()</code> &rarr; <code>--verbose / --no-verbose</code></li>
       <li>Use <code>args: ['name']</code> to make a field a positional argument instead</li>
+      <li><a href="#streaming">Streaming actions</a> write NDJSON to stdout (one JSON chunk per line) - pipe-friendly with <code>jq</code>, <code>head</code>, etc.</li>
     </ul>
   </section>
 
@@ -532,6 +673,7 @@ export { GET, POST, DELETE }`)} /></pre>
       <li>Each request creates a fresh MCP server instance (fully stateless)</li>
       <li>Uses <code>WebStandardStreamableHTTPServerTransport</code> from the MCP SDK</li>
       <li>Supports OAuth 2.1 and bearer token auth</li>
+      <li><a href="#streaming">Streaming actions</a> deliver chunks as MCP <code>notifications/progress</code> just like the stateful HTTP adapter</li>
     </ul>
   </section>
 
@@ -591,7 +733,7 @@ export { GET, POST, DELETE }`)} /></pre>
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <section id="integrations">
     <h2>Integrations</h2>
-    <p>Adapters are the low-level primitives — one Action maps to one wire format. <strong>Integrations</strong> sit one level up: they compose adapters with the conventions of a host framework (DI containers, decorators, file-based routing, lifecycle hooks) so Silkweave feels native to that framework.</p>
+    <p>Adapters are the low-level primitives - one Action maps to one wire format. <strong>Integrations</strong> sit one level up: they compose adapters with the conventions of a host framework (DI containers, decorators, file-based routing, lifecycle hooks) so Silkweave feels native to that framework.</p>
     <p>Pick the integration that matches the shape of your app:</p>
     <table class="docs-table">
       <thead><tr><th>Integration</th><th>When to use</th><th>Status</th></tr></thead>
@@ -611,13 +753,18 @@ export { GET, POST, DELETE }`)} /></pre>
           <td>You're building on the Next.js App Router. File-based route helpers for MCP and tRPC, sharing your Next request context.</td>
           <td>Coming soon</td>
         </tr>
+        <tr>
+          <td><a href="#integration-ai-sdk"><strong>Vercel AI SDK</strong></a></td>
+          <td>You want <code>useChat</code> / <code>useObject</code> on the frontend without writing a separate <code>/api/chat</code> route. Streams Anthropic/OpenAI/etc. chunks through a tRPC subscription, fully typed end-to-end.</td>
+          <td>Stable</td>
+        </tr>
       </tbody>
     </table>
   </section>
 
   <section id="integration-standalone">
     <h3><img src="/logo-color.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Standalone</h3>
-    <p>The default. Compose the fluent builder yourself, pick whichever adapters fit, run it however you like — Node entrypoint, Docker container, serverless function, anywhere a Node process can boot.</p>
+    <p>The default. Compose the fluent builder yourself, pick whichever adapters fit, run it however you like - Node entrypoint, Docker container, serverless function, anywhere a Node process can boot.</p>
     <div class="code-block">
       <div class="code-block-header"><span>main.ts</span></div>
       <pre><code set:html={hl(`import { silkweave } from '@silkweave/core'
@@ -640,7 +787,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 
   <section id="integration-nestjs">
     <h3><img src="/nestjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> NestJS</h3>
-    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes Actions defined as <strong>method decorators on Nest providers</strong>, then mounts them simultaneously as REST routes, tRPC procedures, and MCP tools — all on Nest's running HTTP server, so guards, interceptors, DI, and lifecycle hooks stay coherent.</p>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes Actions defined as <strong>method decorators on Nest providers</strong>, then mounts them simultaneously as REST routes, tRPC procedures, and MCP tools - all on Nest's running HTTP server, so guards, interceptors, DI, and lifecycle hooks stay coherent.</p>
     <div class="code-block">
       <div class="code-block-header"><span>install</span></div>
       <pre><code set:html={hl(`pnpm add @silkweave/core @silkweave/nestjs @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata`)} /></pre>
@@ -709,9 +856,9 @@ export class AppModule {}`)} /></pre>
     </table>
     <ul>
       <li>Adapters mount placeholder middleware slots in <code>OnModuleInit</code> (before Nest's 404 catch-all is installed), then populate the real handlers in <code>OnApplicationBootstrap</code> after <code>@Action</code> discovery completes.</li>
-      <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on every HTTP-backed transport. Action methods are normal Nest providers — inject services via the constructor.</li>
+      <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on every HTTP-backed transport. Action methods are normal Nest providers - inject services via the constructor.</li>
       <li>Use <code>z.coerce.boolean()</code> / <code>z.coerce.number()</code> for fields read from REST query strings.</li>
-      <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev — plain <code>tsx</code> doesn't emit decorator metadata.</li>
+      <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev - plain <code>tsx</code> doesn't emit decorator metadata.</li>
       <li>Default platform is <code>@nestjs/platform-express</code>. For <code>@nestjs/platform-fastify</code>, register <code>@fastify/express</code> first.</li>
     </ul>
     <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nestjs#readme"><code>@silkweave/nestjs</code> README</a>.</p>
@@ -721,10 +868,61 @@ export class AppModule {}`)} /></pre>
     <h3><img src="/nextjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Next.js <span class="badge-soon">coming soon</span></h3>
     <p><code>@silkweave/nextjs</code> will provide App Router route helpers that mount your actions as MCP and tRPC endpoints at the file-system path of your choice, sharing the Next request context (headers, cookies, server actions). Until it ships, target Next.js with the standalone adapters today:</p>
     <ul>
-      <li><strong>tRPC:</strong> use <a href="#adapter-trpc"><code>trpcFetch()</code></a> in a Route Handler — its <code>{'{ GET, POST }'}</code> exports drop straight into <code>app/api/trpc/[...trpc]/route.ts</code>.</li>
-      <li><strong>MCP:</strong> use <a href="#adapter-vercel"><code>vercel()</code></a> — its <code>{'{ GET, POST, DELETE }'}</code> exports are App-Router-compatible. Stateless and Edge-runtime-friendly.</li>
+      <li><strong>tRPC:</strong> use <a href="#adapter-trpc"><code>trpcFetch()</code></a> in a Route Handler - its <code>{'{ GET, POST }'}</code> exports drop straight into <code>app/api/trpc/[...trpc]/route.ts</code>.</li>
+      <li><strong>MCP:</strong> use <a href="#adapter-vercel"><code>vercel()</code></a> - its <code>{'{ GET, POST, DELETE }'}</code> exports are App-Router-compatible. Stateless and Edge-runtime-friendly.</li>
     </ul>
     <p>Follow progress: <a href="https://github.com/silkweave/silkweave/issues">github.com/silkweave/silkweave/issues</a>.</p>
+  </section>
+
+  <section id="integration-ai-sdk">
+    <h3><img src="/vercel-ai.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Vercel AI SDK</h3>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/ai"><code>@silkweave/ai</code></a> package wires <a href="https://ai-sdk.dev">Vercel AI SDK</a>'s <code>useChat</code> hook to a <a href="#streaming">Silkweave streaming action</a> over a tRPC subscription. No <code>/api/chat</code> route, no AI SDK Data Stream Protocol parsing - <code>useChat</code> consumes <code>UIMessageChunk</code> objects directly from your typed tRPC client.</p>
+    <p>The integration is two pieces:</p>
+    <ul>
+      <li><strong><code>createChatAction({'{'} model, ... {'}'})</code></strong> - server-side helper. Wraps AI SDK's <code>streamText</code> in a Silkweave streaming action whose <code>chunk</code> schema is <code>UIMessageChunk</code>; the action yields chunks from <code>result.toUIMessageStream()</code>. The tRPC adapter sees it's streaming and registers it as a <code>.subscription()</code> automatically.</li>
+      <li><strong><code>silkweaveTransport(subscribe)</code></strong> - client-side <code>ChatTransport</code> factory. Wraps any subscribe-style function (typically <code>client.chat.subscribe</code>) into the <code>ReadableStream&lt;UIMessageChunk&gt;</code> <code>useChat</code> expects. Abort signals propagate to <code>unsubscribe()</code>.</li>
+    </ul>
+    <div class="code-block">
+      <div class="code-block-header"><span>install</span></div>
+      <pre><code set:html={hl(`pnpm add @silkweave/core @silkweave/trpc @silkweave/ai ai @ai-sdk/anthropic
+pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server/server.ts</span>
+        <button class="copy-btn" data-copy-raw={aiSdkServerRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(aiSdkServerRaw)} /></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>src/trpc.ts</span>
+        <button class="copy-btn" data-copy-raw={aiSdkClientRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(aiSdkClientRaw)} /></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>src/Chat.tsx</span>
+        <button class="copy-btn" data-copy-raw={aiSdkUseChatRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(aiSdkUseChatRaw)} /></pre>
+    </div>
+    <p>That's the entire integration. Type safety flows from <code>AppRouter</code> through <code>useChat</code>; AI SDK's frontend hook is none the wiser that it isn't talking to its <code>DefaultChatTransport</code> HTTP endpoint. <a href="https://elements.ai-sdk.dev">ai-elements</a> components (<code>Conversation</code>, <code>Message</code>, <code>PromptInput</code>) work as drop-in replacements for the hand-rolled UI - the data layer doesn't change.</p>
+
+    <h4>Why this works</h4>
+    <p>A custom <code>ChatTransport.sendMessages</code> returns <code>Promise&lt;ReadableStream&lt;UIMessageChunk&gt;&gt;</code>. The chunks in that stream are <strong>plain JS objects</strong> - <code>useChat</code> doesn't care where they came from. tRPC subscriptions yield objects. AI SDK's <code>streamText().toUIMessageStream()</code> produces objects of exactly the right shape. The three pieces compose without any wire-format translation:</p>
+    <div class="code-block">
+      <pre><code set:html={hl(aiSdkDiagramRaw)} /></pre>
+    </div>
+
+    <h4>Caveats</h4>
+    <ul>
+      <li><strong>No resume after disconnect.</strong> <code>reconnectToStream()</code> returns <code>null</code> - if the connection drops mid-stream the in-progress message is lost. Replicating AI SDK's stream resumption would require server-side state we don't manage here. Fine for most cases.</li>
+      <li><strong><code>httpSubscriptionLink</code> uses SSE (GET).</strong> Long conversations serialized into query strings will hit URL length limits. Switch to <code>wsLink</code> (WebSocket) for production or configure a custom transport that POSTs.</li>
+      <li><strong><code>onData</code> is typed <code>unknown</code>.</strong> Zod's <code>z.custom&lt;UIMessageChunk&gt;()</code> doesn't preserve the exact union variance through tRPC's subscription inference, so the callback boundary is loose. Runtime is safe because <code>streamText</code> only yields valid chunks; the cast lives inside <code>silkweaveTransport</code>.</li>
+    </ul>
+    <p>Full working example: <a href="https://github.com/silkweave/silkweave/tree/master/examples/ai"><code>examples/ai/</code></a> (Vite + React + Tailwind v4). Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/ai#readme"><code>@silkweave/ai</code> README</a>.</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->

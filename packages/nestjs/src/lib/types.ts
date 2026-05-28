@@ -1,36 +1,51 @@
 import type { HttpAdapterHost } from '@nestjs/core'
-import type { AdapterGenerator, SilkweaveOptions } from '@silkweave/core'
+import type { Action, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 
 /**
- * A Silkweave NestJS adapter. Each transport (REST, tRPC, MCP) implements this
- * shape: given a Nest `HttpAdapterHost`, it (a) immediately mounts a
- * placeholder middleware slot on Nest's running HTTP server during
- * `OnModuleInit` — which is critical because Nest installs its 404 catch-all
- * later in `init()`, before `OnApplicationBootstrap` fires; routes registered
- * after the catch-all are unreachable — and (b) returns a core
- * `AdapterGenerator` whose `start(actions)` populates that slot with the real
- * handler.
- *
- * Adapters mount onto Nest's HTTP server instead of owning their own, so Nest
- * middleware, lifecycle hooks, and request scoping remain coherent.
+ * Context passed to a Nest Silkweave adapter when `SilkweaveModule` wires it
+ * up. Adapters register their routes directly on `httpAdapter` (no
+ * placeholder middleware, no `silkweave()` builder), so they only fire
+ * `register()` once and own the rest of their lifecycle implicitly through
+ * Nest.
+ */
+export interface NestAdapterRegisterContext {
+  /** Nest's underlying HTTP adapter (Express or Fastify). */
+  httpAdapter: NonNullable<HttpAdapterHost['httpAdapter']>
+  /** Identity the adapter surfaces to clients (e.g. MCP server name). */
+  silkweaveOptions: SilkweaveOptions
+  /** Per-adapter context - already forked with `{ adapter: adapter.name, ...userContext }`. */
+  baseContext: SilkweaveContext
+  /** Actions filtered to those enabled on this adapter. */
+  actions: Action[]
+}
+
+/**
+ * A Silkweave Nest adapter. Each transport (REST, tRPC, MCP) implements this
+ * shape. `register()` is called from `SilkweaveModule.configure()` - which
+ * runs *before* Nest's controller routes are mapped - so adapter routes
+ * always sit ahead of any catch-all controllers in the framework's request
+ * pipeline.
  */
 export interface NestSilkweaveAdapter {
-  /** Adapter discriminator — set on the silkweave context as `ctx.get('adapter')`. */
-  readonly name: 'rest' | 'trpc' | 'mcp'
+  /** Adapter discriminator - set on the silkweave context as `ctx.get('adapter')`. */
+  readonly name: 'rest' | 'trpc' | 'mcp' | 'typegen'
   /**
-   * Reserve the adapter's route prefix on the Nest HTTP server *now* (before
-   * Nest's 404 catch-all is installed) and return the core `AdapterGenerator`
-   * that will populate the slot during `silkweave().start()`.
+   * When `true`, the adapter receives every discovered action regardless of
+   * each action's `transports` allowlist / `isEnabled` gate. Used by
+   * non-runtime adapters like `typegen()` that emit types for the entire
+   * action surface.
    */
-  install(host: HttpAdapterHost): AdapterGenerator
+  readonly allActions?: boolean
+  /** Register this adapter's routes on Nest's HTTP server. */
+  register(ctx: NestAdapterRegisterContext): void
 }
 
 export interface SilkweaveModuleOptions {
-  /** Identity for the silkweave instance — surfaced to MCP clients, OpenAPI, etc. */
+  /** Identity for the silkweave instance - surfaced to MCP clients, OpenAPI, etc. */
   silkweave: SilkweaveOptions
   /** Adapters to mount. Examples: `rest()`, `trpc()`, `mcp()`. */
   adapters: NestSilkweaveAdapter[]
-  /** Initial context keys (equivalent to chaining `.set(key, value)` on the builder). */
+  /** Initial context keys merged into every adapter's `baseContext`. */
   context?: Record<string, unknown>
 }
 

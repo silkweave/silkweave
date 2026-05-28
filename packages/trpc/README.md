@@ -57,6 +57,41 @@ The adapter is paired with the generic `Silkweave<Actions>` builder so that `typ
 
 There is **no code generation** - the types flow statically through the TypeScript compiler. Just `export type AppRouter = InferTrpcRouter<typeof server>` and import it on the client.
 
+## Streaming Actions
+
+An action with a `chunk` schema and an `async function*` `run` (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) is registered as a tRPC **`.subscription()`** instead of a query/mutation, regardless of its `kind`. The procedure's input type is `z.infer<typeof action.input>` and its output is an async iterable of `z.infer<typeof action.chunk>`.
+
+```typescript
+// server.ts
+createAction({
+  name: 'generate-messages',
+  description: 'Stream messages about a topic',
+  input: z.object({ topic: z.string(), count: z.number().int().min(1).max(50) }),
+  chunk: z.object({ index: z.number().int(), text: z.string() }),
+  run: async function* ({ topic, count }) {
+    for (let i = 0; i < count; i += 1) {
+      yield { index: i, text: `Message ${i + 1} about ${topic}` }
+    }
+  }
+})
+```
+
+```typescript
+// client.ts
+const subscription = client.generateMessages.subscribe(
+  { topic: 'weather', count: 5 },
+  {
+    onData: chunk => console.log(chunk.index, chunk.text),
+    onError: err => console.error(err),
+    onComplete: () => console.log('done')
+  }
+)
+```
+
+`InferTrpcRouter<typeof server>` produces the correct `TRPCSubscriptionProcedure` type for streaming actions automatically, so the call site is fully typed end-to-end. Use a tRPC link that supports subscriptions (`httpSubscriptionLink` from `@trpc/client/links/httpSubscriptionLink`, or the WebSocket link) alongside `httpBatchLink` in your client.
+
+The subscription respects abort signals: when the client unsubscribes, the adapter stops pulling from your generator. Any thrown error inside the generator is mapped to a `TRPCError` via the same `mapError()` used by queries/mutations (see [Errors](#errors)).
+
 ## Queries vs. Mutations
 
 Actions default to `kind: 'mutation'` (tRPC `.mutation()`, HTTP `POST`). Mark side-effect-free read actions with `kind: 'query'` to get GET-cacheable tRPC queries:

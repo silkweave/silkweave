@@ -85,6 +85,37 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 
 Logging notifications (`logger.info()`, `logger.progress()`) are sent to the MCP client as `notifications/message` and `notifications/progress`.
 
+## Streaming Actions
+
+Actions that declare a `chunk` schema and an `async function*` `run` (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) for the action definition) stream over MCP using `notifications/progress`:
+
+- The client opts in by sending `_meta.progressToken` with the tool call. The MCP TypeScript SDK does this automatically when the host registers a progress listener.
+- For each yielded chunk, the adapter sends a `notifications/progress` with the same `progressToken`, a 1-based `progress` counter, and the JSON-stringified chunk in the `message` field. The send is awaited so transport backpressure flows back to your generator.
+- The tool call resolves with the full buffered chunk array as the `CallToolResult`. Clients that did not opt in (no `progressToken`) receive only this final result.
+
+```typescript
+import { createAction } from '@silkweave/core'
+import z from 'zod/v4'
+
+createAction({
+  name: 'generate-messages',
+  description: 'Stream messages about a topic',
+  input: z.object({ topic: z.string(), count: z.number().int().min(1).max(50) }),
+  chunk: z.object({ index: z.number().int(), text: z.string() }),
+  run: async function* ({ topic, count }) {
+    for (let i = 0; i < count; i += 1) {
+      yield { index: i, text: `Message ${i + 1} about ${topic}` }
+    }
+  }
+})
+```
+
+### What this means for AI hosts
+
+MCP `notifications/progress` is part of the standard protocol - chunks reach the wire correctly. But **what the host client does with them is up to the host**. Most LLM-driven MCP hosts today (Claude Code, Cursor, generic chat UIs) consume progress notifications for **UI rendering** (spinners, status text, progress bars) and **not** as incremental data fed into the model's context. From the model's perspective, an MCP tool call is still atomic - the model sees the final buffered result when the call returns, not the chunks in flight.
+
+This is a host-side rendering choice, not a protocol limitation. If you need per-chunk model visibility today, expose the action via [`@silkweave/fastify`](https://www.npmjs.com/package/@silkweave/fastify) (SSE/NDJSON) or [`@silkweave/trpc`](https://www.npmjs.com/package/@silkweave/trpc) (subscriptions) and have your consumer iterate chunks directly.
+
 ## Smart Tool Results
 
 By default, all MCP adapters use `smartToolResult()` to format action return values:

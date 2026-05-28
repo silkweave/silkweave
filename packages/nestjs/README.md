@@ -1,6 +1,6 @@
 # @silkweave/nestjs
 
-NestJS adapter for [Silkweave](https://github.com/silkweave/silkweave). Define actions as method decorators on Nest providers, then expose them simultaneously over REST, tRPC, and MCP Streamable HTTP — all mounted on the running Nest HTTP server so Nest middleware, guards, and lifecycle hooks stay coherent.
+NestJS adapter for [Silkweave](https://github.com/silkweave/silkweave). Define actions as method decorators on Nest providers, then expose them simultaneously over REST, tRPC, and MCP Streamable HTTP - all mounted on the running Nest HTTP server so Nest middleware, guards, and lifecycle hooks stay coherent.
 
 ## Install
 
@@ -73,7 +73,7 @@ import { UserActions } from './users.actions.js'
       adapters: [
         rest({ basePath: '/api' }),
         trpc({ basePath: '/trpc' }),
-        mcp({ basePath: '/' })
+        mcp({ basePath: '/mcp' })
       ]
     })
   ],
@@ -109,11 +109,11 @@ The `users.list` and `users.get` actions are now reachable via:
 | `name` | `string` | kebab-cased method name | Override the action name. Joined with the class prefix via `.` |
 | `description` | `string` | *required* | Human-readable summary. Used as MCP tool description |
 | `input` | `z.ZodObject` | *required* | Zod object schema for the action's input |
-| `output` | `z.ZodObject` | — | Optional output schema (used by tRPC type inference) |
+| `output` | `z.ZodObject` | - | Optional output schema (used by tRPC type inference) |
 | `kind` | `'query' \| 'mutation'` | `'mutation'` | `'query'` → GET in REST, `.query()` in tRPC. `'mutation'` → POST / `.mutation()` |
 | `transports` | `('rest' \| 'trpc' \| 'mcp')[]` | all | Allowlist of transports that expose this action |
-| `isEnabled` | `(ctx) => boolean` | — | Dynamic gate (AND-combined with `transports`) |
-| `toolResult` | `(response, ctx) => CallToolResult` | — | Custom MCP `CallToolResult` formatter |
+| `isEnabled` | `(ctx) => boolean` | - | Dynamic gate (AND-combined with `transports`) |
+| `toolResult` | `(response, ctx) => CallToolResult` | - | Custom MCP `CallToolResult` formatter |
 
 ### `@Actions(prefix?)` (class decorator)
 
@@ -137,15 +137,15 @@ Maps actions to REST routes on the Nest HTTP server.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `basePath` | `string` | `'/'` | URL prefix joined to each action's path |
-| `auth` | `AuthConfig` | — | `@silkweave/auth` bearer-token config |
+| `basePath` | `string` | `'/api'` | URL prefix joined to each action's path |
+| `auth` | `AuthConfig` | - | `@silkweave/auth` bearer-token config |
 
 Routes follow `{basePath}/{action-name-with-slashes}` where dots in action names become slashes:
 
 - `users.list` (query) → `GET /api/users/list`
 - `users.ban` (mutation) → `POST /api/users/ban`
 
-Input is parsed from `req.query` (queries) or `req.body` (mutations) and validated against the action's Zod schema; validation failures return HTTP 400 with the Zod issues.
+Each action is registered as an individual route on Nest's HTTP adapter (not a sub-app). Input is parsed from `req.query` (queries) or `req.body` (mutations) and validated against the action's Zod schema; validation failures return HTTP 400 with the Zod issues.
 
 ### `trpc(options?)`
 
@@ -154,25 +154,27 @@ Mounts a tRPC HTTP handler built from `@silkweave/trpc`'s `buildRouter`.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `basePath` | `string` | `'/trpc'` | URL prefix the tRPC handler listens on |
-| `auth` | `AuthConfig` | — | `@silkweave/auth` bearer-token config |
+| `auth` | `AuthConfig` | - | `@silkweave/auth` bearer-token config |
 
-Action names with dots (e.g. `users.list`) collapse to camelCase procedure keys (`usersList`) — flat router in v1.
+Action names with dots (e.g. `users.list`) collapse to camelCase procedure keys (`usersList`) - flat router in v1.
 
 ### `mcp(options?)`
 
-Mounts MCP Streamable HTTP at `{basePath}/mcp`, plus optional OAuth routes when `auth.provider` is set. Reuses `@silkweave/mcp`'s `createMcpExpressHandler`.
+Mounts the MCP Streamable HTTP transport directly at `basePath`, with sideload (`{basePath}/resource/:id`), well-known auth metadata (`{basePath}/.well-known/...`), and the OAuth proxy routes (`{basePath}/authorize`, `/token`, `/register`, `/auth/callback`) namespaced under the same prefix. Composes the handler primitives from `@silkweave/mcp` - no Express sub-app.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `basePath` | `string` | `'/'` | Mount point for the MCP sub-app |
-| `auth` | `AuthConfig` | — | Bearer-token / OAuth 2.1 config |
-| `cors` | `CorsOptions \| boolean` | `true` | CORS config (see `@silkweave/mcp`) |
+| `basePath` | `string` | `'/mcp'` | URL prefix; the MCP transport endpoint is at this exact path |
+| `auth` | `AuthConfig` | - | Bearer-token / OAuth 2.1 config |
+| `cors` | `CorsOptions \| boolean` | `true` | CORS config |
+| `sideloadResources` | `boolean` | `true` | Mount `{basePath}/resource/:id` |
+| `resourceDir` | `string` | `'resources'` | Directory the sideload route reads from |
 
 ## Guards & DI
 
 Native NestJS `@UseGuards()` and `@UseInterceptors()` on `@Action` methods run for every HTTP-backed transport. Guards receive an `ExecutionContext` with the HTTP request in `switchToHttp().getRequest()`. The `Reflector` is also wired up so guards can read custom metadata.
 
-Action methods are normal Nest provider methods — inject services via the constructor as usual.
+Action methods are normal Nest provider methods - inject services via the constructor as usual.
 
 ```ts
 @Injectable()

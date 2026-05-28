@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { Action, AdapterFactory, SilkweaveContext } from '@silkweave/core'
+import { Action, ActionRun, AdapterFactory, isStreamingAction, runStreamingAction, SilkweaveContext } from '@silkweave/core'
 import { createLogger } from '@silkweave/logger'
 import { capitalCase, pascalCase } from 'change-case'
 import { handleToolError, smartToolResult } from '../util/result.js'
@@ -26,9 +26,25 @@ function registerTools(server: McpServer, actions: Action[], context: SilkweaveC
         }
       })
       const actionContext = context.fork({ logger, extra })
-      return action.run(input, actionContext)
-        .then((result) => action.toolResult?.(result, actionContext) ?? smartToolResult(result))
-        .catch(handleToolError)
+      const progressToken = extra._meta?.progressToken
+      try {
+        let result: object | object[]
+        if (isStreamingAction(action)) {
+          result = await runStreamingAction(action, input, actionContext, progressToken
+            ? async (chunk, index) => {
+              await extra.sendNotification({
+                method: 'notifications/progress',
+                params: { progressToken, progress: index + 1, message: JSON.stringify(chunk) }
+              })
+            }
+            : undefined)
+        } else {
+          result = await (action.run as ActionRun<object, object>)(input, actionContext)
+        }
+        return action.toolResult?.(result, actionContext) ?? smartToolResult(result)
+      } catch (error) {
+        return handleToolError(error)
+      }
     })
   }
 }

@@ -1,5 +1,5 @@
 import ts, { factory as f } from 'typescript'
-import { type Action } from '@silkweave/core'
+import { type Action, isStreamingAction } from '@silkweave/core'
 import { pascalCase } from 'change-case'
 import { zodToTs, printNode } from './zodToTs.js'
 
@@ -19,7 +19,23 @@ export function generateDts(actions: Action[]): string {
       )
     )
 
-    if (action.output) {
+    if (isStreamingAction(action) && action.chunk) {
+      // Streaming action: emit `${name}Chunk` and `${name}Output = Chunk[]`.
+      statements.push(
+        f.createTypeAliasDeclaration(
+          [f.createModifier(ts.SyntaxKind.ExportKeyword)],
+          `${name}Chunk`,
+          undefined,
+          zodToTs(action.chunk)
+        ),
+        f.createTypeAliasDeclaration(
+          [f.createModifier(ts.SyntaxKind.ExportKeyword)],
+          `${name}Output`,
+          undefined,
+          f.createArrayTypeNode(f.createTypeReferenceNode(`${name}Chunk`))
+        )
+      )
+    } else if (action.output) {
       statements.push(
         f.createInterfaceDeclaration(
           [f.createModifier(ts.SyntaxKind.ExportKeyword)],

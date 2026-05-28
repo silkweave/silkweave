@@ -7,7 +7,7 @@
     "url": "git+ssh://git@github.com/silkweave/silkweave.git"
   },
   "scripts": {
-    "mcp": "cd example && pnpm tsx src/stdio.ts",
+    "mcp": "pnpm -F @silkweave/example-mcp stdio",
     "build": "turbo build",
     "lint": "turbo lint",
     "roam": "roam index && roam fitness && roam rules --ci",
@@ -21,7 +21,7 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "25.0.3",
     "rimraf": "^6.1.2",
-    "turbo": "^2.9.12",
+    "turbo": "^2.9.14",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.56.1"
   },
@@ -29,14 +29,20 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
-    ]
-  },
-  "overrides": {
-    "@types/node": "25.0.3",
-    "esbuild": "0.21.5",
-    "typescript": "5.9.3",
-    "vite": "7.3.0",
-    "zod": "3.25.76"
+    ],
+    "overrides": {
+      "@types/node": "25.0.3",
+      "esbuild": "0.21.5",
+      "typescript": "5.9.3",
+      "vite": "7.3.0",
+      "zod": "3.25.76",
+      "zod@^4": "3.25.76"
+    },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "zod": "3.25.76"
+      }
+    }
   },
   "packageManager": "pnpm@11.1.1"
 }

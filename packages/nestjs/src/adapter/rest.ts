@@ -1,12 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { HttpException } from '@nestjs/common'
-import type { HttpAdapterHost } from '@nestjs/core'
 import { AuthConfig, AuthInfo, validateToken } from '@silkweave/auth'
-import { type Action, type Adapter, type AdapterGenerator, type SilkweaveContext, SilkweaveError } from '@silkweave/core'
+import { type Action, type SilkweaveContext, SilkweaveError } from '@silkweave/core'
 import { buildLogLevels, type Logger, type LogLevel } from '@silkweave/logger'
 import type { IncomingMessage, ServerResponse } from 'http'
 import { z } from 'zod/v4'
-import { reserveSlot, type NodeMiddleware } from '../lib/slot.js'
-import type { NestSilkweaveAdapter } from '../lib/types.js'
+import type { NestAdapterRegisterContext, NestSilkweaveAdapter } from '../lib/types.js'
 
 const CONSOLE_LEVEL_MAP: Record<LogLevel, 'log' | 'info' | 'warn' | 'error'> = {
   emergency: 'error',
@@ -20,19 +19,10 @@ const CONSOLE_LEVEL_MAP: Record<LogLevel, 'log' | 'info' | 'warn' | 'error'> = {
 }
 
 export interface RestAdapterOptions {
-  /** URL prefix at which the REST routes are mounted. e.g. `'/api'` → `POST /api/users/list`. Default: `'/'`. */
+  /** URL prefix joined to each action's path. e.g. `'/api'` → `POST /api/users/list`. Default: `'/api'`. */
   basePath?: string
   /** Optional bearer-token auth applied to every REST action. */
   auth?: AuthConfig
-}
-
-function createRestLogger(): Logger {
-  return {
-    ...buildLogLevels((level, data) => {
-      console[CONSOLE_LEVEL_MAP[level]](data)
-    }),
-    progress: () => { /* progress notifications not supported on REST */ }
-  }
 }
 
 interface RequestLike {
@@ -41,6 +31,13 @@ interface RequestLike {
   query?: unknown
   url?: string
   method?: string
+}
+
+function createRestLogger(): Logger {
+  return {
+    ...buildLogLevels((level, data) => { console[CONSOLE_LEVEL_MAP[level]](data) }),
+    progress: () => { /* progress notifications not supported on REST */ }
+  }
 }
 
 function actionNameToPath(name: string): string {
@@ -53,7 +50,11 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
     req.on('data', (c: Buffer) => chunks.push(c))
     req.on('end', () => {
       if (chunks.length === 0) { return resolve({}) }
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8'))) } catch (err) { reject(err) }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8')))
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error('Unable to parse JSON body'))
+      }
     })
     req.on('error', reject)
   })
@@ -95,22 +96,13 @@ function handleRestError(err: unknown, res: ServerResponse): void {
   sendJson(res, { error: 'internal', message: 'Internal error' }, 500)
 }
 
-function buildHandler(actions: Action[], context: SilkweaveContext, auth: AuthConfig | undefined): NodeMiddleware {
-  const routes = new Map<string, Action>()
-  for (const action of actions) {
-    const method = action.kind === 'query' ? 'GET' : 'POST'
-    routes.set(`${method} ${actionNameToPath(action.name)}`, action)
-  }
-  const logger = createRestLogger()
-  return async (req, res, next) => {
-    const pathOnly = (req.url ?? '/').split('?')[0]
-    const key = `${req.method ?? ''} ${pathOnly}`
-    const action = routes.get(key)
-    if (!action) {
-      if (next) { return next() }
-      sendJson(res, { error: 'not_found', message: `No route for ${req.method} ${pathOnly}` }, 404)
-      return
-    }
+function createActionHandler(
+  action: Action,
+  context: SilkweaveContext,
+  auth: AuthConfig | undefined,
+  logger: Logger
+): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  return async (req, res) => {
     try {
       const reqLike = req as unknown as RequestLike
       let authInfo: AuthInfo | undefined
@@ -118,9 +110,7 @@ function buildHandler(actions: Action[], context: SilkweaveContext, auth: AuthCo
         const authHeader = typeof reqLike.headers.authorization === 'string' ? reqLike.headers.authorization : undefined
         const result = await validateToken(authHeader, auth, context.fork({ request: req }))
         if (result.error) {
-          for (const [k, v] of Object.entries(result.error.headers)) {
-            res.setHeader(k, v)
-          }
+          for (const [k, v] of Object.entries(result.error.headers)) { res.setHeader(k, v) }
           sendJson(res, result.error.body, result.error.statusCode)
           return
         }
@@ -144,35 +134,27 @@ function buildHandler(actions: Action[], context: SilkweaveContext, auth: AuthCo
 }
 
 /**
- * REST adapter for `@silkweave/nestjs`. Mounts each discovered `@Action` as a
- * route on Nest's running HTTP server:
+ * REST adapter for `@silkweave/nestjs`. Registers each discovered `@Action`
+ * as an individual route on Nest's HTTP adapter:
  *
- * - `kind: 'query'` → `GET ${basePath}/${actionName-with-slashes}` (input read from query string)
- * - `kind: 'mutation'` → `POST ${basePath}/${actionName-with-slashes}` (input read from JSON body)
+ * - `kind: 'query'` → `GET ${basePath}/${actionName-with-slashes}` (input from query string)
+ * - `kind: 'mutation'` → `POST ${basePath}/${actionName-with-slashes}` (input from JSON body)
  *
- * Works on `@nestjs/platform-express` out of the box. For
- * `@nestjs/platform-fastify`, register `@fastify/express` before this adapter
- * so Nest can serve Express-style middleware.
+ * Routes show up in Nest's `RoutesResolver` logger and are eligible for
+ * `@nestjs/swagger` scanning. Works on `@nestjs/platform-express` out of the
+ * box. For `@nestjs/platform-fastify`, register `@fastify/express` first.
  */
 export function rest(options: RestAdapterOptions = {}): NestSilkweaveAdapter {
   return {
     name: 'rest',
-    install: (host: HttpAdapterHost): AdapterGenerator => {
-      const httpAdapter = host.httpAdapter
-      if (!httpAdapter) {
-        throw new Error('@silkweave/nestjs rest(): HttpAdapterHost.httpAdapter is not available.')
-      }
-      const basePath = (options.basePath ?? '').replace(/\/$/, '') || '/'
-      const setHandler = reserveSlot(httpAdapter as unknown as { use: (path: string, h: NodeMiddleware) => unknown }, basePath, 'REST')
-      return (_silkweaveOptions, baseContext): Adapter => {
-        const context = baseContext.fork({ adapter: 'rest' })
-        return {
-          context,
-          start: async (actions) => {
-            setHandler(buildHandler(actions, context, options.auth))
-          },
-          stop: async () => { /* Nest owns the HTTP server */ }
-        }
+    register({ httpAdapter, baseContext, actions }: NestAdapterRegisterContext): void {
+      const basePath = (options.basePath ?? '/api').replace(/\/$/, '')
+      const logger = createRestLogger()
+      for (const action of actions) {
+        const path = `${basePath}${actionNameToPath(action.name)}`
+        const method = action.kind === 'query' ? 'get' : 'post'
+        const handler = createActionHandler(action, baseContext, options.auth, logger)
+          ; (httpAdapter as unknown as Record<string, (path: string, h: typeof handler) => unknown>)[method](path, handler)
       }
     }
   }

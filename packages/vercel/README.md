@@ -54,6 +54,12 @@ export { GET, POST, DELETE }
 - Tool results use `smartToolResult()` by default. Large payloads (> 4096 chars) are automatically split into a text summary + embedded resource to reduce LLM context bloat. Actions can override this with a custom `toolResult` hook.
 - Logging goes to `process.stderr` (Vercel log drain) and MCP client notifications
 
+## Streaming Actions
+
+Streaming actions (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) work identically to [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp)'s `http()` adapter - chunks are delivered as `notifications/progress` over the Streamable HTTP transport when the client sends `_meta.progressToken`, with the JSON-stringified chunk in the `message` field. The tool call resolves with the buffered chunk array as the `CallToolResult`.
+
+The same AI-host caveat applies as for stdio/http MCP: chunks reach the wire as standard MCP progress notifications, but most LLM hosts today consume them for UI rendering rather than as incremental data fed into the model's context. See the [`@silkweave/mcp` README](https://www.npmjs.com/package/@silkweave/mcp#what-this-means-for-ai-hosts) for the full discussion.
+
 ## Options
 
 ```typescript

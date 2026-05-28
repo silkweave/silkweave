@@ -1,55 +1,102 @@
-import type { HttpAdapterHost } from '@nestjs/core'
 import { AuthConfig } from '@silkweave/auth'
-import type { Adapter, AdapterGenerator } from '@silkweave/core'
-import { createMcpExpressHandler, type CreateMcpExpressHandlerOptions } from '@silkweave/mcp'
-import { reserveSlot, type NodeMiddleware } from '../lib/slot.js'
-import type { NestSilkweaveAdapter } from '../lib/types.js'
+import {
+  authMiddleware,
+  mcpCors,
+  mcpTransport,
+  oauthRoutes,
+  protectedResourceMetadata,
+  sideloadResource
+} from '@silkweave/mcp'
+import { type CorsOptions } from 'cors'
+import express, { type RequestHandler } from 'express'
+import type { NestAdapterRegisterContext, NestSilkweaveAdapter } from '../lib/types.js'
 
-export interface McpAdapterOptions extends Omit<CreateMcpExpressHandlerOptions, 'auth'> {
-  /** URL prefix at which the MCP sub-app is mounted. Default `'/'` — the MCP transport then lives at `/mcp`, OAuth routes at `/authorize`, etc. */
+export interface McpAdapterOptions {
+  /** URL prefix the MCP namespace lives under - the transport itself is at this exact path. Default `'/mcp'`. */
   basePath?: string
-  /** Optional bearer-token / OAuth auth applied to MCP requests. Same shape as `@silkweave/mcp`'s `http()` auth. */
+  /** Optional bearer-token / OAuth 2.1 config. */
   auth?: AuthConfig
+  /** CORS configuration. `false` to disable, `true`/omitted for permissive defaults, or a `CorsOptions` object. */
+  cors?: CorsOptions | boolean
+  /** Mount the sideload resource route at `${basePath}/resource/:id`. Default `true`. */
+  sideloadResources?: boolean
+  /** Directory the sideload route reads from. Default `'resources'`. */
+  resourceDir?: string
+}
+
+function compose(...handlers: RequestHandler[]): RequestHandler {
+  return (req, res, next) => {
+    let i = 0
+    const dispatch: () => void = () => {
+      const h = handlers[i++]
+      if (!h) { return next() }
+      h(req, res, (err) => err ? next(err) : dispatch())
+    }
+    dispatch()
+  }
 }
 
 /**
- * MCP Streamable HTTP adapter for `@silkweave/nestjs`. Builds the same Express
- * sub-app that `@silkweave/mcp`'s `http()` adapter uses internally (via
- * `createMcpExpressHandler`) and mounts it on Nest's running HTTP server at
- * the configured base path.
+ * MCP adapter for `@silkweave/nestjs`. Registers the MCP Streamable HTTP
+ * transport, sideload, well-known and OAuth routes individually on Nest's
+ * HTTP adapter at the configured `basePath` (default `/mcp`):
  *
- * Routes provided by the mounted sub-app:
- * - `POST /mcp`, `GET /mcp`, `DELETE /mcp` — MCP Streamable HTTP transport
- * - `GET /resource/:id` — sideload resources (large MCP responses)
- * - `GET /.well-known/oauth-protected-resource` (when `auth.resourceUrl`/`auth.authorizationServers` set)
- * - `GET /authorize`, `POST /token`, `POST /register`, `GET /auth/callback` (when `auth.provider` set)
+ * - `POST/GET/DELETE ${basePath}` - Streamable HTTP transport
+ * - `GET ${basePath}/resource/:id` - sideload (`sideloadResources` opt-out)
+ * - `GET ${basePath}/.well-known/oauth-protected-resource` - RFC 9728 metadata (when `auth.resourceUrl`/`auth.authorizationServers` set)
+ * - `GET ${basePath}/authorize`, `POST ${basePath}/token`, `POST ${basePath}/register`, `GET ${basePath}${callbackPath}` (when `auth.provider` set)
  *
- * Note: this adapter mounts an Express sub-app. On `@nestjs/platform-fastify`,
- * register `@fastify/express` before this adapter so Nest can serve Express
- * middleware.
+ * Each route is a real Nest-level route - they show up in
+ * `RoutesResolver`'s log and there is no sub-app or middleware-slot
+ * indirection.
  */
 export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
   return {
     name: 'mcp',
-    install: (host: HttpAdapterHost): AdapterGenerator => {
-      const httpAdapter = host.httpAdapter
-      if (!httpAdapter) {
-        throw new Error('@silkweave/nestjs mcp(): HttpAdapterHost.httpAdapter is not available.')
+    register({ httpAdapter, silkweaveOptions, baseContext, actions }: NestAdapterRegisterContext): void {
+      const basePath = (options.basePath ?? '/mcp').replace(/\/$/, '')
+      if (!basePath) { throw new Error('@silkweave/nestjs mcp(): basePath cannot be empty or "/" - pick a path like "/mcp".') }
+
+      const adapter = httpAdapter as unknown as {
+        get: (path: string, ...h: RequestHandler[]) => unknown
+        post: (path: string, ...h: RequestHandler[]) => unknown
+        delete: (path: string, ...h: RequestHandler[]) => unknown
       }
-      const { basePath = '/', auth, ...handlerOptions } = options
-      const mountPath = basePath === '/' ? '/' : basePath.replace(/\/$/, '')
-      const setHandler = reserveSlot(httpAdapter as unknown as { use: (path: string, h: NodeMiddleware) => unknown }, mountPath, 'MCP')
-      return (silkweaveOptions, baseContext): Adapter => {
-        const context = baseContext.fork({ adapter: 'mcp' })
-        return {
-          context,
-          start: async (actions) => {
-            const app = createMcpExpressHandler(silkweaveOptions, context, actions, { ...handlerOptions, auth })
-            setHandler(app as unknown as NodeMiddleware)
-          },
-          stop: async () => { /* Nest owns the HTTP server */ }
-        }
+
+      const corsHandler = mcpCors(options.cors ?? true)
+      const auth = options.auth
+      const guard = auth ? authMiddleware(auth, baseContext) : null
+      const prefix = (...handlers: (RequestHandler | null)[]): RequestHandler[] =>
+        handlers.filter((h): h is RequestHandler => Boolean(h))
+
+      // Public auth-discovery / OAuth routes - registered first so they're
+      // never inadvertently guarded by the auth middleware.
+      if (auth?.authorizationServers?.length && auth.resourceUrl) {
+        adapter.get(
+          `${basePath}/.well-known/oauth-protected-resource`,
+          ...prefix(corsHandler, protectedResourceMetadata(auth))
+        )
       }
+      if (auth?.provider) {
+        const oauth = oauthRoutes(auth)
+        adapter.get(`${basePath}/.well-known/oauth-authorization-server`, ...prefix(corsHandler, oauth.wellKnownAuthServer))
+        adapter.get(`${basePath}/authorize`, ...prefix(corsHandler, oauth.authorize))
+        adapter.get(`${basePath}${oauth.callbackPath}`, ...prefix(corsHandler, oauth.callback))
+        adapter.post(`${basePath}/token`, ...prefix(corsHandler, ...oauth.token))
+        adapter.post(`${basePath}/register`, ...prefix(corsHandler, ...oauth.register))
+      }
+
+      // Protected routes - wrapped with auth middleware (when configured).
+      const protect = guard ? (h: RequestHandler) => compose(guard, h) : (h: RequestHandler) => h
+
+      if (options.sideloadResources !== false) {
+        adapter.get(`${basePath}/resource/:id`, ...prefix(corsHandler, protect(sideloadResource({ resourceDir: options.resourceDir }))))
+      }
+
+      const transport = mcpTransport(silkweaveOptions, baseContext, actions)
+      adapter.post(basePath, ...prefix(corsHandler, express.json(), protect(transport.post)))
+      adapter.get(basePath, ...prefix(corsHandler, protect(transport.stream)))
+      adapter.delete(basePath, ...prefix(corsHandler, protect(transport.stream)))
     }
   }
 }

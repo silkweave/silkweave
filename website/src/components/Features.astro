@@ -25,6 +25,18 @@ const features = [
     link: '/docs#context'
   },
   {
+    icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>`,
+    title: 'Streaming Actions',
+    desc: 'Yield chunks from an async generator. Silkweave delivers them as MCP progress, SSE, NDJSON, or tRPC subscriptions.',
+    link: '/docs#streaming'
+  },
+  {
+    icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 19h20L12 2z"/></svg>`,
+    title: 'Vercel AI SDK Native',
+    desc: 'useChat over a tRPC subscription with a custom transport. No /api/chat route, no Data Stream Protocol - just typed UIMessageChunks.',
+    link: '/docs#integration-ai-sdk'
+  },
+  {
     icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
     title: 'Vercel Serverless',
     desc: 'Deploy stateless MCP servers to Vercel, Cloudflare Workers, or Bun. Web Standard APIs, zero lock-in.',

@@ -1,5 +1,5 @@
 import { Action, Silkweave } from '@silkweave/core'
-import type { AnyTRPCRootTypes, TRPCBuiltRouter, TRPCMutationProcedure, TRPCQueryProcedure } from '@trpc/server'
+import type { AnyTRPCRootTypes, TRPCBuiltRouter, TRPCMutationProcedure, TRPCQueryProcedure, TRPCSubscriptionProcedure } from '@trpc/server'
 import type { z } from 'zod/v4'
 
 type CamelCase<S extends string> = S extends `${infer A}-${infer B}`
@@ -8,17 +8,29 @@ type CamelCase<S extends string> = S extends `${infer A}-${infer B}`
     ? `${A}${Capitalize<CamelCase<B>>}`
     : S)
 
-type ActionToProcedure<A extends Action> = 'query' extends NonNullable<A['kind']>
-  ? TRPCQueryProcedure<{
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChunkOf<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<infer C, unknown, unknown> ? C : never
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type IsStreaming<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<unknown, unknown, unknown> ? true : false
+
+type ActionToProcedure<A extends Action> = IsStreaming<A> extends true
+  ? TRPCSubscriptionProcedure<{
     meta: object
     input: z.infer<A['input']>
-    output: Awaited<ReturnType<A['run']>>
+    output: ChunkOf<A>
   }>
-  : TRPCMutationProcedure<{
-    meta: object
-    input: z.infer<A['input']>
-    output: Awaited<ReturnType<A['run']>>
-  }>
+  : ('query' extends NonNullable<A['kind']>
+    ? TRPCQueryProcedure<{
+      meta: object
+      input: z.infer<A['input']>
+      output: Awaited<ReturnType<A['run']>>
+    }>
+    : TRPCMutationProcedure<{
+      meta: object
+      input: z.infer<A['input']>
+      output: Awaited<ReturnType<A['run']>>
+    }>)
 
 type ActionsToRouterRecord<Actions extends Record<string, Action>> = {
   [K in keyof Actions & string as CamelCase<Actions[K]['name']>]: ActionToProcedure<Actions[K]>

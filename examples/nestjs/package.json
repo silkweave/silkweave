@@ -1,0 +1,33 @@
+{
+  "name": "@silkweave/example-nestjs",
+  "version": "1.9.1",
+  "description": "Silkweave NestJS adapter example (REST + tRPC + MCP via decorators)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --import @swc-node/register/esm-register src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "check": "pnpm lint && pnpm typecheck"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@silkweave/core": "workspace:*",
+    "@silkweave/nestjs": "workspace:*",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@swc-node/register": "^1.11.1",
+    "@types/node": "^22.0.0",
+    "eslint": "^10.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}

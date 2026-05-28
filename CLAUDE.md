@@ -14,15 +14,22 @@ pnpm check          # Lint + typecheck all packages
 pnpm clean          # Clean all build outputs and turbo cache
 
 # Run example servers (not automated tests - these start live servers)
-pnpm tsx example/src/stdio.ts    # MCP stdio server
-pnpm tsx example/src/http.ts     # MCP streamable HTTP server on :8080
-pnpm tsx example/src/fastify.ts  # Fastify REST API with Swagger on :8080
-pnpm tsx example/src/http-auth.ts # MCP HTTP with bearer token auth on :8080
-pnpm tsx example/src/http-oauth.ts # MCP HTTP with Google OAuth 2.1 on :8080
-pnpm tsx example/src/trpc.ts     # tRPC standalone HTTP server on :8080/trpc/
-pnpm tsx example/src/cli.ts      # CLI mode
+pnpm -F @silkweave/example-core dev        # Run an Action directly without an adapter
+pnpm -F @silkweave/example-cli dev         # CLI adapter (commander + clack)
+pnpm -F @silkweave/example-mcp stdio       # MCP stdio server
+pnpm -F @silkweave/example-mcp http        # MCP streamable HTTP server on :8080
+pnpm -F @silkweave/example-mcp http-auth   # MCP HTTP with bearer token auth on :8080
+pnpm -F @silkweave/example-mcp http-oauth  # MCP HTTP with Google OAuth 2.1 on :8080
+pnpm -F @silkweave/example-mcp cli-proxy   # MCP CLI proxy client (connects to http example)
+pnpm -F @silkweave/example-fastify dev     # Fastify REST API with Swagger on :8080
+pnpm -F @silkweave/example-trpc dev        # tRPC standalone HTTP server on :8080/trpc/
+pnpm -F @silkweave/example-typegen dev     # Generate .d.ts from action Zod schemas
+pnpm -F @silkweave/example-nestjs dev      # NestJS server (REST + tRPC + MCP) on :8080
 
-# MCP Inspector (connects to example stdio via .mcp.json)
+# AI chat example (Vite + React + useChat + tRPC subscriptions)
+ANTHROPIC_API_KEY=sk-... pnpm -F @silkweave/example-ai dev
+
+# MCP Inspector (connects to MCP stdio example via .mcp.json)
 pnpm mcp
 ```
 
@@ -30,7 +37,7 @@ pnpm mcp
 
 The core pattern is **Action → Adapter → Silkweave**:
 
-- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod `input` schema, an optional Zod `output` schema, and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. The `output` schema is used by the typegen and tRPC adapters to generate typed response interfaces. An optional `kind: 'query' | 'mutation'` field (default `'mutation'`) controls how the action is exposed over tRPC - queries are GET-cacheable, mutations are POST. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads). `Action<I, O, N, K>` is generic over input/output types, the literal `name`, and `kind` - literal types are preserved through `createAction()` so the `Silkweave<Actions>` builder can thread action types to type-aware adapters like tRPC.
+- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod `input` schema, an optional Zod `output` schema, and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. The `output` schema is used by the typegen and tRPC adapters to generate typed response interfaces. An optional `kind: 'query' | 'mutation'` field (default `'mutation'`) controls how the action is exposed over tRPC - queries are GET-cacheable, mutations are POST. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads). `Action<I, O, N, K>` is generic over input/output types, the literal `name`, and `kind` - literal types are preserved through `createAction()` so the `Silkweave<Actions>` builder can thread action types to type-aware adapters like tRPC. Actions can also be **streaming**: declare a `chunk` Zod schema and an `async function*` `run` that yields chunks; adapters detect this via `isStreamingAction()` and switch to per-chunk wire delivery (see [Streaming](#streaming) below).
 - **Adapter** (`packages/core/src/util/adapter.ts`): Translates actions into a specific transport. `AdapterFactory<T>` takes config options, returns an `AdapterGenerator` that takes `SilkweaveOptions` and produces an `Adapter` with `start(actions)` / `stop()`.
 - **Silkweave** (`packages/core/src/lib/silkweave.ts`): Fluent builder - `silkweave(opts).adapter(generator).action(action).start()`. `Silkweave<Actions extends Record<string, Action>>` is generic over accumulated actions so `typeof server` carries action type info forward; type-aware adapters (e.g. `@silkweave/trpc`'s `InferTrpcRouter<typeof server>`) extract this for end-to-end type safety.
 
@@ -47,7 +54,9 @@ The core pattern is **Action → Adapter → Silkweave**:
 | `@silkweave/vercel` | `packages/vercel` | Vercel serverless adapter - stateless MCP over Streamable HTTP |
 | `@silkweave/nestjs` | `packages/nestjs` | NestJS adapter - method/class decorators (`@Action`, `@Actions`) discovered via DI, mounted as REST/tRPC/MCP routes on Nest's HTTP server |
 | `@silkweave/typegen` | `packages/typegen` | Type generator - emits `.d.ts` interfaces from action Zod schemas using the TypeScript compiler API |
-| `@silkweave/examples` | `example` | Example usage of all adapters |
+| `@silkweave/ai` | `packages/ai` | Vercel AI SDK bridge - `createChatAction()` wraps `streamText` into a streaming action; `silkweaveTransport()` is a custom `ChatTransport` that adapts any subscribe-style function (typically a tRPC subscription) into the `ReadableStream<UIMessageChunk>` that `useChat` consumes |
+| `@silkweave/example-*` | `examples/*` | One example per adapter package: `examples/core`, `examples/cli`, `examples/mcp`, `examples/fastify`, `examples/trpc`, `examples/typegen`, `examples/vercel`, `examples/nestjs`. Each is a self-contained workspace package with its own `package.json`, `tsconfig.json`, `eslint.config.mjs`, and minimal inline actions. |
+| `@silkweave/example-ai` | `examples/ai` | End-to-end chat app: Vite + React + `useChat` → `silkweaveTransport` → tRPC subscription → Silkweave streaming action → AI SDK `streamText`. Run with `pnpm -F @silkweave/example-ai dev` (needs `ANTHROPIC_API_KEY`). |
 
 ### Adapters
 
@@ -71,6 +80,46 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 - `unwrap()` in `packages/core/src/util/zod.ts` - recursively unwraps Zod wrapper types (optional, nullable, default, readonly) to get the base type and metadata. Used by the CLI adapter for option generation.
 - `buildLogLevels()` in `packages/core/src/util/logger.ts` - builds a log-level record from a single callback function.
 - `buildCLILogger()` / `parseCLIInput()` / `handleCLIError()` in `packages/core/src/util/cli.ts` - CLI logging and input parsing utilities shared by `@silkweave/cli` and `@silkweave/mcp`'s cliProxy.
+- `isStreamingAction(action)` in `packages/core/src/util/action.ts` - returns `true` when `action.run` is an `async function*`. Every adapter checks this at registration time to branch between buffered and streaming code paths.
+- `runStreamingAction(action, input, context, onChunk?)` in `packages/core/src/util/streaming.ts` - drives a streaming action's async generator, awaiting `onChunk` for each yielded value before pulling the next (which is how transport-level backpressure - SSE drain, stdout drain, MCP notification ack - flows back to the action). Returns the buffered array of chunks; the buffered fallback is used when a client opts out of streaming (e.g. no MCP `progressToken`, or a `POST` without an SSE/NDJSON `Accept` header in Fastify).
+
+### Streaming
+
+A streaming action declares a `chunk` Zod schema (instead of, or alongside, `output`) and an `async function*` `run`:
+
+```typescript
+createAction({
+  name: 'generate-messages',
+  description: '...',
+  input: z.object({ count: z.number() }),
+  chunk: z.object({ index: z.number(), text: z.string() }),
+  run: async function* ({ count }, { logger }) {
+    for (let i = 0; i < count; i += 1) {
+      yield { index: i, text: `Message ${i}` }
+    }
+  }
+})
+```
+
+Each adapter delivers chunks differently:
+
+| Adapter | Wire format | Trigger | Fallback |
+|---------|-------------|---------|----------|
+| `stdio()`, `http()`, `vercel()` (MCP) | `notifications/progress` with the JSON-stringified chunk in `message` and a 1-based `progress` counter | Client sends `_meta.progressToken` in the tool call | Action runs to completion, chunks are buffered and returned as the final `CallToolResult` |
+| `fastify()` (REST) | `text/event-stream` (SSE: `data: <json>\n\n`, terminated by `event: done`) or `application/x-ndjson` (one JSON chunk per line) | `Accept` header matches `text/event-stream` or `application/x-ndjson` | `200 OK` with the buffered chunk array in the response body |
+| `trpc()`, `trpcFetch()` | Action is registered as a tRPC `.subscription()` whose async generator yields chunks directly | Streaming action ⇒ always a subscription (regardless of `kind`) | n/a - the consumer iterates the subscription |
+| `cli()` | NDJSON on stdout (one JSON chunk per line, backpressure-aware via `stdout.write` + `drain`) | Streaming action ⇒ always streamed | n/a |
+
+**MCP and AI host visibility.** Standard MCP `notifications/progress` puts each chunk on the wire correctly, but what the host client does with those notifications is a host-side choice. Most LLM hosts today (Claude Code, Cursor, generic chat UIs) consume progress notifications for *UI rendering* - spinners, status text, progress bars - while the model still sees only the final aggregated tool result when the call returns. Chunks reach the wire; in-flight model visibility depends on whether the host surfaces them into the model's context. For per-chunk model visibility today, prefer Fastify (SSE/NDJSON) or tRPC subscriptions.
+
+### Vercel AI SDK Integration (in @silkweave/ai)
+
+`@silkweave/ai` bridges Vercel AI SDK's `useChat` hook to a Silkweave streaming action over tRPC subscriptions - skipping AI SDK's Data Stream Protocol entirely. The chunks `useChat` consumes are plain JS objects, so a custom `ChatTransport` doesn't need to emit the prefix-coded wire format; it just needs to produce a `ReadableStream<UIMessageChunk>` from whatever transport you choose.
+
+- `createChatAction({ model, system?, tools?, ... })` in `packages/ai/src/chatAction.ts` - server-side helper. Wraps `streamText()` from `ai` in a Silkweave streaming action; `chunk` schema is `z.custom<UIMessageChunk>()` and `run` is an async generator that yields chunks from `result.toUIMessageStream()`. Combined with the tRPC adapter, this automatically registers as a `.subscription()` procedure.
+- `silkweaveTransport(subscribe)` in `packages/ai/src/transport.ts` - client-side `ChatTransport` factory. Wraps a subscribe-style function (typically `client.chat.subscribe`) into a `ReadableStream<UIMessageChunk>` that `useChat` consumes directly. Abort signals propagate to `unsubscribe()`. `reconnectToStream` returns `null` - stream resume after disconnect is intentionally unsupported (would require server-side state we don't manage).
+- `onData` is typed as `unknown` at the callback boundary because Zod's `z.custom<UIMessageChunk>()` doesn't preserve the exact union variance through tRPC's subscription type inference (`input?: unknown` vs `input: unknown`). Runtime is safe because the server only yields valid chunks; the cast lives in the transport.
+- `examples/ai/` is the canonical end-to-end example: Vite + React + `useChat` → custom transport → tRPC subscription → `createChatAction` → Anthropic's Claude via `@ai-sdk/anthropic`. Server loads `ANTHROPIC_API_KEY` from `examples/ai/.env` via `dotenv`.
 
 ### tRPC Utilities (in @silkweave/trpc)
 
@@ -142,7 +191,7 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 
 ## Wrapup Config
 
-- check: `pnpm check`
+- check: `pnpm check` — always run from the **repo root** (not from a sub-package), so turbo runs lint + typecheck across every workspace package
 - test: skip
 - push: yes
 - version_bump: yes (aligned across all packages)

@@ -761,10 +761,10 @@ pnpm build
 pnpm check
 
 # Run example servers
-pnpm tsx example/src/stdio.ts    # MCP stdio server
-pnpm tsx example/src/http.ts     # MCP streamable HTTP server on :8080
-pnpm tsx example/src/fastify.ts  # Fastify REST API with Swagger on :8080
-pnpm tsx example/src/cli.ts      # CLI mode
+pnpm -F @silkweave/example-mcp stdio       # MCP stdio server
+pnpm -F @silkweave/example-mcp http        # MCP streamable HTTP server on :8080
+pnpm -F @silkweave/example-fastify dev     # Fastify REST API with Swagger on :8080
+pnpm -F @silkweave/example-cli dev         # CLI mode
 ```
 
 Requires Node.js >= 18.
