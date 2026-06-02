@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, type Type } from '@nestjs/common'
 import { DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { createAction, type Action, type SilkweaveContext } from '@silkweave/core'
+import { createAction, type Action, type ActionKind, type SilkweaveContext, type StreamingActionInput } from '@silkweave/core'
 import { kebabCase } from 'change-case'
 import { buildIsEnabled } from './filter.js'
 import { collectGuards, runGuards } from './guards.js'
@@ -64,9 +64,40 @@ export class ActionDiscovery {
     const moduleRef = this.moduleRef
     const reflector = this.reflector
 
+    const applyGuards = async (context: SilkweaveContext): Promise<void> => {
+      if (guards.length === 0) { return }
+      const request = context.getOptional<unknown>('request')
+      const response = context.getOptional<unknown>('response')
+      await runGuards(guards, moduleRef, reflector, d.classRef, d.method, request, response)
+    }
+
     // Cast at the createAction boundary to bridge dual-zod-version installs
     // (zod@3.25 + zod@4.x can both be present transitively). Runtime is fine -
     // they share the same /v4 surface - but the structural types are distinct.
+    const streaming = d.method.constructor?.name === 'AsyncGeneratorFunction'
+
+    if (streaming) {
+      if (!d.meta.chunk) {
+        throw new Error(`@Action "${name}" is an async generator but has no \`chunk\` schema`)
+      }
+      const method = d.method
+      const instance = d.instance
+      return createAction({
+        name,
+        description: d.meta.description,
+        input: d.meta.input,
+        chunk: d.meta.chunk,
+        kind: d.meta.kind ?? 'mutation',
+        args: d.meta.args,
+        isEnabled,
+        toolResult: d.meta.toolResult,
+        run: async function* (input: object, context: SilkweaveContext) {
+          await applyGuards(context)
+          yield* (method.call(instance, input, context) as AsyncGenerator<object, void, void>)
+        }
+      } as StreamingActionInput<object, unknown, string, ActionKind>) as Action
+    }
+
     return createAction({
       name,
       description: d.meta.description,
@@ -77,11 +108,7 @@ export class ActionDiscovery {
       isEnabled,
       toolResult: d.meta.toolResult,
       run: async (input: object, context: SilkweaveContext): Promise<object> => {
-        if (guards.length > 0) {
-          const request = context.getOptional<unknown>('request')
-          const response = context.getOptional<unknown>('response')
-          await runGuards(guards, moduleRef, reflector, d.classRef, d.method, request, response)
-        }
+        await applyGuards(context)
         const result = await (d.method.call(d.instance, input, context) as Promise<object>)
         return result
       }

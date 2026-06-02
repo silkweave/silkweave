@@ -110,6 +110,7 @@ The `users.list` and `users.get` actions are now reachable via:
 | `description` | `string` | *required* | Human-readable summary. Used as MCP tool description |
 | `input` | `z.ZodObject` | *required* | Zod object schema for the action's input |
 | `output` | `z.ZodObject` | - | Optional output schema (used by tRPC type inference) |
+| `chunk` | `z.ZodType` | - | Schema for chunks yielded by a streaming (`async function*`) method. **Required** when the method is an async generator |
 | `kind` | `'query' \| 'mutation'` | `'mutation'` | `'query'` → GET in REST, `.query()` in tRPC. `'mutation'` → POST / `.mutation()` |
 | `transports` | `('rest' \| 'trpc' \| 'mcp')[]` | all | Allowlist of transports that expose this action |
 | `isEnabled` | `(ctx) => boolean` | - | Dynamic gate (AND-combined with `transports`) |
@@ -157,6 +158,24 @@ Mounts a tRPC HTTP handler built from `@silkweave/trpc`'s `buildRouter`.
 | `auth` | `AuthConfig` | - | `@silkweave/auth` bearer-token config |
 
 Action names with dots (e.g. `users.list`) collapse to camelCase procedure keys (`usersList`) - flat router in v1.
+
+**Streaming.** An `@Action` method declared as an `async function*` (with a `chunk` schema) is registered as a tRPC **subscription** that streams each yielded chunk over SSE - exactly like a standalone `createAction({ chunk, run: async function*(){…} })`. `@UseGuards()` guards still run before the first chunk. This is what `useChat` + `@silkweave/ai`'s `silkweaveTransport()` consume.
+
+```ts
+@Action({
+  description: 'Stream a countdown',
+  input: z.object({ from: z.number().int() }),
+  chunk: z.object({ n: z.number().int() })
+})
+async *countdown(input: { from: number }) {
+  for (let n = input.from; n >= 0; n -= 1) {
+    await new Promise((r) => setTimeout(r, 200))
+    yield { n }
+  }
+}
+```
+
+Declaring an async-generator method without a `chunk` schema throws at discovery time - the schema is required for typegen/tRPC to expose the subscription.
 
 ### `mcp(options?)`
 

@@ -6,7 +6,7 @@ export const ACTIONS_METADATA = '__silkweave_actions__'
 
 export type Transport = 'rest' | 'trpc' | 'mcp'
 
-export interface ActionMetadata<I extends object = object, O extends object = object> {
+export interface ActionMetadata<I extends object = object, O extends object = object, C = unknown> {
   /** Action name. Defaults to the kebab-cased method name. */
   name?: string
   /** Human-readable description. Becomes the MCP tool description and REST OpenAPI summary. */
@@ -15,6 +15,13 @@ export interface ActionMetadata<I extends object = object, O extends object = ob
   input: z.ZodType<I> & { shape: Record<string, z.ZodTypeAny> }
   /** Optional Zod object schema for the action's output (used by tRPC type inference). */
   output?: z.ZodType<O> & { shape: Record<string, z.ZodTypeAny> }
+  /**
+   * Zod schema for individual chunks yielded by a streaming (async-generator)
+   * action method. Required when the decorated method is an `async function*`.
+   * Mirrors `Action.chunk` in @silkweave/core; typegen/trpc use it to expose
+   * the action as a tRPC subscription.
+   */
+  chunk?: z.ZodType<C>
   /** `'query'` (GET in REST, `.query()` in tRPC) or `'mutation'` (POST in REST, `.mutation()` in tRPC). Default: `'mutation'`. */
   kind?: ActionKind
   /** Allowlist of transports that should expose this action. Default: all registered transports. */

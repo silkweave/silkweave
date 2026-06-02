@@ -475,6 +475,12 @@ function hl(raw: string): string {
           <td>Streaming action ⇒ always streamed</td>
           <td>n/a</td>
         </tr>
+        <tr>
+          <td>NestJS (<code>trpc</code>)</td>
+          <td>Same as tRPC above - an <code>async function*</code> <code>@Action</code> (with a <code>chunk</code> schema) is discovered as a streaming action and registered as a <code>.subscription()</code></td>
+          <td>Decorated method is an <code>async function*</code></td>
+          <td>n/a</td>
+        </tr>
       </tbody>
     </table>
 
@@ -857,6 +863,7 @@ export class AppModule {}`)} /></pre>
     <ul>
       <li>Adapters mount placeholder middleware slots in <code>OnModuleInit</code> (before Nest's 404 catch-all is installed), then populate the real handlers in <code>OnApplicationBootstrap</code> after <code>@Action</code> discovery completes.</li>
       <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on every HTTP-backed transport. Action methods are normal Nest providers - inject services via the constructor.</li>
+      <li><a href="#streaming">Streaming</a>: declare an <code>@Action</code> method as an <code>async function*</code> with a <code>chunk</code> schema and it's served as a tRPC <code>.subscription()</code> (SSE) - the same as a standalone streaming <code>createAction</code>. Guards still run before the first <code>yield</code>; an async generator without a <code>chunk</code> schema throws at discovery time. This is what <code>useChat</code> + <code>@silkweave/ai</code>'s <code>silkweaveTransport()</code> consume.</li>
       <li>Use <code>z.coerce.boolean()</code> / <code>z.coerce.number()</code> for fields read from REST query strings.</li>
       <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev - plain <code>tsx</code> doesn't emit decorator metadata.</li>
       <li>Default platform is <code>@nestjs/platform-express</code>. For <code>@nestjs/platform-fastify</code>, register <code>@fastify/express</code> first.</li>

@@ -24,6 +24,14 @@ const BanUserInput = z.object({
   reason: z.string()
 })
 
+const CountdownInput = z.object({
+  from: z.number().int()
+})
+
+const CountdownChunk = z.object({
+  n: z.number().int()
+})
+
 @Injectable()
 @Actions('users')
 export class UserActions {
@@ -56,5 +64,17 @@ export class UserActions {
   })
   ban(input: z.infer<typeof BanUserInput>, _ctx: SilkweaveContext) {
     return { banned: input.id, reason: input.reason }
+  }
+
+  @Action({
+    description: 'Stream a countdown',
+    input: CountdownInput,
+    chunk: CountdownChunk
+  })
+  async *countdown(input: z.infer<typeof CountdownInput>, _ctx: SilkweaveContext) {
+    for (let n = input.from; n >= 0; n -= 1) {
+      await new Promise((r) => setTimeout(r, 200))
+      yield { n }
+    }
   }
 }

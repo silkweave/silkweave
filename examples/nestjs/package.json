@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-nestjs",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Silkweave NestJS adapter example (REST + tRPC + MCP via decorators)",
   "private": true,
   "type": "module",

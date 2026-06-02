@@ -31,8 +31,8 @@ import { ACTION_METADATA, type ActionMetadata } from '../lib/metadata.js'
  * }
  * ```
  */
-export function Action<I extends object = object, O extends object = object>(
-  options: ActionMetadata<I, O>
+export function Action<I extends object = object, O extends object = object, C = unknown>(
+  options: ActionMetadata<I, O, C>
 ): MethodDecorator {
   return SetMetadata(ACTION_METADATA, options)
 }

@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-vercel",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Silkweave Vercel/Next.js route handler example",
   "private": true,
   "type": "module",
