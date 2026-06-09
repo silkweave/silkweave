@@ -2,10 +2,14 @@
   "name": "@silkweave/mcp",
   "version": "1.10.0",
   "description": "Silkweave MCP Package",
+  "homepage": "https://github.com/silkweave/silkweave/tree/master/packages/mcp#readme",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/silkweave/silkweave.git",
     "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/silkweave/silkweave/issues"
   },
   "type": "module",
   "main": "src/index.ts",
