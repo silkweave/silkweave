@@ -58,9 +58,8 @@ export class UserActions {
 
   @UseGuards(AdminGuard)
   @Action({
-    description: 'Ban a user (admin only - guard checks `x-admin-token` header)',
-    input: BanUserInput,
-    transports: ['rest', 'trpc']
+    description: 'Ban a user (admin only - guard checks `x-admin-token` header on every transport, including MCP)',
+    input: BanUserInput
   })
   ban(input: z.infer<typeof BanUserInput>, _ctx: SilkweaveContext) {
     return { banned: input.id, reason: input.reason }

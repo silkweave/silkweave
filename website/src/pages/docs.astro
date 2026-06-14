@@ -821,11 +821,10 @@ export class UserActions {
     return this.db.listUsers(input.activeOnly)
   }
 
-  @UseGuards(AdminGuard)                 // native Nest guards work
+  @UseGuards(AdminGuard)                 // native Nest guards work on every transport, MCP included
   @Action({
     description: 'Ban a user',
-    input: z.object({ id: z.string(), reason: z.string() }),
-    transports: ['rest', 'trpc']         // hide from MCP tools
+    input: z.object({ id: z.string(), reason: z.string() })
   })
   ban(input, _ctx) { return this.db.ban(input.id, input.reason) }
 }`)} /></pre>
@@ -850,7 +849,7 @@ import { mcp, rest, SilkweaveModule, trpc } from '@silkweave/nestjs'
 })
 export class AppModule {}`)} /></pre>
     </div>
-    <p>The <code>users.list</code> action is now reachable at <code>GET /api/users/list</code> (REST), <code>client.usersList.query(...)</code> (tRPC), and as the <code>UsersList</code> MCP tool. The <code>users.ban</code> action skips MCP per its <code>transports</code> allowlist and is gated by the Nest guard on every transport.</p>
+    <p>The <code>users.list</code> action is now reachable at <code>GET /api/users/list</code> (REST), <code>client.usersList.query(...)</code> (tRPC), and as the <code>UsersList</code> MCP tool. The <code>users.ban</code> action is gated by the Nest guard on <strong>every</strong> transport - REST, tRPC, and MCP. Over MCP the guard reads the inbound tool-call headers via <code>switchToHttp().getRequest().headers</code>, the same way it does for REST/tRPC.</p>
     <h4>Action name → transport path</h4>
     <table class="docs-table">
       <thead><tr><th>Action name</th><th>REST</th><th>tRPC</th><th>MCP tool</th></tr></thead>
@@ -862,7 +861,7 @@ export class AppModule {}`)} /></pre>
     </table>
     <ul>
       <li>Adapters mount placeholder middleware slots in <code>OnModuleInit</code> (before Nest's 404 catch-all is installed), then populate the real handlers in <code>OnApplicationBootstrap</code> after <code>@Action</code> discovery completes.</li>
-      <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on every HTTP-backed transport. Action methods are normal Nest providers - inject services via the constructor.</li>
+      <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on <strong>every</strong> transport - REST, tRPC, and MCP. Guards get an <code>ExecutionContext</code> whose <code>switchToHttp().getRequest()</code> carries the request headers; over MCP these come from the SDK's <code>extra.requestInfo</code> (headers + url only - no path <code>params</code>/<code>query</code>). A denying guard yields a clean MCP tool error, not a 500. For bearer-token/OAuth MCP auth use <code>mcp(&#123; auth &#125;)</code> and read <code>ctx.get('auth')</code> in the action. Action methods are normal Nest providers - inject services via the constructor.</li>
       <li><a href="#streaming">Streaming</a>: declare an <code>@Action</code> method as an <code>async function*</code> with a <code>chunk</code> schema and it's served as a tRPC <code>.subscription()</code> (SSE) - the same as a standalone streaming <code>createAction</code>. Guards still run before the first <code>yield</code>; an async generator without a <code>chunk</code> schema throws at discovery time. This is what <code>useChat</code> + <code>@silkweave/ai</code>'s <code>silkweaveTransport()</code> consume.</li>
       <li>Use <code>z.coerce.boolean()</code> / <code>z.coerce.number()</code> for fields read from REST query strings.</li>
       <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev - plain <code>tsx</code> doesn't emit decorator metadata.</li>

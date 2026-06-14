@@ -1,11 +1,11 @@
 {
   "name": "@silkweave/example-nestjs",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Silkweave NestJS adapter example (REST + tRPC + MCP via decorators)",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx --import @swc-node/register/esm-register src/main.ts",
+    "dev": "node --import @swc-node/register/esm-register src/main.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"

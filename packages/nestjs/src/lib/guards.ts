@@ -33,12 +33,17 @@ async function resolveGuard(ref: GuardRef, moduleRef: ModuleRef): Promise<CanAct
 }
 
 /**
- * Run the configured guards against an HTTP request. Throws `ForbiddenException`
+ * Run the configured guards against a request. Throws `ForbiddenException`
  * if any guard rejects, mirroring Nest's HTTP request-pipeline behavior.
  *
  * Pass `null` for `response` when running on top of a tRPC or MCP request that
  * doesn't surface a raw response object; guards that introspect the response
  * will receive `null`.
+ *
+ * `contextType` is reflected through `ExecutionContext.getType()` so guards can
+ * branch on the transport. It is `'http'` for REST/tRPC and for MCP-over-HTTP
+ * (where a header-bearing request stand-in is available); transports without any
+ * HTTP request (e.g. MCP stdio) pass `'rpc'`.
  */
 export async function runGuards(
   guards: GuardRef[],
@@ -47,10 +52,11 @@ export async function runGuards(
   classRef: Type<unknown>,
   handler: (...args: unknown[]) => unknown,
   request: unknown,
-  response: unknown
+  response: unknown,
+  contextType: 'http' | 'rpc' = 'http'
 ): Promise<void> {
   if (guards.length === 0) { return }
-  const context = new SilkweaveExecutionContext([request, response], classRef, handler, 'http')
+  const context = new SilkweaveExecutionContext([request, response], classRef, handler, contextType)
   for (const ref of guards) {
     const guard = await resolveGuard(ref, moduleRef)
     const result = guard.canActivate(context)

@@ -47,11 +47,10 @@ export class UserActions {
     return this.db.getUser(input.id)
   }
 
-  @UseGuards(AdminGuard)
+  @UseGuards(AdminGuard)            // guard reads the request header on every transport, MCP included
   @Action({
     description: 'Ban a user',
-    input: BanInput,
-    transports: ['rest', 'trpc']   // exclude from MCP tools
+    input: BanInput
   })
   ban(input: z.infer<typeof BanInput>) {
     return this.db.banUser(input.id, input.reason)
@@ -98,7 +97,7 @@ The `users.list` and `users.get` actions are now reachable via:
 - **tRPC:** `client.usersList.query({ activeOnly: true })` and `client.usersGet.query({ id: '1' })`
 - **MCP:** tools `UsersList` and `UsersGet`
 
-`users.ban` skips MCP per its `transports: ['rest', 'trpc']` and is guarded by `@UseGuards(AdminGuard)` on every transport that has an HTTP request.
+`users.ban` is guarded by `@UseGuards(AdminGuard)` on **every** transport - REST, tRPC, **and** MCP. The guard reads its credential from the request header (`switchToHttp().getRequest().headers`); over MCP the inbound tool-call headers are surfaced the same way (see [Guards & DI](#guards--di)).
 
 ## Decorators
 
@@ -191,7 +190,13 @@ Mounts the MCP Streamable HTTP transport directly at `basePath`, with sideload (
 
 ## Guards & DI
 
-Native NestJS `@UseGuards()` and `@UseInterceptors()` on `@Action` methods run for every HTTP-backed transport. Guards receive an `ExecutionContext` with the HTTP request in `switchToHttp().getRequest()`. The `Reflector` is also wired up so guards can read custom metadata.
+Native NestJS `@UseGuards()` and `@UseInterceptors()` on `@Action` methods run for **every** transport - REST, tRPC, and MCP. Guards receive an `ExecutionContext` with the request in `switchToHttp().getRequest()`. The `Reflector` is also wired up so guards can read custom metadata.
+
+**Headers over MCP.** REST and tRPC pass the raw HTTP request to the guard. For MCP (Streamable HTTP), the inbound tool-call request is surfaced as a stand-in `{ headers, url, params, query }` object built from the MCP SDK's `extra.requestInfo`, so a header-based guard - e.g. one reading `getRequest().headers['x-api-key']` - works unchanged. `ExecutionContext.getType()` is `'http'` whenever a request is available (and `'rpc'` for transports with none, e.g. MCP stdio). Caveats:
+
+- Only **headers** (and the request `url`) cross the MCP boundary. There are no path `params` or `query` on an MCP tool call, so `getRequest().params` / `.query` are empty objects - guards relying on them degrade to "deny" rather than crash.
+- A guard that denies (returns `false` or throws) produces a clean MCP tool error (`ForbiddenException`), not an HTTP 500.
+- For OAuth 2.1 / bearer-token MCP auth, prefer `mcp({ auth })` and read the resolved identity from the silkweave context (`ctx.get('auth')`) inside the action; the header stand-in is for custom request-reading guards.
 
 Action methods are normal Nest provider methods - inject services via the constructor as usual.
 

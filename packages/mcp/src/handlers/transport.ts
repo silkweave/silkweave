@@ -10,6 +10,19 @@ import { type RequestHandler } from 'express'
 import { handleToolError, jsonToolResult, smartToolResult } from '../util/result.js'
 import { authStorage } from './auth.js'
 
+/**
+ * Build the generic `request` context value (the same key REST/tRPC populate)
+ * from the MCP SDK's `extra.requestInfo`, so transport-agnostic consumers - e.g.
+ * `@silkweave/nestjs` `@UseGuards` guards reading
+ * `switchToHttp().getRequest().headers` - work over MCP. There is no path
+ * `params`/`query` on an MCP call, so those are empty stand-ins for graceful
+ * degradation. Returns `undefined` when no HTTP request info is available.
+ */
+function requestFromExtra(requestInfo: { headers?: unknown; url?: { toString(): string } } | undefined) {
+  if (!requestInfo) { return undefined }
+  return { headers: requestInfo.headers ?? {}, url: requestInfo.url?.toString(), params: {}, query: {} }
+}
+
 function registerTools(server: McpServer, actions: Action[], context: SilkweaveContext) {
   for (const action of actions) {
     server.registerTool(pascalCase(action.name), {
@@ -31,7 +44,12 @@ function registerTools(server: McpServer, actions: Action[], context: SilkweaveC
         }
       })
       const currentAuth = authStorage.getStore()
-      const actionContext = context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })
+      const actionContext = context.fork({
+        logger,
+        extra,
+        request: requestFromExtra(extra.requestInfo),
+        ...(currentAuth ? { auth: currentAuth } : {})
+      })
       const disposition = extra._meta?.disposition
       const progressToken = extra._meta?.progressToken
       try {

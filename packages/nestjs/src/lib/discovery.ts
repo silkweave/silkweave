@@ -30,9 +30,10 @@ export class ActionDiscovery {
    * a list of core `Action` objects ready to feed into `silkweave().actions()`.
    *
    * Action invocation is wrapped to (a) run `@UseGuards` guards declared on the
-   * method or its class against the incoming HTTP request (read from
-   * `ctx.get('request')`) and (b) bind `this` to the resolved Nest provider so
-   * DI-injected dependencies remain available.
+   * method or its class against the incoming request (read from
+   * `ctx.get('request')`, populated by REST/tRPC and by MCP-over-HTTP from the
+   * SDK's `extra.requestInfo`) and (b) bind `this` to the resolved Nest provider
+   * so DI-injected dependencies remain available.
    */
   discover(): Action[] {
     const discovered: DiscoveredAction[] = []
@@ -66,9 +67,16 @@ export class ActionDiscovery {
 
     const applyGuards = async (context: SilkweaveContext): Promise<void> => {
       if (guards.length === 0) { return }
+      // REST and tRPC populate `request`/`response`; MCP-over-HTTP populates
+      // `request` (a `{ headers, url, params, query }` stand-in built from the
+      // SDK's `extra.requestInfo`). Transports with no HTTP request at all (e.g.
+      // MCP stdio) get a header-less stand-in so guards reading `req.headers`
+      // degrade gracefully (deny) instead of dereferencing `undefined`.
       const request = context.getOptional<unknown>('request')
-      const response = context.getOptional<unknown>('response')
-      await runGuards(guards, moduleRef, reflector, d.classRef, d.method, request, response)
+      const response = context.getOptional<unknown>('response') ?? null
+      const hasRequest = request != null
+      const guardRequest = hasRequest ? request : { headers: {}, params: {}, query: {} }
+      await runGuards(guards, moduleRef, reflector, d.classRef, d.method, guardRequest, response, hasRequest ? 'http' : 'rpc')
     }
 
     // Cast at the createAction boundary to bridge dual-zod-version installs

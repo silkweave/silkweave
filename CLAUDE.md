@@ -135,13 +135,14 @@ Each adapter delivers chunks differently:
 - `smartToolResult()` in `packages/mcp/src/util/result.ts` - default response formatter. Responses ≤ 4096 chars are returned as `TextContent` JSON; larger payloads are automatically split into a short text summary + base64 embedded resource to reduce LLM context bloat.
 - `jsonToolResult()` / `errorToolResult()` / `handleToolError()` in `packages/mcp/src/util/result.ts` - lower-level helpers for constructing `CallToolResult` objects. Used internally by all MCP adapters and available for custom `toolResult` hooks.
 - `createMcpExpressHandler()` in `packages/mcp/src/lib/handler.ts` - builds the Express sub-app exposing MCP Streamable HTTP, OAuth routes, and bearer-token auth. Shared by `http()` (server-owning) and `@silkweave/nestjs`'s `mcp()` (mounts on Nest's HTTP server).
+- `registerTools()` in `packages/mcp/src/handlers/transport.ts` - forks the per-tool-call action context with `logger`, `extra` (the SDK `RequestHandlerExtra`), optional `auth`, and a `request` key. The `request` is a `{ headers, url, params, query }` stand-in built from `extra.requestInfo` (`requestFromExtra()`), surfacing the inbound tool-call HTTP headers under the same context key REST/tRPC populate - this is what lets `@silkweave/nestjs` `@UseGuards` guards read request headers over MCP. There are no path `params`/`query` on an MCP call, so those are empty.
 
 ### NestJS Utilities (in @silkweave/nestjs)
 
 - `@Action(options)` (`packages/nestjs/src/decorator/action.ts`) - method decorator that registers an Action on a Nest provider. Compiles `transports[]` allowlist into the core `Action.isEnabled` mechanism.
 - `@Actions(prefix?)` (`packages/nestjs/src/decorator/actions.ts`) - class decorator that prefixes every method-level action name. Accepts `string` shorthand or `{ prefix, transports }`.
 - `ActionDiscovery` (`packages/nestjs/src/lib/discovery.ts`) - walks every Nest provider via `DiscoveryService` + `MetadataScanner`, builds core `Action[]` from `@Action` metadata, wraps each invocation with guard resolution. Detects `async function*` methods (`d.method.constructor?.name === 'AsyncGeneratorFunction'`) and builds a **streaming** core action (guards run inside the generator before the first `yield`, so `isStreamingAction()` is true and the trpc/typegen adapters expose it as a subscription); requires a `chunk` schema and throws at discovery time if absent.
-- `runGuards()` (`packages/nestjs/src/lib/guards.ts`) - reads `@UseGuards()` metadata from method+class, resolves guard instances via `ModuleRef`, runs `canActivate()` against a `SilkweaveExecutionContext`.
+- `runGuards()` (`packages/nestjs/src/lib/guards.ts`) - reads `@UseGuards()` metadata from method+class, resolves guard instances via `ModuleRef`, runs `canActivate()` against a `SilkweaveExecutionContext`. Transport-aware: `applyGuards` (in `discovery.ts`) reads `request`/`response` from the silkweave context (populated by REST/tRPC, and by MCP-over-HTTP from `extra.requestInfo` - see below), passing `contextType: 'http'` when a request exists and `'rpc'` otherwise. Transports with no HTTP request (e.g. MCP stdio) get a header-less request stand-in so header-reading guards deny instead of crashing. So `@UseGuards` works on **all** transports including MCP, where a guard reading `switchToHttp().getRequest().headers['x-api-key']` sees the inbound tool-call headers.
 - `reserveSlot()` (`packages/nestjs/src/lib/slot.ts`) - mounts a placeholder middleware on Nest's HTTP server during `OnModuleInit` (before Nest's 404 catch-all is installed) and returns a setter callback used in `OnApplicationBootstrap` to populate the real handler. This is the key to the adapter's lifecycle correctness.
 
 ## Tooling
@@ -192,7 +193,7 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 
 ## Wrapup Config
 
-- check: `pnpm check` — always run from the **repo root** (not from a sub-package), so turbo runs lint + typecheck across every workspace package
+- check: `pnpm check` - always run from the **repo root** (not from a sub-package), so turbo runs lint + typecheck across every workspace package
 - test: skip
 - push: yes
 - version_bump: yes (aligned across all packages)

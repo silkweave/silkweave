@@ -8,6 +8,7 @@
   },
   "scripts": {
     "mcp": "pnpm -F @silkweave/example-mcp stdio",
+    "image": "node --env-file-if-exists=.env scripts/generate-image.ts",
     "build": "turbo build",
     "lint": "turbo lint",
     "roam": "roam index && roam fitness && roam rules --ci",

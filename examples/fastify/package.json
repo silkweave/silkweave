@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-fastify",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Silkweave Fastify REST adapter example",
   "private": true,
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/vercel",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Silkweave Vercel Serverless Adapter",
   "repository": {
     "type": "git",
