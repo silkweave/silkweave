@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-typegen",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Silkweave typegen adapter example",
   "private": true,
   "type": "module",
