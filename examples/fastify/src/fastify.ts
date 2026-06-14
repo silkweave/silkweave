@@ -35,11 +35,33 @@ const GenerateMessagesAction = createAction({
   }
 })
 
+const ListUsersAction = createAction({
+  name: 'list.users',
+  description: 'List users',
+  kind: 'query',
+  method: 'GET',
+  path: 'spaces/:spaceId/users',
+  queryParams: ['offset', 'limit'],
+  input: z.object({
+    spaceId: z.string(),
+    offset: z.int().optional().default(0),
+    limit: z.int().optional().default(10)
+  }),
+  output: z.object({
+    users: z.array(z.object({ id: z.string() }))
+  }),
+  run: async ({ spaceId }) => {
+    const users = [{ id: `${spaceId}.user` }]
+    return { users }
+  }
+})
+
 async function main() {
   await silkweave({ name: 'silkweave', description: 'Silkweave Fastify example', version: '1.0.0' })
     .adapter(fastify({ host: 'localhost', port: 8080, logger: true }))
     .action(HelloAction)
     .action(GenerateMessagesAction)
+    .action(ListUsersAction)
     .start()
 }
 

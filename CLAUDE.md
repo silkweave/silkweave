@@ -37,7 +37,7 @@ pnpm mcp
 
 The core pattern is **Action → Adapter → Silkweave**:
 
-- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod `input` schema, an optional Zod `output` schema, and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. The `output` schema is used by the typegen and tRPC adapters to generate typed response interfaces. An optional `kind: 'query' | 'mutation'` field (default `'mutation'`) controls how the action is exposed over tRPC - queries are GET-cacheable, mutations are POST. An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads). `Action<I, O, N, K>` is generic over input/output types, the literal `name`, and `kind` - literal types are preserved through `createAction()` so the `Silkweave<Actions>` builder can thread action types to type-aware adapters like tRPC. Actions can also be **streaming**: declare a `chunk` Zod schema and an `async function*` `run` that yields chunks; adapters detect this via `isStreamingAction()` and switch to per-chunk wire delivery (see [Streaming](#streaming) below).
+- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod `input` schema, an optional Zod `output` schema, and an async `run(input, context)` function. Actions are adapter-agnostic - they receive a `Logger` via context. The `output` schema is used by the typegen and tRPC adapters to generate typed response interfaces. An optional `kind: 'query' | 'mutation'` field (default `'mutation'`) controls how the action is exposed over tRPC - queries are GET-cacheable, mutations are POST. REST-style adapters (`@silkweave/fastify`, `@silkweave/nestjs` `rest`) additionally honor three optional routing fields: `method` (`'GET' | 'POST' | 'PUT' | 'DELETE'`, default `POST` or `GET` when `kind: 'query'`), `path` (a route template that may contain `:param` placeholders, e.g. `'spaces/:spaceId/users'`), and `queryParams` (input fields read from the URL query string instead of the body, e.g. `['offset', 'limit']`). Path placeholders and query params must be keys of the input schema; the input is merged from path + query + body and validated as one (see [REST routing](#rest-routing) below). An optional `toolResult(response, context)` hook lets actions control how results are formatted as MCP `CallToolResult` (e.g. returning embedded resources for large payloads). `Action<I, O, N, K>` is generic over input/output types, the literal `name`, and `kind` - literal types are preserved through `createAction()` so the `Silkweave<Actions>` builder can thread action types to type-aware adapters like tRPC. Actions can also be **streaming**: declare a `chunk` Zod schema and an `async function*` `run` that yields chunks; adapters detect this via `isStreamingAction()` and switch to per-chunk wire delivery (see [Streaming](#streaming) below).
 - **Adapter** (`packages/core/src/util/adapter.ts`): Translates actions into a specific transport. `AdapterFactory<T>` takes config options, returns an `AdapterGenerator` that takes `SilkweaveOptions` and produces an `Adapter` with `start(actions)` / `stop()`.
 - **Silkweave** (`packages/core/src/lib/silkweave.ts`): Fluent builder - `silkweave(opts).adapter(generator).action(action).start()`. `Silkweave<Actions extends Record<string, Action>>` is generic over accumulated actions so `typeof server` carries action type info forward; type-aware adapters (e.g. `@silkweave/trpc`'s `InferTrpcRouter<typeof server>`) extract this for end-to-end type safety.
 
@@ -81,6 +81,7 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 - `buildLogLevels()` in `packages/core/src/util/logger.ts` - builds a log-level record from a single callback function.
 - `buildCLILogger()` / `parseCLIInput()` / `handleCLIError()` in `packages/core/src/util/cli.ts` - CLI logging and input parsing utilities shared by `@silkweave/cli` and `@silkweave/mcp`'s cliProxy.
 - `isStreamingAction(action)` in `packages/core/src/util/action.ts` - returns `true` when `action.run` is an `async function*`. Every adapter checks this at registration time to branch between buffered and streaming code paths.
+- HTTP routing helpers in `packages/core/src/util/http.ts` - shared by `@silkweave/fastify` and `@silkweave/nestjs` `rest`. `actionMethod(action)` resolves the HTTP verb (`method` ?? `GET` for queries ?? `POST`); `methodHasBody(method)` is `true` for everything except `GET`; `pathParamNames(path)` extracts `:param` names; `validateActionRouting(action)` throws a `SilkweaveError` at registration time if a path placeholder or `queryParams` entry is not a key of the input schema; `resolveActionInput(action, { params, query, body })` merges the three sources (body base layer, then declared query params, then path params) and coerces path/query strings to the primitive each field's schema expects, returning the object to feed `action.input.parse()`.
 - `runStreamingAction(action, input, context, onChunk?)` in `packages/core/src/util/streaming.ts` - drives a streaming action's async generator, awaiting `onChunk` for each yielded value before pulling the next (which is how transport-level backpressure - SSE drain, stdout drain, MCP notification ack - flows back to the action). Returns the buffered array of chunks; the buffered fallback is used when a client opts out of streaming (e.g. no MCP `progressToken`, or a `POST` without an SSE/NDJSON `Accept` header in Fastify).
 
 ### Streaming
@@ -113,6 +114,32 @@ Each adapter delivers chunks differently:
 
 **MCP and AI host visibility.** Standard MCP `notifications/progress` puts each chunk on the wire correctly, but what the host client does with those notifications is a host-side choice. Most LLM hosts today (Claude Code, Cursor, generic chat UIs) consume progress notifications for *UI rendering* - spinners, status text, progress bars - while the model still sees only the final aggregated tool result when the call returns. Chunks reach the wire; in-flight model visibility depends on whether the host surfaces them into the model's context. For per-chunk model visibility today, prefer Fastify (SSE/NDJSON) or tRPC subscriptions.
 
+### REST routing
+
+REST-style adapters (`@silkweave/fastify`, `@silkweave/nestjs` `rest`) map a single input schema across the HTTP request's path, query string, and body using three optional action fields:
+
+```typescript
+createAction({
+  name: 'list.users',
+  kind: 'query',                       // ⇒ method defaults to GET
+  method: 'GET',                       // explicit verb (overrides the kind default)
+  path: 'spaces/:spaceId/users',       // :spaceId resolved from the URL path
+  queryParams: ['offset', 'limit'],    // read from ?offset=&limit= instead of the body
+  input: z.object({
+    spaceId: z.string(),               // ← path param
+    offset: z.int().optional().default(0),  // ← query param (coerced + defaulted)
+    limit: z.int().optional().default(10)   // ← query param
+  }),
+  run: async ({ spaceId, offset, limit }) => { /* ... */ }
+})
+```
+
+- **`method`** - `'GET' | 'POST' | 'PUT' | 'DELETE'`. Defaults to `POST`, or `GET` when `kind: 'query'`. An explicit `method` always wins.
+- **`path`** - route template joined to the adapter's base (Fastify mounts at `/`, nestjs `rest` at `basePath`, default `/api`). `:param` placeholders are matched from the URL path. When unset, the path is derived from `name` (Fastify uses the name verbatim; nestjs converts dots to slashes).
+- **`queryParams`** - input fields sourced from the query string on body-carrying methods. On a bodyless `GET`, *every* non-path input field is read from the query string automatically.
+
+Field-source precedence when merging: body (base) → declared query params → path params (highest). Path/query values arrive as strings and are coerced to the schema's primitive (number/boolean/bigint). Both adapters validate the result - Fastify via per-source JSON Schema (AJV) route schemas (and surfaces failures as `400 validation_error`), nestjs `rest` via `action.input.parse()`. Misconfigured routing (a `:param` or `queryParams` entry absent from the input schema) throws at registration via `validateActionRouting()`.
+
 ### Vercel AI SDK Integration (in @silkweave/ai)
 
 `@silkweave/ai` bridges Vercel AI SDK's `useChat` hook to a Silkweave streaming action over tRPC subscriptions - skipping AI SDK's Data Stream Protocol entirely. The chunks `useChat` consumes are plain JS objects, so a custom `ChatTransport` doesn't need to emit the prefix-coded wire format; it just needs to produce a `ReadableStream<UIMessageChunk>` from whatever transport you choose.
@@ -144,6 +171,7 @@ Each adapter delivers chunks differently:
 - `ActionDiscovery` (`packages/nestjs/src/lib/discovery.ts`) - walks every Nest provider via `DiscoveryService` + `MetadataScanner`, builds core `Action[]` from `@Action` metadata, wraps each invocation with guard resolution. Detects `async function*` methods (`d.method.constructor?.name === 'AsyncGeneratorFunction'`) and builds a **streaming** core action (guards run inside the generator before the first `yield`, so `isStreamingAction()` is true and the trpc/typegen adapters expose it as a subscription); requires a `chunk` schema and throws at discovery time if absent.
 - `runGuards()` (`packages/nestjs/src/lib/guards.ts`) - reads `@UseGuards()` metadata from method+class, resolves guard instances via `ModuleRef`, runs `canActivate()` against a `SilkweaveExecutionContext`. Transport-aware: `applyGuards` (in `discovery.ts`) reads `request`/`response` from the silkweave context (populated by REST/tRPC, and by MCP-over-HTTP from `extra.requestInfo` - see below), passing `contextType: 'http'` when a request exists and `'rpc'` otherwise. Transports with no HTTP request (e.g. MCP stdio) get a header-less request stand-in so header-reading guards deny instead of crashing. So `@UseGuards` works on **all** transports including MCP, where a guard reading `switchToHttp().getRequest().headers['x-api-key']` sees the inbound tool-call headers.
 - `reserveSlot()` (`packages/nestjs/src/lib/slot.ts`) - mounts a placeholder middleware on Nest's HTTP server during `OnModuleInit` (before Nest's 404 catch-all is installed) and returns a setter callback used in `OnApplicationBootstrap` to populate the real handler. This is the key to the adapter's lifecycle correctness.
+- `addSilkweaveActions(app, document, options?)` (`packages/nestjs/src/lib/swagger.ts`) - merges every REST-exposed `@Action` into a `@nestjs/swagger` `OpenAPIObject`. The Swagger scanner only walks **controllers**, but Silkweave registers action routes directly on the HTTP adapter, so they're invisible to it. The helper resolves `ActionDiscovery` + module options via `app.get()`, filters to REST-enabled actions (`adapter: 'rest'`), and merges paths built by `buildActionPaths()` into `document.paths` - so the docs stay in sync with the live routes without dynamic controllers. The `rest()` adapter exposes its `basePath` on the returned object so the helper picks it up automatically. `buildActionPaths(actions, { basePath, tag })` (`packages/nestjs/src/lib/openapi.ts`) is the standalone path builder, mirroring the `rest()` adapter's verb/path/query/body routing (via the core `actionMethod`/`pathParamNames`/`methodHasBody` helpers). `@nestjs/swagger` is an **optional** peer dependency.
 
 ## Tooling
 

@@ -1,6 +1,6 @@
 import type { FastifyCorsOptions } from '@fastify/cors'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, ActionStreamRun, AdapterFactory, isStreamingAction, runStreamingAction, SilkweaveContext, SilkweaveError } from '@silkweave/core'
+import { Action, actionMethod, ActionStreamRun, AdapterFactory, HttpMethod, isStreamingAction, methodHasBody, pathParamNames, resolveActionInput, runStreamingAction, SilkweaveContext, SilkweaveError, validateActionRouting } from '@silkweave/core'
 import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
 import { once } from 'events'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -148,6 +148,54 @@ function createActionLogger(instance: FastifyInstance): Logger {
   }
 }
 
+interface ObjectSchema {
+  type: 'object'
+  properties: Record<string, unknown>
+  required: string[]
+}
+
+/**
+ * Split an action's input JSON Schema into Fastify `params`/`querystring`/`body`
+ * schemas based on its `path` placeholders and `queryParams`. Fastify's own AJV
+ * validation, type coercion, and default-filling then apply per source, and the
+ * three are merged back into a single input by `resolveActionInput` at runtime.
+ */
+function splitInputSchema(action: Action, method: HttpMethod): {
+  params?: ObjectSchema
+  querystring?: ObjectSchema
+  body?: ObjectSchema
+} {
+  const json = z.toJSONSchema(action.input) as { properties?: Record<string, unknown>; required?: string[] }
+  const properties = json.properties ?? {}
+  const required = new Set(json.required ?? [])
+  const pathParams = new Set(pathParamNames(action.path))
+  const queryKeys = new Set((action.queryParams ?? []).map(String))
+  const hasBody = methodHasBody(method)
+
+  const params: ObjectSchema = { type: 'object', properties: {}, required: [] }
+  const querystring: ObjectSchema = { type: 'object', properties: {}, required: [] }
+  const body: ObjectSchema = { type: 'object', properties: {}, required: [] }
+
+  for (const [key, prop] of Object.entries(properties)) {
+    if (pathParams.has(key)) {
+      params.properties[key] = prop
+      params.required.push(key)
+    } else if (!hasBody || queryKeys.has(key)) {
+      querystring.properties[key] = prop
+      if (required.has(key)) { querystring.required.push(key) }
+    } else {
+      body.properties[key] = prop
+      if (required.has(key)) { body.required.push(key) }
+    }
+  }
+
+  return {
+    params: Object.keys(params.properties).length ? params : undefined,
+    querystring: Object.keys(querystring.properties).length ? querystring : undefined,
+    body: hasBody && Object.keys(body.properties).length ? body : undefined
+  }
+}
+
 export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, auth, cors: corsConfig, ...fastifyOptions }) => {
   const instance = fastifyInstance(fastifyOptions)
   return (options, baseContext) => {
@@ -190,6 +238,11 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
           if (error instanceof z.ZodError) {
             return reply.status(400).send({ error: 'validation_error', issues: error.issues })
           }
+          // Fastify's schema (AJV) validation failures for body/querystring/params.
+          const validation = (error as { validation?: unknown }).validation
+          if (validation) {
+            return reply.status(400).send({ error: 'validation_error', issues: validation })
+          }
           instance.log.error(error)
           return reply.status(500).send({ error: 'internal', message: 'Internal server error' })
         })
@@ -197,32 +250,41 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
         const logger = createActionLogger(instance)
 
         for (const action of actions) {
-          const schema = z.toJSONSchema(action.input) as { properties?: Record<string, unknown>; required?: string[] }
+          validateActionRouting(action)
+          const method = actionMethod(action)
+          const url = action.path ? `/${action.path.replace(/^\//, '')}` : `/${action.name}`
+          const { params, querystring, body } = splitInputSchema(action, method)
           const streaming = isStreamingAction(action)
-          instance.post(`/${action.name}`, {
+          instance.route({
+            method,
+            url,
             schema: {
               description: action.description,
-              body: {
-                type: 'object',
-                properties: schema.properties,
-                required: schema.required
-              },
+              ...(params ? { params } : {}),
+              ...(querystring ? { querystring } : {}),
+              ...(body ? { body } : {}),
               response: {
                 200: { description: 'Successful response' }
               }
-            }
-          }, async (request, reply) => {
-            const authInfo = auth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
-            const actionContext = context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) })
-            if (streaming) {
-              const format = pickStreamFormat(request.headers.accept)
-              if (format) {
-                await streamAction(reply, format, action, request.body as object, actionContext)
-                return reply
+            },
+            handler: async (request, reply) => {
+              const authInfo = auth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
+              const actionContext = context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) })
+              const input = resolveActionInput(action, {
+                params: request.params as Record<string, string | undefined>,
+                query: request.query as Record<string, unknown>,
+                body: request.body
+              })
+              if (streaming) {
+                const format = pickStreamFormat(request.headers.accept)
+                if (format) {
+                  await streamAction(reply, format, action, input, actionContext)
+                  return reply
+                }
+                return runStreamingAction(action, input, actionContext)
               }
-              return runStreamingAction(action, request.body as object, actionContext)
+              return action.run(input, actionContext)
             }
-            return action.run(request.body, actionContext)
           })
         }
         await instance.listen({ host, port })

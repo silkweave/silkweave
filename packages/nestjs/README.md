@@ -93,7 +93,7 @@ await app.listen(8080)
 
 The `users.list` and `users.get` actions are now reachable via:
 
-- **REST:** `GET /api/users/list?activeOnly=true` and `GET /api/users/get?id=1`
+- **REST:** `GET /api/users/list?activeOnly=true` (query param) and `GET /api/users/1` (path param, via `path: 'users/:id'`)
 - **tRPC:** `client.usersList.query({ activeOnly: true })` and `client.usersGet.query({ id: '1' })`
 - **MCP:** tools `UsersList` and `UsersGet`
 
@@ -111,6 +111,9 @@ The `users.list` and `users.get` actions are now reachable via:
 | `output` | `z.ZodObject` | - | Optional output schema (used by tRPC type inference) |
 | `chunk` | `z.ZodType` | - | Schema for chunks yielded by a streaming (`async function*`) method. **Required** when the method is an async generator |
 | `kind` | `'query' \| 'mutation'` | `'mutation'` | `'query'` → GET in REST, `.query()` in tRPC. `'mutation'` → POST / `.mutation()` |
+| `method` | `'GET' \| 'POST' \| 'PUT' \| 'DELETE'` | `POST` (or `GET` when `kind: 'query'`) | REST HTTP verb. Overrides the `kind`-derived default |
+| `path` | `string` | action name with dots as slashes | REST route, optionally with `:param` placeholders (e.g. `'spaces/:spaceId/users'`). Each placeholder must be a key of `input` and is resolved from the URL path |
+| `queryParams` | `(keyof input)[]` | - | Input fields read from the URL query string instead of the body (e.g. `['offset', 'limit']`). On a bodyless GET every non-path field is read from the query string automatically |
 | `transports` | `('rest' \| 'trpc' \| 'mcp')[]` | all | Allowlist of transports that expose this action |
 | `isEnabled` | `(ctx) => boolean` | - | Dynamic gate (AND-combined with `transports`) |
 | `toolResult` | `(response, ctx) => CallToolResult` | - | Custom MCP `CallToolResult` formatter |
@@ -140,12 +143,39 @@ Maps actions to REST routes on the Nest HTTP server.
 | `basePath` | `string` | `'/api'` | URL prefix joined to each action's path |
 | `auth` | `AuthConfig` | - | `@silkweave/auth` bearer-token config |
 
-Routes follow `{basePath}/{action-name-with-slashes}` where dots in action names become slashes:
+By default routes follow `{basePath}/{action-name-with-slashes}` where dots in action names become slashes, and the verb comes from `kind`:
 
 - `users.list` (query) → `GET /api/users/list`
 - `users.ban` (mutation) → `POST /api/users/ban`
 
-Each action is registered as an individual route on Nest's HTTP adapter (not a sub-app). Input is parsed from `req.query` (queries) or `req.body` (mutations) and validated against the action's Zod schema; validation failures return HTTP 400 with the Zod issues.
+The action's `method`, `path`, and `queryParams` fields override this (see the `@Action` options table above):
+
+- `path: 'users/:id'`, `kind: 'query'` → `GET /api/users/:id` (`id` from the path)
+- `queryParams: ['activeOnly']`, `kind: 'query'` → `GET /api/users/list?activeOnly=true`
+
+Each action is registered as an individual route on Nest's HTTP adapter (not a sub-app). Input is merged from the request body, `queryParams` query-string fields, and `:param` path placeholders (path/query strings are coerced to the schema's primitive), then validated against the action's Zod schema; validation failures return HTTP 400 with the Zod issues.
+
+#### Swagger / OpenAPI
+
+`@nestjs/swagger` builds its document by scanning **controllers**, but Silkweave registers action routes directly on the HTTP adapter - so the scanner never sees them. `addSilkweaveActions(app, document, options?)` closes the gap: it discovers the actions through the same `ActionDiscovery` provider the `rest()` adapter uses, builds OpenAPI paths with the same routing logic, and merges them into the document. The result stays in sync with the live routes without any dynamic controllers. Call it between `createDocument()` and `setup()`:
+
+```ts
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { addSilkweaveActions } from '@silkweave/nestjs'
+
+const config = new DocumentBuilder().setTitle('My API').setVersion('1.0.0').build()
+const document = SwaggerModule.createDocument(app, config)  // your controllers
+addSilkweaveActions(app, document)                          // + silkweave actions
+SwaggerModule.setup('api/docs', app, document)
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `basePath` | `string` | the `rest()` adapter's `basePath`, else `'/api'` | URL prefix the action routes are mounted on |
+| `tag` | `string` | `'Actions'` | OpenAPI tag the actions are grouped under |
+| `includeDisabled` | `boolean` | `false` | Include actions gated off the REST transport (via `transports` / `isEnabled`) |
+
+`@nestjs/swagger` is an **optional** peer dependency - install it alongside `@silkweave/nestjs` to use this helper. Path params, `queryParams`, request bodies, and `output`/`chunk` response schemas are all derived from the action's Zod schemas.
 
 ### `trpc(options?)`
 

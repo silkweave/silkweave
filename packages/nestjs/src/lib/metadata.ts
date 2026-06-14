@@ -1,4 +1,4 @@
-import { type Action, type ActionKind, type SilkweaveContext } from '@silkweave/core'
+import { type Action, type ActionKind, type HttpMethod, type SilkweaveContext } from '@silkweave/core'
 import type z from 'zod/v4'
 
 export const ACTION_METADATA = '__silkweave_action__'
@@ -24,6 +24,12 @@ export interface ActionMetadata<I extends object = object, O extends object = ob
   chunk?: z.ZodType<C>
   /** `'query'` (GET in REST, `.query()` in tRPC) or `'mutation'` (POST in REST, `.mutation()` in tRPC). Default: `'mutation'`. */
   kind?: ActionKind
+  /** HTTP verb for the REST route. Defaults to `POST` (or `GET` when `kind` is `'query'`). Overrides the `kind`-derived default. */
+  method?: HttpMethod
+  /** REST route path, optionally with `:param` placeholders (e.g. `'spaces/:spaceId/users'`). Each placeholder must be a key of `input`. Defaults to the action name with dots as slashes. */
+  path?: string
+  /** Input fields read from the URL query string instead of the request body (e.g. `['offset', 'limit']`). Each must be a key of `input`. */
+  queryParams?: (keyof I)[]
   /** Allowlist of transports that should expose this action. Default: all registered transports. */
   transports?: Transport[]
   /** Dynamic enable check (in addition to `transports`). AND-combined with the transports filter. */

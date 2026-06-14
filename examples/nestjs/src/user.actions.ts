@@ -1,4 +1,4 @@
-import { Injectable, UseGuards } from '@nestjs/common'
+import { Injectable, NotFoundException, UseGuards } from '@nestjs/common'
 import { type SilkweaveContext } from '@silkweave/core'
 import { Action, Actions } from '@silkweave/nestjs'
 import z from 'zod/v4'
@@ -38,7 +38,8 @@ export class UserActions {
   @Action({
     description: 'List users',
     input: ListUsersInput,
-    kind: 'query'
+    kind: 'query',
+    queryParams: ['activeOnly']
   })
   list(input: z.infer<typeof ListUsersInput>, _ctx: SilkweaveContext) {
     const users = input.activeOnly ? USERS.filter((u) => u.active) : USERS
@@ -48,11 +49,12 @@ export class UserActions {
   @Action({
     description: 'Get a single user by ID',
     input: GetUserInput,
-    kind: 'query'
+    kind: 'query',
+    path: 'users/:id'
   })
   get(input: z.infer<typeof GetUserInput>, _ctx: SilkweaveContext) {
     const user = USERS.find((u) => u.id === input.id)
-    if (!user) { return { user: null } }
+    if (!user) { throw new NotFoundException('user not found') }
     return { user }
   }
 

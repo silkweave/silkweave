@@ -30,6 +30,12 @@ export interface NestSilkweaveAdapter {
   /** Adapter discriminator - set on the silkweave context as `ctx.get('adapter')`. */
   readonly name: 'rest' | 'trpc' | 'mcp' | 'typegen'
   /**
+   * URL prefix the adapter mounts on (e.g. `'/api'`). Surfaced for introspection
+   * tooling such as `addSilkweaveActions()` (OpenAPI/Swagger), which reads it to
+   * keep generated docs aligned with the live routes.
+   */
+  readonly basePath?: string
+  /**
    * When `true`, the adapter receives every discovered action regardless of
    * each action's `transports` allowlist / `isEnabled` gate. Used by
    * non-runtime adapters like `typegen()` that emit types for the entire

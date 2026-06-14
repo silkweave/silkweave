@@ -355,6 +355,9 @@ function hl(raw: string): string {
   output?: z.ZodType<O>             // buffered actions
   chunk?: z.ZodType<Chunk>          // streaming actions
   kind?: 'query' | 'mutation'       // tRPC dispatch
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'   // REST verb
+  path?: string                     // REST route, e.g. 'spaces/:spaceId/users'
+  queryParams?: (keyof I)[]         // input fields read from the query string
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run:
@@ -368,6 +371,7 @@ function hl(raw: string): string {
       <li><strong><code>input</code></strong> - Zod object schema. Drives validation, CLI option generation, and OpenAPI docs.</li>
       <li><strong><code>output</code></strong> - Optional Zod object schema for the return type. Used by the <a href="#adapter-typegen">typegen adapter</a> to generate typed response interfaces and by Fastify for OpenAPI response schemas.</li>
       <li><strong><code>chunk</code></strong> - Optional Zod schema for individual chunks yielded by a streaming <code>run</code> (an <code>async function*</code>). Presence of this field plus a generator <code>run</code> marks the action as <a href="#streaming">streaming</a>; adapters then switch to per-chunk wire delivery.</li>
+      <li><strong><code>method</code></strong> / <strong><code>path</code></strong> / <strong><code>queryParams</code></strong> - Optional REST routing for the <a href="#adapter-fastify">Fastify</a> and <a href="#integration-nestjs">NestJS</a> <code>rest</code> adapters. See <a href="#rest-routing">REST routing</a>.</li>
       <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
       <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
       <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
@@ -543,7 +547,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 
   <section id="adapter-fastify">
     <h3>Fastify REST</h3>
-    <p>The <code>fastify()</code> adapter registers each action as a <code>POST /{'{'}<span>name</span>{'}'}</code> endpoint with auto-generated OpenAPI documentation and interactive Swagger UI (powered by Scalar).</p>
+    <p>The <code>fastify()</code> adapter registers each action as a <code>POST /{'{'}<span>name</span>{'}'}</code> endpoint (by default) with auto-generated OpenAPI documentation and interactive Swagger UI (powered by Scalar). Use the action's <code>method</code>, <code>path</code>, and <code>queryParams</code> fields for custom verbs and dynamic routes - see <a href="#rest-routing">REST routing</a>.</p>
     <div class="code-block">
       <div class="code-block-header"><span>server.ts</span></div>
       <pre><code set:html={hl(`import { fastify } from '@silkweave/fastify'
@@ -560,6 +564,41 @@ await silkweave({ name: 'my-api', version: '1.0.0' })
       <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults (<code>origin: '*'</code>), or a <a href="https://www.npmjs.com/package/@fastify/cors">FastifyCorsOptions</a> object</li>
       <li>Errors are mapped to HTTP status codes automatically (see <a href="#error-handling">Error Handling</a>)</li>
       <li><a href="#streaming">Streaming actions</a>: content negotiation on <code>Accept</code> picks SSE (<code>text/event-stream</code>), NDJSON (<code>application/x-ndjson</code>), or buffered JSON</li>
+    </ul>
+  </section>
+
+  <section id="rest-routing">
+    <h3>REST routing</h3>
+    <p>The REST-style adapters - <a href="#adapter-fastify">Fastify</a> and the <a href="#integration-nestjs">NestJS</a> <code>rest</code> adapter - map a single input schema across the request's path, query string, and body using three optional action fields:</p>
+    <ul>
+      <li><strong><code>method</code></strong> - <code>'GET' | 'POST' | 'PUT' | 'DELETE'</code>. Defaults to <code>POST</code>, or <code>GET</code> when <code>kind: 'query'</code>. An explicit <code>method</code> always wins.</li>
+      <li><strong><code>path</code></strong> - a route template, optionally with <code>:param</code> placeholders. Each placeholder must be a key of the input schema and is resolved from the URL path. When unset, the route is derived from <code>name</code>.</li>
+      <li><strong><code>queryParams</code></strong> - input fields read from the URL query string instead of the body. On a bodyless <code>GET</code>, every non-path field is read from the query string automatically.</li>
+    </ul>
+    <div class="code-block">
+      <div class="code-block-header"><span>list-users.ts</span></div>
+      <pre><code set:html={hl(`const ListUsers = createAction({
+  name: 'list.users',
+  description: 'List users in a space',
+  kind: 'query',                    // ⇒ GET
+  path: 'spaces/:spaceId/users',    // GET /spaces/:spaceId/users
+  queryParams: ['offset', 'limit'],
+  input: z.object({
+    spaceId: z.string(),                    // ← from the path
+    offset: z.int().optional().default(0),  // ← from ?offset=
+    limit: z.int().optional().default(10)   // ← from ?limit=
+  }),
+  output: z.object({ users: z.array(z.object({ id: z.string() })) }),
+  run: async ({ spaceId, offset, limit }) => ({ users: [/* ... */] })
+})
+
+// GET /spaces/acme/users?offset=20&limit=10`)} /></pre>
+    </div>
+    <ul>
+      <li>The input is merged from all three sources with precedence <strong>body &rarr; query params &rarr; path params</strong>, then validated as one schema.</li>
+      <li>Path and query values arrive as strings and are coerced to the primitive each field's schema expects (number / boolean / bigint).</li>
+      <li>Fastify validates each source with its generated JSON Schema (AJV) and emits per-source OpenAPI parameters; validation failures return <code>400 {'{'} error: 'validation_error', issues: [...] {'}'}</code>. The NestJS <code>rest</code> adapter validates via the Zod schema.</li>
+      <li>A <code>:param</code> placeholder or <code>queryParams</code> entry that isn't a key of the input schema throws at startup (<code>validateActionRouting</code>).</li>
     </ul>
   </section>
 
@@ -863,10 +902,23 @@ export class AppModule {}`)} /></pre>
       <li>Adapters mount placeholder middleware slots in <code>OnModuleInit</code> (before Nest's 404 catch-all is installed), then populate the real handlers in <code>OnApplicationBootstrap</code> after <code>@Action</code> discovery completes.</li>
       <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on <strong>every</strong> transport - REST, tRPC, and MCP. Guards get an <code>ExecutionContext</code> whose <code>switchToHttp().getRequest()</code> carries the request headers; over MCP these come from the SDK's <code>extra.requestInfo</code> (headers + url only - no path <code>params</code>/<code>query</code>). A denying guard yields a clean MCP tool error, not a 500. For bearer-token/OAuth MCP auth use <code>mcp(&#123; auth &#125;)</code> and read <code>ctx.get('auth')</code> in the action. Action methods are normal Nest providers - inject services via the constructor.</li>
       <li><a href="#streaming">Streaming</a>: declare an <code>@Action</code> method as an <code>async function*</code> with a <code>chunk</code> schema and it's served as a tRPC <code>.subscription()</code> (SSE) - the same as a standalone streaming <code>createAction</code>. Guards still run before the first <code>yield</code>; an async generator without a <code>chunk</code> schema throws at discovery time. This is what <code>useChat</code> + <code>@silkweave/ai</code>'s <code>silkweaveTransport()</code> consume.</li>
-      <li>Use <code>z.coerce.boolean()</code> / <code>z.coerce.number()</code> for fields read from REST query strings.</li>
+      <li>Path and query-string values are coerced to the field's primitive (number / boolean / bigint) automatically - see <a href="#rest-routing">REST routing</a> for <code>method</code> / <code>path</code> / <code>queryParams</code>.</li>
       <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev - plain <code>tsx</code> doesn't emit decorator metadata.</li>
       <li>Default platform is <code>@nestjs/platform-express</code>. For <code>@nestjs/platform-fastify</code>, register <code>@fastify/express</code> first.</li>
     </ul>
+    <h4>Swagger / OpenAPI</h4>
+    <p><code>@nestjs/swagger</code> builds its document by scanning <strong>controllers</strong>, but Silkweave registers action routes directly on the HTTP adapter - so the scanner never sees them. <code>addSilkweaveActions(app, document)</code> closes the gap: it discovers the actions through the same machinery the <code>rest()</code> adapter uses and merges OpenAPI paths (with matching verbs, path/query params, and request/response schemas) into the document, so the docs stay in sync with the live routes. Call it between <code>createDocument()</code> and <code>setup()</code>:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>main.ts</span></div>
+      <pre><code set:html={hl(`import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { addSilkweaveActions } from '@silkweave/nestjs'
+
+const config = new DocumentBuilder().setTitle('My API').setVersion('1.0.0').build()
+const document = SwaggerModule.createDocument(app, config)  // your controllers
+addSilkweaveActions(app, document)                          // + silkweave actions
+SwaggerModule.setup('api/docs', app, document)`)} /></pre>
+    </div>
+    <p><code>@nestjs/swagger</code> is an <strong>optional</strong> peer dependency. Options: <code>basePath</code> (defaults to the <code>rest()</code> adapter's), <code>tag</code> (group label, default <code>'Actions'</code>), and <code>includeDisabled</code> (include actions gated off the REST transport).</p>
     <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nestjs#readme"><code>@silkweave/nestjs</code> README</a>.</p>
   </section>
 

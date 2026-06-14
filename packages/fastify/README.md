@@ -25,12 +25,42 @@ Visit `http://localhost:8080/` for the interactive Scalar API reference.
 
 ## Route Mapping
 
-Each action becomes a `POST /{action.name}` route. Zod schemas are converted to JSON Schema for request body validation and OpenAPI documentation.
+By default each action becomes a `POST /{action.name}` route. Zod schemas are converted to JSON Schema for request body validation and OpenAPI documentation.
 
 | Action | Route | Body |
 |--------|-------|------|
 | `name: 'search'` | `POST /search` | `{ "query": "...", "limit": 10 }` |
 | `name: 'greet'` | `POST /greet` | `{ "name": "World" }` |
+
+### Method, path & query params
+
+Three optional action fields control REST routing and where each input field is read from:
+
+- **`method`** - `'GET' | 'POST' | 'PUT' | 'DELETE'`. Defaults to `POST`, or `GET` when `kind: 'query'`. An explicit `method` always wins.
+- **`path`** - route template, optionally with `:param` placeholders (e.g. `'spaces/:spaceId/users'`). Each placeholder must be a key of the input schema and is resolved from the URL path. When unset, the route is `/{action.name}`.
+- **`queryParams`** - input fields read from the URL query string instead of the body (e.g. `['offset', 'limit']`). On a bodyless `GET`, every non-path field is read from the query string automatically.
+
+```typescript
+const ListUsers = createAction({
+  name: 'list.users',
+  kind: 'query',                    // ⇒ GET
+  path: 'spaces/:spaceId/users',    // GET /spaces/:spaceId/users
+  queryParams: ['offset', 'limit'],
+  input: z.object({
+    spaceId: z.string(),                    // from the path
+    offset: z.int().optional().default(0),  // from ?offset=
+    limit: z.int().optional().default(10)   // from ?limit=
+  }),
+  output: z.object({ users: z.array(z.object({ id: z.string() })) }),
+  run: async ({ spaceId, offset, limit }) => ({ users: [/* ... */] })
+})
+```
+
+```bash
+curl 'http://localhost:8080/spaces/acme/users?offset=20&limit=10'
+```
+
+The input is merged from path + query + body (precedence: body → query → path) and validated per-source with the generated JSON Schema. The path placeholders, query params, and body each get their own OpenAPI parameters/requestBody, and validation failures return `400 { "error": "validation_error", "issues": [...] }`. A `:param` or `queryParams` entry that isn't in the input schema throws at startup.
 
 ## Streaming Actions
 

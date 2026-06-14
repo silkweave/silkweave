@@ -5,6 +5,8 @@ import { SilkweaveContext } from './context.js'
 
 export type ActionKind = 'query' | 'mutation'
 
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
 export type ActionRun<I, O> = (input: I, context: SilkweaveContext) => Promise<O>
 export type ActionStreamRun<I, C> = (input: I, context: SilkweaveContext) => AsyncGenerator<C, void, void>
 
@@ -27,6 +29,24 @@ export interface Action<
    */
   chunk?: z.ZodType<C>
   kind?: K
+  /**
+   * HTTP verb for REST-style adapters (fastify, nestjs `rest`). Defaults to
+   * `POST`, or `GET` when `kind` is `'query'`. An explicit `method` always wins.
+   */
+  method?: HttpMethod
+  /**
+   * Route path for REST-style adapters. May contain `:param` placeholders
+   * (e.g. `'spaces/:spaceId/users'`); each placeholder must be a key of the
+   * input schema and is resolved from the URL path at runtime. When unset, the
+   * adapter derives the path from `name`.
+   */
+  path?: string
+  /**
+   * Input fields sourced from the URL query string instead of the request body
+   * (e.g. `['offset', 'limit']`). Each must be a key of the input schema; their
+   * required/optional status is validated by the input schema as usual.
+   */
+  queryParams?: (keyof I)[]
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O> | ActionStreamRun<I, C>
@@ -39,6 +59,9 @@ export interface NonStreamingActionInput<I extends object, O extends object, N e
   input: z.ZodType<I> & { shape: Record<string, z.ZodTypeAny> }
   output?: z.ZodType<O> & { shape: Record<string, z.ZodTypeAny> }
   kind?: K
+  method?: HttpMethod
+  path?: string
+  queryParams?: (keyof I)[]
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O>
@@ -51,6 +74,9 @@ export interface StreamingActionInput<I extends object, C, N extends string, K e
   input: z.ZodType<I> & { shape: Record<string, z.ZodTypeAny> }
   chunk: z.ZodType<C>
   kind?: K
+  method?: HttpMethod
+  path?: string
+  queryParams?: (keyof I)[]
   args?: (keyof I)[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionStreamRun<I, C>

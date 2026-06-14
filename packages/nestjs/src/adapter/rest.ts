@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { HttpException } from '@nestjs/common'
 import { AuthConfig, AuthInfo, validateToken } from '@silkweave/auth'
-import { type Action, type SilkweaveContext, SilkweaveError } from '@silkweave/core'
+import { type Action, actionMethod, methodHasBody, resolveActionInput, type SilkweaveContext, SilkweaveError, validateActionRouting } from '@silkweave/core'
 import { buildLogLevels, type Logger, type LogLevel } from '@silkweave/logger'
 import type { IncomingMessage, ServerResponse } from 'http'
 import { z } from 'zod/v4'
@@ -28,7 +28,8 @@ export interface RestAdapterOptions {
 interface RequestLike {
   headers: Record<string, string | string[] | undefined>
   body?: unknown
-  query?: unknown
+  query?: Record<string, unknown>
+  params?: Record<string, string | undefined>
   url?: string
   method?: string
 }
@@ -116,9 +117,11 @@ function createActionHandler(
         }
         authInfo = result.auth
       }
-      const raw = action.kind === 'query'
-        ? (reqLike.query ?? parseQuery(req.url))
-        : (reqLike.body ?? await readJsonBody(req))
+      const query = reqLike.query ?? parseQuery(req.url)
+      const body = methodHasBody(actionMethod(action))
+        ? (reqLike.body ?? await readJsonBody(req))
+        : undefined
+      const raw = resolveActionInput(action, { params: reqLike.params, query, body })
       const input = action.input.parse(raw) as object
       const result = await action.run(input, context.fork({
         logger,
@@ -137,22 +140,31 @@ function createActionHandler(
  * REST adapter for `@silkweave/nestjs`. Registers each discovered `@Action`
  * as an individual route on Nest's HTTP adapter:
  *
- * - `kind: 'query'` → `GET ${basePath}/${actionName-with-slashes}` (input from query string)
- * - `kind: 'mutation'` → `POST ${basePath}/${actionName-with-slashes}` (input from JSON body)
+ * - HTTP verb comes from `method`, else `GET` for `kind: 'query'`, else `POST`.
+ * - Path comes from `path` (joined to `basePath`, may contain `:param`
+ *   placeholders), else `${basePath}/${actionName-with-slashes}`.
+ * - Input is merged from the request body, the `queryParams` query-string
+ *   fields, and any `:param` path placeholders (see `resolveActionInput`).
  *
- * Routes show up in Nest's `RoutesResolver` logger and are eligible for
- * `@nestjs/swagger` scanning. Works on `@nestjs/platform-express` out of the
- * box. For `@nestjs/platform-fastify`, register `@fastify/express` first.
+ * Routes show up in Nest's `RoutesResolver` logger. They are registered
+ * directly on the HTTP adapter (not as Nest controllers), so `@nestjs/swagger`'s
+ * controller scanner does not see them - use `addSilkweaveActions()` to add them
+ * to the OpenAPI document. Works on `@nestjs/platform-express` out of the box.
+ * For `@nestjs/platform-fastify`, register `@fastify/express` first.
  */
 export function rest(options: RestAdapterOptions = {}): NestSilkweaveAdapter {
+  const basePath = (options.basePath ?? '/api').replace(/\/$/, '')
   return {
     name: 'rest',
+    basePath,
     register({ httpAdapter, baseContext, actions }: NestAdapterRegisterContext): void {
-      const basePath = (options.basePath ?? '/api').replace(/\/$/, '')
       const logger = createRestLogger()
       for (const action of actions) {
-        const path = `${basePath}${actionNameToPath(action.name)}`
-        const method = action.kind === 'query' ? 'get' : 'post'
+        validateActionRouting(action)
+        const path = action.path
+          ? `${basePath}/${action.path.replace(/^\//, '')}`
+          : `${basePath}${actionNameToPath(action.name)}`
+        const method = actionMethod(action).toLowerCase()
         const handler = createActionHandler(action, baseContext, options.auth, logger)
           ; (httpAdapter as unknown as Record<string, (path: string, h: typeof handler) => unknown>)[method](path, handler)
       }
