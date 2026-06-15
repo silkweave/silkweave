@@ -832,93 +832,87 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 
   <section id="integration-nestjs">
     <h3><img src="/nestjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> NestJS</h3>
-    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes Actions defined as <strong>method decorators on Nest providers</strong>, then mounts them simultaneously as REST routes, tRPC procedures, and MCP tools - all on Nest's running HTTP server, so guards, interceptors, DI, and lifecycle hooks stay coherent.</p>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes your <strong>existing NestJS controllers</strong> as MCP tools. Add a <code>@Mcp()</code> decorator to a route handler and its name, description, and input schema are <strong>reflected</strong> from the route, the <code>@Param</code>/<code>@Query</code>/<code>@Body</code> decorators, and any <code>@nestjs/swagger</code> / <code>class-validator</code> metadata the method already carries. On a tool call the validated input is split back into the method's positional arguments and the handler is invoked directly, with <code>@UseGuards()</code> guards applied first. It is <strong>additive</strong> - controllers keep serving HTTP unchanged, and removing <code>@Mcp()</code> fully reverts a method.</p>
     <div class="code-block">
       <div class="code-block-header"><span>install</span></div>
       <pre><code set:html={hl(`pnpm add @silkweave/core @silkweave/nestjs @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata`)} /></pre>
     </div>
+    <p><code>@nestjs/swagger</code> and <code>class-validator</code> are <strong>optional</strong> peers - install whichever your DTOs already use; the reflector reads both and falls back to TypeScript <code>design:type</code>.</p>
     <div class="code-block">
-      <div class="code-block-header"><span>users.actions.ts</span></div>
-      <pre><code set:html={hl(`import { Injectable, UseGuards } from '@nestjs/common'
-import { type SilkweaveContext } from '@silkweave/core'
-import { Action, Actions } from '@silkweave/nestjs'
-import z from 'zod/v4'
+      <div class="code-block-header"><span>users.controller.ts</span></div>
+      <pre><code set:html={hl(`import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { ApiOperation, ApiParam, ApiProperty, ApiQuery } from '@nestjs/swagger'
+import { Mcp } from '@silkweave/nestjs'
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator'
 
-const ListInput = z.object({ activeOnly: z.coerce.boolean().optional() })
+class BanUserDto {
+  @ApiProperty({ description: 'Reason for the ban' })
+  @IsString() @MinLength(3)
+  reason!: string
 
-@Injectable()
-@Actions('users')                       // optional class prefix
-export class UserActions {
+  @ApiProperty({ description: 'Permanent?', required: false })
+  @IsOptional() @IsBoolean()
+  permanent?: boolean
+}
+
+@Controller('users')
+export class UsersController {
   constructor(private readonly db: DbService) {}
 
-  @Action({
-    description: 'List users',
-    input: ListInput,
-    kind: 'query'                        // GET in REST, .query() in tRPC
-  })
-  list(input: z.infer<typeof ListInput>, _ctx: SilkweaveContext) {
-    return this.db.listUsers(input.activeOnly)
+  @Get(':id')                            // ordinary REST route - unchanged
+  @ApiOperation({ summary: 'Get a single user by ID' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @Mcp()                                 // ...also an MCP tool
+  get(@Param('id') id: string) {
+    return this.db.getUser(id)
   }
 
-  @UseGuards(AdminGuard)                 // native Nest guards work on every transport, MCP included
-  @Action({
-    description: 'Ban a user',
-    input: z.object({ id: z.string(), reason: z.string() })
-  })
-  ban(input, _ctx) { return this.db.ban(input.id, input.reason) }
+  @Post(':id/ban')
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @UseGuards(AdminGuard)                 // runs on MCP too
+  @Mcp({ description: 'Ban a user (admin only).' })
+  ban(@Param('id') id: string, @Body() body: BanUserDto) {
+    return this.db.ban(id, body.reason, body.permanent ?? false)
+  }
 }`)} /></pre>
     </div>
     <div class="code-block">
       <div class="code-block-header"><span>app.module.ts</span></div>
       <pre><code set:html={hl(`import { Module } from '@nestjs/common'
-import { mcp, rest, SilkweaveModule, trpc } from '@silkweave/nestjs'
+import { mcp, SilkweaveModule } from '@silkweave/nestjs'
 
 @Module({
   imports: [
     SilkweaveModule.forRoot({
       silkweave: { name: 'my-app', description: 'My App', version: '1.0.0' },
-      adapters: [
-        rest({ basePath: '/api' }),
-        trpc({ basePath: '/trpc' }),
-        mcp({ basePath: '/' })
-      ]
+      adapters: [mcp({ basePath: '/mcp' })]
     })
   ],
-  providers: [UserActions, AdminGuard]
+  controllers: [UsersController],
+  providers: [AdminGuard]
 })
 export class AppModule {}`)} /></pre>
     </div>
-    <p>The <code>users.list</code> action is now reachable at <code>GET /api/users/list</code> (REST), <code>client.usersList.query(...)</code> (tRPC), and as the <code>UsersList</code> MCP tool. The <code>users.ban</code> action is gated by the Nest guard on <strong>every</strong> transport - REST, tRPC, and MCP. Over MCP the guard reads the inbound tool-call headers via <code>switchToHttp().getRequest().headers</code>, the same way it does for REST/tRPC.</p>
-    <h4>Action name → transport path</h4>
+    <p>The MCP endpoint now exposes <code>UsersGet</code> (<code>&#123; id: string &#125;</code>, described from <code>@ApiParam</code>) and <code>UsersBan</code> (<code>&#123; id, reason (minLength 3), permanent? &#125;</code>, flattened from the path param + <code>BanUserDto</code> with <code>@ApiProperty</code> + <code>class-validator</code> merged). <code>UsersBan</code> is gated by the Nest guard, which over MCP reads the inbound tool-call headers via <code>switchToHttp().getRequest().headers</code>.</p>
+    <h4>How reflection works</h4>
+    <p>Each <code>@Mcp</code> method becomes one flat Zod input object, merged per field in increasing precedence: <code>design:type</code> &lt; <code>class-validator</code> &lt; swagger decorators &lt; ingested OpenAPI document &lt; <code>@Mcp(&#123; input &#125;)</code>. Field sources follow the parameter decorators:</p>
     <table class="docs-table">
-      <thead><tr><th>Action name</th><th>REST</th><th>tRPC</th><th>MCP tool</th></tr></thead>
+      <thead><tr><th>Controller parameter</th><th>Tool input</th></tr></thead>
       <tbody>
-        <tr><td><code>hello</code></td><td><code>/hello</code></td><td><code>hello</code></td><td><code>Hello</code></td></tr>
-        <tr><td><code>users.list</code></td><td><code>/users/list</code></td><td><code>usersList</code></td><td><code>UsersList</code></td></tr>
-        <tr><td><code>posts.get-by-id</code></td><td><code>/posts/get-by-id</code></td><td><code>postsGetById</code></td><td><code>PostsGetById</code></td></tr>
+        <tr><td><code>@Param('id') id</code></td><td>scalar field <code>id</code></td></tr>
+        <tr><td><code>@Query('limit') limit</code></td><td>scalar field <code>limit</code></td></tr>
+        <tr><td><code>@Query() dto: ListDto</code></td><td>each <code>ListDto</code> property, flattened</td></tr>
+        <tr><td><code>@Body() dto: CreateDto</code></td><td>each <code>CreateDto</code> property, flattened</td></tr>
+        <tr><td><code>@Req</code>/<code>@Headers</code>/<code>@Ip</code></td><td>not exposed; bound from the MCP request at call time</td></tr>
       </tbody>
     </table>
     <ul>
-      <li>Adapters mount placeholder middleware slots in <code>OnModuleInit</code> (before Nest's 404 catch-all is installed), then populate the real handlers in <code>OnApplicationBootstrap</code> after <code>@Action</code> discovery completes.</li>
-      <li><code>@UseGuards()</code> / <code>@UseInterceptors()</code> from <code>@nestjs/common</code> fire on <strong>every</strong> transport - REST, tRPC, and MCP. Guards get an <code>ExecutionContext</code> whose <code>switchToHttp().getRequest()</code> carries the request headers; over MCP these come from the SDK's <code>extra.requestInfo</code> (headers + url only - no path <code>params</code>/<code>query</code>). A denying guard yields a clean MCP tool error, not a 500. For bearer-token/OAuth MCP auth use <code>mcp(&#123; auth &#125;)</code> and read <code>ctx.get('auth')</code> in the action. Action methods are normal Nest providers - inject services via the constructor.</li>
-      <li><a href="#streaming">Streaming</a>: declare an <code>@Action</code> method as an <code>async function*</code> with a <code>chunk</code> schema and it's served as a tRPC <code>.subscription()</code> (SSE) - the same as a standalone streaming <code>createAction</code>. Guards still run before the first <code>yield</code>; an async generator without a <code>chunk</code> schema throws at discovery time. This is what <code>useChat</code> + <code>@silkweave/ai</code>'s <code>silkweaveTransport()</code> consume.</li>
-      <li>Path and query-string values are coerced to the field's primitive (number / boolean / bigint) automatically - see <a href="#rest-routing">REST routing</a> for <code>method</code> / <code>path</code> / <code>queryParams</code>.</li>
-      <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev - plain <code>tsx</code> doesn't emit decorator metadata.</li>
-      <li>Default platform is <code>@nestjs/platform-express</code>. For <code>@nestjs/platform-fastify</code>, register <code>@fastify/express</code> first.</li>
+      <li><strong>Opt-in.</strong> Only methods carrying <code>@Mcp()</code> are exposed - controllers are never auto-published. <code>@Mcp</code> is MCP-only; a <code>@Trpc</code> sibling is planned.</li>
+      <li><code>@UseGuards()</code> fires before the handler on a tool call. Guards get an <code>ExecutionContext</code> whose <code>switchToHttp().getRequest()</code> carries the inbound tool-call headers (from the SDK's <code>extra.requestInfo</code> - headers + url only, no path <code>params</code>/<code>query</code>). A denying guard yields a clean MCP tool error, not a 500. For bearer-token/OAuth MCP auth use <code>mcp(&#123; auth &#125;)</code> and read <code>ctx.get('auth')</code>.</li>
+      <li><strong>What does not run:</strong> the handler is invoked directly, so globally-registered <code>ValidationPipe</code> / interceptors / exception filters do not apply (MCP input is validated against the reflected Zod schema instead), and whole-DTO arguments arrive as plain objects (no <code>@Transform</code>). Only guards and parameter-bound pipes run. Express only by default.</li>
+      <li><strong>Optional OpenAPI ingestion:</strong> pass <code>openapi: document</code> to <code>SilkweaveModule.forRoot()</code> to use a pre-built OpenAPI doc as the authoritative schema source, matched to each method by verb + path.</li>
+      <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev - plain <code>tsx</code> doesn't emit decorator metadata. Because the controllers are ordinary Nest controllers, <code>@nestjs/swagger</code> documents them natively - no Silkweave-specific merging needed.</li>
     </ul>
-    <h4>Swagger / OpenAPI</h4>
-    <p><code>@nestjs/swagger</code> builds its document by scanning <strong>controllers</strong>, but Silkweave registers action routes directly on the HTTP adapter - so the scanner never sees them. <code>addSilkweaveActions(app, document)</code> closes the gap: it discovers the actions through the same machinery the <code>rest()</code> adapter uses and merges OpenAPI paths (with matching verbs, path/query params, and request/response schemas) into the document, so the docs stay in sync with the live routes. Call it between <code>createDocument()</code> and <code>setup()</code>:</p>
-    <div class="code-block">
-      <div class="code-block-header"><span>main.ts</span></div>
-      <pre><code set:html={hl(`import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import { addSilkweaveActions } from '@silkweave/nestjs'
-
-const config = new DocumentBuilder().setTitle('My API').setVersion('1.0.0').build()
-const document = SwaggerModule.createDocument(app, config)  // your controllers
-addSilkweaveActions(app, document)                          // + silkweave actions
-SwaggerModule.setup('api/docs', app, document)`)} /></pre>
-    </div>
-    <p><code>@nestjs/swagger</code> is an <strong>optional</strong> peer dependency. Options: <code>basePath</code> (defaults to the <code>rest()</code> adapter's), <code>tag</code> (group label, default <code>'Actions'</code>), and <code>includeDisabled</code> (include actions gated off the REST transport).</p>
     <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nestjs#readme"><code>@silkweave/nestjs</code> README</a>.</p>
   </section>
 

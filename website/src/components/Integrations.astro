@@ -20,11 +20,11 @@ const integrations = [
     logo: '/nestjs.svg',
     logoAlt: 'NestJS',
     status: 'Stable',
-    summary: 'Define actions as method decorators on Nest providers. Mounts as REST, tRPC, and MCP on your running Nest server, with native guards and DI.',
+    summary: 'Expose your existing NestJS controllers as MCP tools by adding one @Mcp() decorator. Tool input is reflected from the route + @Param/@Query/@Body + swagger/class-validator metadata. Additive - controllers serve HTTP unchanged.',
     bullets: [
-      '<code>@Action</code> / <code>@Actions</code> decorators, <code>DiscoveryService</code>-driven',
-      '<code>@UseGuards()</code> fires on every HTTP-backed transport',
-      'Per-action <code>transports</code> allowlist (REST, tRPC, MCP)'
+      '<code>@Mcp()</code> on existing controller routes, <code>DiscoveryService</code>-driven',
+      'Input schema reflected from params + swagger/class-validator (+ optional OpenAPI doc)',
+      '<code>@UseGuards()</code> fires over MCP, reading inbound tool-call headers'
     ],
     href: '/docs#integration-nestjs'
   },

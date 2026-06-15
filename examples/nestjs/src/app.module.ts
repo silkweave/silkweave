@@ -1,19 +1,16 @@
 import { Module } from '@nestjs/common'
-import { mcp, rest, SilkweaveModule, trpc } from '@silkweave/nestjs'
+import { mcp, SilkweaveModule } from '@silkweave/nestjs'
 import { AdminGuard } from './admin.guard.js'
-import { UserActions } from './user.actions.js'
+import { UsersController } from './users.controller.js'
 
 @Module({
   imports: [
     SilkweaveModule.forRoot({
       silkweave: { name: 'silkweave-nestjs', description: 'Silkweave NestJS example', version: '1.0.0' },
-      adapters: [
-        rest({ basePath: '/api' }),
-        trpc({ basePath: '/trpc' }),
-        mcp({ basePath: '/mcp' })
-      ]
+      adapters: [mcp({ basePath: '/mcp' })]
     })
   ],
-  providers: [AdminGuard, UserActions]
+  controllers: [UsersController],
+  providers: [AdminGuard]
 })
 export class AppModule {}

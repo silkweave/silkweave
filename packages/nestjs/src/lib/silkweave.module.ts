@@ -1,19 +1,22 @@
 import { Inject, Module, type DynamicModule, type MiddlewareConsumer, type NestModule } from '@nestjs/common'
 import { DiscoveryModule, HttpAdapterHost } from '@nestjs/core'
 import { createContext } from '@silkweave/core'
-import { ActionDiscovery } from './discovery.js'
+import { ControllerDiscovery } from './controllerDiscovery.js'
 import { SILKWEAVE_MODULE_OPTIONS, type SilkweaveModuleOptions } from './types.js'
 
 /**
  * Root module for `@silkweave/nestjs`.
  *
- * Discovers every `@Action`-decorated method via `DiscoveryService` and
- * registers the configured adapters (`rest()`, `trpc()`, `mcp()`) directly on
- * Nest's HTTP adapter inside `configure()`. Because `configure()` runs during
- * `registerModules` - before Nest's `registerRouter()` step - Silkweave's
- * routes always sit ahead of every controller in the Express stack. There is
- * no slot middleware, no race with Nest's 404 catch-all, and every route
- * shows up in Nest's `RoutesResolver` logger.
+ * Discovers every `@Mcp`-decorated **controller method** via `DiscoveryService`,
+ * reflects each into a Silkweave action (input schema from the route + parameter
+ * decorators + optional OpenAPI document; invocation by re-binding the validated
+ * input back into the method), and registers the configured adapter(s) - `mcp()` -
+ * directly on Nest's HTTP adapter inside `configure()`.
+ *
+ * Because `configure()` runs during `registerModules` - before Nest's
+ * `registerRouter()` step - Silkweave's routes always sit ahead of every
+ * controller in the Express stack. The controllers keep serving HTTP exactly as
+ * before; `@Mcp` is purely additive.
  *
  * @example
  * ```ts
@@ -21,13 +24,10 @@ import { SILKWEAVE_MODULE_OPTIONS, type SilkweaveModuleOptions } from './types.j
  *   imports: [
  *     SilkweaveModule.forRoot({
  *       silkweave: { name: 'app', description: 'My App', version: '1.0.0' },
- *       adapters: [
- *         rest({ basePath: '/api' }),
- *         trpc({ basePath: '/trpc' }),
- *         mcp({ basePath: '/mcp' })
- *       ]
+ *       adapters: [mcp({ basePath: '/mcp' })]
  *     })
- *   ]
+ *   ],
+ *   controllers: [ChannelsController]
  * })
  * export class AppModule {}
  * ```
@@ -36,7 +36,7 @@ import { SILKWEAVE_MODULE_OPTIONS, type SilkweaveModuleOptions } from './types.j
 export class SilkweaveModule implements NestModule {
   constructor(
     @Inject(SILKWEAVE_MODULE_OPTIONS) private readonly options: SilkweaveModuleOptions,
-    private readonly discovery: ActionDiscovery,
+    private readonly discovery: ControllerDiscovery,
     private readonly httpAdapterHost: HttpAdapterHost
   ) { }
 
@@ -47,7 +47,7 @@ export class SilkweaveModule implements NestModule {
       imports: [DiscoveryModule],
       providers: [
         { provide: SILKWEAVE_MODULE_OPTIONS, useValue: options },
-        ActionDiscovery
+        ControllerDiscovery
       ],
       exports: []
     }
@@ -58,7 +58,7 @@ export class SilkweaveModule implements NestModule {
     if (!httpAdapter) {
       throw new Error('@silkweave/nestjs: HttpAdapterHost.httpAdapter is not available.')
     }
-    const allActions = this.discovery.discover()
+    const allActions = this.discovery.discover(this.options.openapi)
     for (const adapter of this.options.adapters) {
       const baseContext = createContext({ ...(this.options.context ?? {}), adapter: adapter.name })
       const actions = adapter.allActions

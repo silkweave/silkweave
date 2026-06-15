@@ -1,5 +1,6 @@
 import type { HttpAdapterHost } from '@nestjs/core'
 import type { Action, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
+import type { OpenApiDocument } from './reflect/openapi.js'
 
 /**
  * Context passed to a Nest Silkweave adapter when `SilkweaveModule` wires it
@@ -28,18 +29,13 @@ export interface NestAdapterRegisterContext {
  */
 export interface NestSilkweaveAdapter {
   /** Adapter discriminator - set on the silkweave context as `ctx.get('adapter')`. */
-  readonly name: 'rest' | 'trpc' | 'mcp' | 'typegen'
-  /**
-   * URL prefix the adapter mounts on (e.g. `'/api'`). Surfaced for introspection
-   * tooling such as `addSilkweaveActions()` (OpenAPI/Swagger), which reads it to
-   * keep generated docs aligned with the live routes.
-   */
+  readonly name: 'mcp'
+  /** URL prefix the adapter mounts on (e.g. `'/mcp'`). Surfaced for introspection. */
   readonly basePath?: string
   /**
    * When `true`, the adapter receives every discovered action regardless of
-   * each action's `transports` allowlist / `isEnabled` gate. Used by
-   * non-runtime adapters like `typegen()` that emit types for the entire
-   * action surface.
+   * each action's `isEnabled` gate. Reserved for non-runtime adapters that need
+   * the entire action surface.
    */
   readonly allActions?: boolean
   /** Register this adapter's routes on Nest's HTTP server. */
@@ -49,10 +45,17 @@ export interface NestSilkweaveAdapter {
 export interface SilkweaveModuleOptions {
   /** Identity for the silkweave instance - surfaced to MCP clients, OpenAPI, etc. */
   silkweave: SilkweaveOptions
-  /** Adapters to mount. Examples: `rest()`, `trpc()`, `mcp()`. */
+  /** Adapters to mount. Currently `mcp()`. */
   adapters: NestSilkweaveAdapter[]
   /** Initial context keys merged into every adapter's `baseContext`. */
   context?: Record<string, unknown>
+  /**
+   * Optional OpenAPI document (e.g. from `SwaggerModule.createDocument(app, cfg)`)
+   * used as an authoritative source when reflecting `@Mcp` tool input schemas.
+   * Matched to each method by HTTP verb + path; falls back to decorator
+   * reflection when an operation or field isn't present.
+   */
+  openapi?: OpenApiDocument
 }
 
 export const SILKWEAVE_MODULE_OPTIONS = '__silkweave_module_options__'

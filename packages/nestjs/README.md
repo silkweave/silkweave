@@ -1,6 +1,8 @@
 # @silkweave/nestjs
 
-NestJS adapter for [Silkweave](https://github.com/silkweave/silkweave). Define actions as method decorators on Nest providers, then expose them simultaneously over REST, tRPC, and MCP Streamable HTTP - all mounted on the running Nest HTTP server so Nest middleware, guards, and lifecycle hooks stay coherent.
+NestJS adapter for [Silkweave](https://github.com/silkweave/silkweave). Expose your **existing NestJS controllers** as MCP (Model Context Protocol) tools by adding a single `@Mcp()` decorator to a route handler. The tool's name, description, and input schema are **reflected** from the route, the `@Param`/`@Query`/`@Body` decorators, and any `@nestjs/swagger` / `class-validator` metadata the method already carries - nothing is re-declared. On a tool call the validated input is split back into the method's positional arguments and the handler is invoked directly, with `@UseGuards()` guards applied first.
+
+It is **additive**: controllers keep serving HTTP exactly as before, and removing `@Mcp()` fully reverts a method.
 
 ## Install
 
@@ -8,52 +10,59 @@ NestJS adapter for [Silkweave](https://github.com/silkweave/silkweave). Define a
 pnpm add @silkweave/core @silkweave/nestjs @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata
 ```
 
-> NestJS dev workflows need decorator-aware transforms. Recommend `@swc-node/register` (`node --import @swc-node/register/esm-register src/main.ts`) or the standard `nest start` CLI; plain `tsx` doesn't emit decorator metadata.
+`@nestjs/swagger` and `class-validator` are **optional** peers - install whichever your DTOs already use; the reflector reads both and falls back to TypeScript `design:type` when neither is present.
+
+> NestJS needs decorator-aware transforms with `emitDecoratorMetadata`. Use `@swc-node/register` (`node --import @swc-node/register/esm-register src/main.ts`) or the `nest start` CLI; plain `tsx` does not emit decorator metadata.
 
 ## Usage
 
 ```ts
-// users.actions.ts
-import { Injectable, UseGuards } from '@nestjs/common'
-import { type SilkweaveContext } from '@silkweave/core'
-import { Action, Actions } from '@silkweave/nestjs'
-import z from 'zod/v4'
+// users.controller.ts
+import { Body, Controller, Get, NotFoundException, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { ApiOperation, ApiParam, ApiProperty, ApiQuery } from '@nestjs/swagger'
+import { Mcp } from '@silkweave/nestjs'
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator'
 import { AdminGuard } from './admin.guard.js'
 
-const ListInput = z.object({ activeOnly: z.coerce.boolean().optional() })
-const GetInput = z.object({ id: z.string() })
-const BanInput = z.object({ id: z.string(), reason: z.string() })
+class BanUserDto {
+  @ApiProperty({ description: 'Reason for the ban' })
+  @IsString() @MinLength(3)
+  reason!: string
 
-@Injectable()
-@Actions('users')
-export class UserActions {
+  @ApiProperty({ description: 'Whether the ban is permanent', required: false })
+  @IsOptional() @IsBoolean()
+  permanent?: boolean
+}
+
+@Controller('users')
+export class UsersController {
   constructor(private readonly db: DbService) {}
 
-  @Action({
-    description: 'List users',
-    input: ListInput,
-    kind: 'query'
-  })
-  list(input: z.infer<typeof ListInput>, _ctx: SilkweaveContext) {
-    return this.db.listUsers(input.activeOnly)
+  @Get()
+  @ApiOperation({ summary: 'List users' })
+  @ApiQuery({ name: 'activeOnly', required: false, type: Boolean, description: 'Only active users' })
+  @Mcp()
+  list(@Query('activeOnly') activeOnly?: boolean) {
+    return this.db.listUsers(activeOnly)
   }
 
-  @Action({
-    description: 'Get a single user by ID',
-    input: GetInput,
-    kind: 'query'
-  })
-  get(input: z.infer<typeof GetInput>) {
-    return this.db.getUser(input.id)
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single user by ID' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @Mcp()
+  get(@Param('id') id: string) {
+    const user = this.db.getUser(id)
+    if (!user) { throw new NotFoundException('user not found') }
+    return user
   }
 
-  @UseGuards(AdminGuard)            // guard reads the request header on every transport, MCP included
-  @Action({
-    description: 'Ban a user',
-    input: BanInput
-  })
-  ban(input: z.infer<typeof BanInput>) {
-    return this.db.banUser(input.id, input.reason)
+  @Post(':id/ban')
+  @ApiOperation({ summary: 'Ban a user' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @UseGuards(AdminGuard)                 // runs on every transport, MCP included
+  @Mcp({ description: 'Ban a user (admin only).' })
+  ban(@Param('id') id: string, @Body() body: BanUserDto) {
+    return this.db.banUser(id, body.reason, body.permanent ?? false)
   }
 }
 ```
@@ -61,22 +70,19 @@ export class UserActions {
 ```ts
 // app.module.ts
 import { Module } from '@nestjs/common'
-import { mcp, rest, SilkweaveModule, trpc } from '@silkweave/nestjs'
+import { mcp, SilkweaveModule } from '@silkweave/nestjs'
 import { AdminGuard } from './admin.guard.js'
-import { UserActions } from './users.actions.js'
+import { UsersController } from './users.controller.js'
 
 @Module({
   imports: [
     SilkweaveModule.forRoot({
       silkweave: { name: 'my-app', description: 'My App', version: '1.0.0' },
-      adapters: [
-        rest({ basePath: '/api' }),
-        trpc({ basePath: '/trpc' }),
-        mcp({ basePath: '/mcp' })
-      ]
+      adapters: [mcp({ basePath: '/mcp' })]
     })
   ],
-  providers: [AdminGuard, UserActions]
+  controllers: [UsersController],
+  providers: [AdminGuard]
 })
 export class AppModule {}
 ```
@@ -91,120 +97,64 @@ const app = await NestFactory.create(AppModule)
 await app.listen(8080)
 ```
 
-The `users.list` and `users.get` actions are now reachable via:
+The MCP endpoint at `/mcp` now exposes three tools - `UsersList`, `UsersGet`, `UsersBan` - whose input schemas are reflected from the controllers:
 
-- **REST:** `GET /api/users/list?activeOnly=true` (query param) and `GET /api/users/1` (path param, via `path: 'users/:id'`)
-- **tRPC:** `client.usersList.query({ activeOnly: true })` and `client.usersGet.query({ id: '1' })`
-- **MCP:** tools `UsersList` and `UsersGet`
+- `UsersGet` → `{ id: string }` (`id` required, described "User ID" from `@ApiParam`)
+- `UsersList` → `{ activeOnly?: boolean }` (optional, typed/described from `@ApiQuery`)
+- `UsersBan` → `{ id: string, reason: string (minLength 3), permanent?: boolean }` (flattened from the path param + `BanUserDto`, with `@ApiProperty` + `class-validator` merged)
 
-`users.ban` is guarded by `@UseGuards(AdminGuard)` on **every** transport - REST, tRPC, **and** MCP. The guard reads its credential from the request header (`switchToHttp().getRequest().headers`); over MCP the inbound tool-call headers are surfaced the same way (see [Guards & DI](#guards--di)).
+`UsersBan` is guarded by `@UseGuards(AdminGuard)`; over MCP the guard reads the inbound tool-call headers (see [Guards & DI](#guards--di)).
 
-## Decorators
+## Decorator
 
-### `@Action(options)` (method decorator)
+### `@Mcp(options?)` (method decorator)
+
+Exposes the decorated controller route as an MCP tool. Every option is optional.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `name` | `string` | kebab-cased method name | Override the action name. Joined with the class prefix via `.` |
-| `description` | `string` | *required* | Human-readable summary. Used as MCP tool description |
-| `input` | `z.ZodObject` | *required* | Zod object schema for the action's input |
-| `output` | `z.ZodObject` | - | Optional output schema (used by tRPC type inference) |
-| `chunk` | `z.ZodType` | - | Schema for chunks yielded by a streaming (`async function*`) method. **Required** when the method is an async generator |
-| `kind` | `'query' \| 'mutation'` | `'mutation'` | `'query'` → GET in REST, `.query()` in tRPC. `'mutation'` → POST / `.mutation()` |
-| `method` | `'GET' \| 'POST' \| 'PUT' \| 'DELETE'` | `POST` (or `GET` when `kind: 'query'`) | REST HTTP verb. Overrides the `kind`-derived default |
-| `path` | `string` | action name with dots as slashes | REST route, optionally with `:param` placeholders (e.g. `'spaces/:spaceId/users'`). Each placeholder must be a key of `input` and is resolved from the URL path |
-| `queryParams` | `(keyof input)[]` | - | Input fields read from the URL query string instead of the body (e.g. `['offset', 'limit']`). On a bodyless GET every non-path field is read from the query string automatically |
-| `transports` | `('rest' \| 'trpc' \| 'mcp')[]` | all | Allowlist of transports that expose this action |
-| `isEnabled` | `(ctx) => boolean` | - | Dynamic gate (AND-combined with `transports`) |
-| `toolResult` | `(response, ctx) => CallToolResult` | - | Custom MCP `CallToolResult` formatter |
+| `name` | `string` | `${ControllerBase}${MethodName}` (e.g. `UsersGet`) | MCP tool name override |
+| `description` | `string` | `@ApiOperation` summary/description, else generated | Tool description |
+| `input` | `Record<string, z.ZodType>` | - | Zod raw-shape override merged over the reflected fields (per-field). The escape hatch for shapes reflection can't express - discriminated unions, custom validators, `@Transform` |
+| `pipes` | `'apply' \| 'skip'` | `'apply'` | Whether to run parameter-bound pipes (`@Param('id', ParseIntPipe)`) when re-binding |
 
-### `@Actions(prefix?)` (class decorator)
+## How reflection works
 
-Groups a class's actions under a common prefix. Joined to method-level names with a dot.
+For each `@Mcp` method the adapter builds **one flat Zod input object** by merging, per field, in increasing precedence:
+
+1. TypeScript `design:type` (the parameter/property constructor)
+2. `class-validator` decorators (`@IsString`, `@MinLength`, `@IsOptional`, `@IsEnum`, ...) - **optional** peer
+3. `@nestjs/swagger` decorators - `@ApiParam`/`@ApiQuery` for scalar path/query params, `@ApiProperty` for whole-DTO properties - **optional** peer
+4. An ingested OpenAPI document, matched by HTTP verb + path (`SilkweaveModule.forRoot({ openapi })`)
+5. `@Mcp({ input })` raw-shape override
+
+Field sources are derived from the parameter decorators:
+
+| Controller parameter | Tool input |
+|----------------------|-----------|
+| `@Param('id') id` | scalar field `id` |
+| `@Param() params` | one field per `:param` in the route |
+| `@Query('limit') limit` | scalar field `limit` |
+| `@Query() dto: ListDto` | each property of `ListDto`, flattened to top level |
+| `@Body('x') x` | scalar field `x` |
+| `@Body() dto: CreateDto` | each property of `CreateDto`, flattened to top level |
+| `@Req`/`@Res`/`@Headers`/`@Ip`/`@Session`/files | not exposed; bound at call time (headers/req from the MCP request stand-in, the rest `undefined`) |
+
+On a tool call the validated input is split back into the handler's positional arguments per the same parameter map, parameter-bound pipes run (unless `pipes: 'skip'`), and the method is invoked directly.
+
+### Optional OpenAPI ingestion
+
+Pass a pre-built OpenAPI document (e.g. a committed `openapi.json`, or one built in a two-phase bootstrap) to use it as the authoritative schema source. It is matched to each `@Mcp` method by verb + path and overrides decorator reflection for the fields it covers; unmatched operations/fields fall back to reflection.
 
 ```ts
-@Actions('users')
-class UserActions {
-  @Action({ ... }) list(...) {}    // action name: 'users.list'
-  @Action({ name: 'top' }) ... {}  // action name: 'users.top'
-}
-```
-
-Accepts either a string (shorthand) or `{ prefix, transports }` for a class-wide transport default.
-
-## Adapters
-
-### `rest(options?)`
-
-Maps actions to REST routes on the Nest HTTP server.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `basePath` | `string` | `'/api'` | URL prefix joined to each action's path |
-| `auth` | `AuthConfig` | - | `@silkweave/auth` bearer-token config |
-
-By default routes follow `{basePath}/{action-name-with-slashes}` where dots in action names become slashes, and the verb comes from `kind`:
-
-- `users.list` (query) → `GET /api/users/list`
-- `users.ban` (mutation) → `POST /api/users/ban`
-
-The action's `method`, `path`, and `queryParams` fields override this (see the `@Action` options table above):
-
-- `path: 'users/:id'`, `kind: 'query'` → `GET /api/users/:id` (`id` from the path)
-- `queryParams: ['activeOnly']`, `kind: 'query'` → `GET /api/users/list?activeOnly=true`
-
-Each action is registered as an individual route on Nest's HTTP adapter (not a sub-app). Input is merged from the request body, `queryParams` query-string fields, and `:param` path placeholders (path/query strings are coerced to the schema's primitive), then validated against the action's Zod schema; validation failures return HTTP 400 with the Zod issues.
-
-#### Swagger / OpenAPI
-
-`@nestjs/swagger` builds its document by scanning **controllers**, but Silkweave registers action routes directly on the HTTP adapter - so the scanner never sees them. `addSilkweaveActions(app, document, options?)` closes the gap: it discovers the actions through the same `ActionDiscovery` provider the `rest()` adapter uses, builds OpenAPI paths with the same routing logic, and merges them into the document. The result stays in sync with the live routes without any dynamic controllers. Call it between `createDocument()` and `setup()`:
-
-```ts
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import { addSilkweaveActions } from '@silkweave/nestjs'
-
-const config = new DocumentBuilder().setTitle('My API').setVersion('1.0.0').build()
-const document = SwaggerModule.createDocument(app, config)  // your controllers
-addSilkweaveActions(app, document)                          // + silkweave actions
-SwaggerModule.setup('api/docs', app, document)
-```
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `basePath` | `string` | the `rest()` adapter's `basePath`, else `'/api'` | URL prefix the action routes are mounted on |
-| `tag` | `string` | `'Actions'` | OpenAPI tag the actions are grouped under |
-| `includeDisabled` | `boolean` | `false` | Include actions gated off the REST transport (via `transports` / `isEnabled`) |
-
-`@nestjs/swagger` is an **optional** peer dependency - install it alongside `@silkweave/nestjs` to use this helper. Path params, `queryParams`, request bodies, and `output`/`chunk` response schemas are all derived from the action's Zod schemas.
-
-### `trpc(options?)`
-
-Mounts a tRPC HTTP handler built from `@silkweave/trpc`'s `buildRouter`.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `basePath` | `string` | `'/trpc'` | URL prefix the tRPC handler listens on |
-| `auth` | `AuthConfig` | - | `@silkweave/auth` bearer-token config |
-
-Action names with dots (e.g. `users.list`) collapse to camelCase procedure keys (`usersList`) - flat router in v1.
-
-**Streaming.** An `@Action` method declared as an `async function*` (with a `chunk` schema) is registered as a tRPC **subscription** that streams each yielded chunk over SSE - exactly like a standalone `createAction({ chunk, run: async function*(){…} })`. `@UseGuards()` guards still run before the first chunk. This is what `useChat` + `@silkweave/ai`'s `silkweaveTransport()` consume.
-
-```ts
-@Action({
-  description: 'Stream a countdown',
-  input: z.object({ from: z.number().int() }),
-  chunk: z.object({ n: z.number().int() })
+SilkweaveModule.forRoot({
+  silkweave: { name: 'my-app', description: 'My App', version: '1.0.0' },
+  adapters: [mcp()],
+  openapi: openApiDocument
 })
-async *countdown(input: { from: number }) {
-  for (let n = input.from; n >= 0; n -= 1) {
-    await new Promise((r) => setTimeout(r, 200))
-    yield { n }
-  }
-}
 ```
 
-Declaring an async-generator method without a `chunk` schema throws at discovery time - the schema is required for typegen/tRPC to expose the subscription.
+## Adapter
 
 ### `mcp(options?)`
 
@@ -220,46 +170,29 @@ Mounts the MCP Streamable HTTP transport directly at `basePath`, with sideload (
 
 ## Guards & DI
 
-Native NestJS `@UseGuards()` and `@UseInterceptors()` on `@Action` methods run for **every** transport - REST, tRPC, and MCP. Guards receive an `ExecutionContext` with the request in `switchToHttp().getRequest()`. The `Reflector` is also wired up so guards can read custom metadata.
+Native NestJS `@UseGuards()` on `@Mcp` methods run before the handler is invoked. Guards receive an `ExecutionContext` with the request in `switchToHttp().getRequest()`, and the `Reflector` is wired up so guards can read custom metadata.
 
-**Headers over MCP.** REST and tRPC pass the raw HTTP request to the guard. For MCP (Streamable HTTP), the inbound tool-call request is surfaced as a stand-in `{ headers, url, params, query }` object built from the MCP SDK's `extra.requestInfo`, so a header-based guard - e.g. one reading `getRequest().headers['x-api-key']` - works unchanged. `ExecutionContext.getType()` is `'http'` whenever a request is available (and `'rpc'` for transports with none, e.g. MCP stdio). Caveats:
+**Headers over MCP.** The inbound tool-call request is surfaced as a stand-in `{ headers, url, params, query }` object built from the MCP SDK's `extra.requestInfo`, so a header-based guard - e.g. one reading `getRequest().headers['x-api-key']` - works unchanged. `ExecutionContext.getType()` is `'http'` whenever a request is available (and `'rpc'` for transports with none, e.g. MCP stdio). Caveats:
 
-- Only **headers** (and the request `url`) cross the MCP boundary. There are no path `params` or `query` on an MCP tool call, so `getRequest().params` / `.query` are empty objects - guards relying on them degrade to "deny" rather than crash.
+- Only **headers** (and the request `url`) cross the MCP boundary - `getRequest().params`/`.query` are empty objects.
 - A guard that denies (returns `false` or throws) produces a clean MCP tool error (`ForbiddenException`), not an HTTP 500.
-- For OAuth 2.1 / bearer-token MCP auth, prefer `mcp({ auth })` and read the resolved identity from the silkweave context (`ctx.get('auth')`) inside the action; the header stand-in is for custom request-reading guards.
+- For OAuth 2.1 / bearer-token MCP auth, prefer `mcp({ auth })` and read the resolved identity from the silkweave context (`ctx.get('auth')`); the header stand-in is for custom request-reading guards.
 
-Action methods are normal Nest provider methods - inject services via the constructor as usual.
+Controllers are normal Nest providers - inject services via the constructor as usual.
 
-```ts
-@Injectable()
-class MyActions {
-  constructor(
-    private readonly db: DbService,
-    private readonly cache: CacheService
-  ) {}
+## What does *not* run
 
-  @UseGuards(AuthGuard, RateLimitGuard)
-  @Action({ description: '...', input: z.object({...}) })
-  async myAction(input, ctx) {
-    return this.db.query(...)
-  }
-}
-```
+Because the handler is invoked directly (not through Nest's HTTP request pipeline), the following do **not** apply on a tool call - only `@UseGuards()` and parameter-bound pipes do:
 
-## Action name → transport path
-
-| Action name | REST path | tRPC procedure | MCP tool |
-|-------------|-----------|----------------|----------|
-| `hello` | `/hello` | `hello` | `Hello` |
-| `users.list` | `/users/list` | `usersList` | `UsersList` |
-| `posts.get-by-id` | `/posts/get-by-id` | `postsGetById` | `PostsGetById` |
+- Globally-registered `ValidationPipe` / interceptors / exception filters (MCP input is instead validated against the reflected Zod schema).
+- DTO class instantiation - whole-DTO `@Body()`/`@Query()` arguments arrive as plain objects, so `@Transform` and DTO methods do not fire.
+- Discriminated-union / `@ValidateIf` XOR constraints can't be expressed as hard MCP schema constraints - document them in the tool `description` or supply `@Mcp({ input })`.
 
 ## Notes
 
-- **Lifecycle:** adapters mount their route slots in `OnModuleInit` (before Nest's 404 catch-all is installed) and populate the handlers in `OnApplicationBootstrap` after `@Action` discovery.
-- **Express only by default.** `@nestjs/platform-fastify` requires `@fastify/express` registered upfront so Nest can serve Express-style middleware (used by all three adapters internally).
-- **Query coercion for REST queries:** request query strings are always strings; use `z.coerce.boolean()` / `z.coerce.number()` in your Zod schemas for queries.
-- **`reflect-metadata`** must be imported once at the top of your entry file (typical Nest requirement).
+- **Opt-in.** Only methods carrying `@Mcp()` are exposed - controllers are never auto-published.
+- **Express only by default.** `@nestjs/platform-fastify` requires `@fastify/express` registered upfront.
+- **`reflect-metadata`** must be imported once at the top of your entry file.
 
 ## License
 

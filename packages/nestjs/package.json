@@ -28,22 +28,21 @@
   "peerDependencies": {
     "@nestjs/common": "^10.0.0 || ^11.0.0",
     "@nestjs/core": "^10.0.0 || ^11.0.0",
-    "@nestjs/swagger": "^7.0.0 || ^8.0.0 || ^11.0.0"
+    "@nestjs/swagger": "^7.0.0 || ^8.0.0 || ^11.0.0",
+    "class-validator": "^0.14.0"
   },
   "peerDependenciesMeta": {
     "@nestjs/swagger": {
+      "optional": true
+    },
+    "class-validator": {
       "optional": true
     }
   },
   "dependencies": {
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "@silkweave/logger": "workspace:*",
     "@silkweave/mcp": "workspace:*",
-    "@silkweave/trpc": "workspace:*",
-    "@silkweave/typegen": "workspace:*",
-    "@trpc/server": "^11.7.1",
-    "change-case": "^5.4.4",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "zod": "^3.25.0"
