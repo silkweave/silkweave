@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/trpc",
-  "version": "1.12.0",
+  "version": "2.0.0",
   "description": "Silkweave tRPC Adapter",
   "repository": {
     "type": "git",

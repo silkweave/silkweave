@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/ai",
-  "version": "1.12.0",
+  "version": "2.0.0",
   "description": "Silkweave Vercel AI SDK integration - custom ChatTransport bridging useChat to tRPC subscriptions, plus a chat action helper that wraps streamText into a streaming Silkweave action",
   "repository": {
     "type": "git",
