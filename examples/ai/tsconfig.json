@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "customConditions": ["@silkweave/source"],
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",

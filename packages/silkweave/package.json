@@ -8,6 +8,7 @@
     "directory": "packages/silkweave"
   },
   "type": "module",
+  "files": ["build"],
   "exports": {
     "./auth": {
       "types": "./build/auth.d.mts",

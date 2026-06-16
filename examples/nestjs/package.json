@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --import @swc-node/register/esm-register src/main.ts",
+    "dev": "node --conditions=@silkweave/source --import @swc-node/register/esm-register src/main.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"

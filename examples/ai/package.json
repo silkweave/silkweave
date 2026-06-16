@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"pnpm dev:server\" \"pnpm dev:web\"",
-    "dev:server": "tsx watch --tsconfig tsconfig.server.json server/server.ts",
+    "dev:server": "tsx watch --conditions=@silkweave/source --tsconfig tsconfig.server.json server/server.ts",
     "dev:web": "vite",
     "build": "vite build",
     "preview": "vite preview",

@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/action.ts",
+    "dev": "tsx --conditions=@silkweave/source src/action.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"

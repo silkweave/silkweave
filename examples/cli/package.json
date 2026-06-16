@@ -5,8 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/cli.ts",
-    "umbrella": "tsx src/umbrella.ts",
+    "dev": "tsx --conditions=@silkweave/source src/cli.ts",
+    "umbrella": "tsx --conditions=@silkweave/source src/umbrella.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"

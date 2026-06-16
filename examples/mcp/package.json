@@ -5,12 +5,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/stdio.ts",
-    "stdio": "tsx src/stdio.ts",
-    "http": "tsx src/http.ts",
-    "http-auth": "tsx src/http-auth.ts",
-    "http-oauth": "tsx src/http-oauth.ts",
-    "cli-proxy": "tsx src/cli-proxy.ts",
+    "dev": "tsx --conditions=@silkweave/source src/stdio.ts",
+    "stdio": "tsx --conditions=@silkweave/source src/stdio.ts",
+    "http": "tsx --conditions=@silkweave/source src/http.ts",
+    "http-auth": "tsx --conditions=@silkweave/source src/http-auth.ts",
+    "http-oauth": "tsx --conditions=@silkweave/source src/http-oauth.ts",
+    "cli-proxy": "tsx --conditions=@silkweave/source src/cli-proxy.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"

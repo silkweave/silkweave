@@ -8,13 +8,15 @@
     "directory": "packages/ai"
   },
   "type": "module",
-  "main": "src/index.ts",
-  "publishConfig": {
-    "main": "build/index.mjs",
-    "exports": {
-      ".": "./build/index.mjs"
-    },
-    "types": "./build/index.d.ts"
+  "main": "./build/index.mjs",
+  "types": "./build/index.d.mts",
+  "files": ["build"],
+  "exports": {
+    ".": {
+      "@silkweave/source": "./src/index.ts",
+      "types": "./build/index.d.mts",
+      "default": "./build/index.mjs"
+    }
   },
   "scripts": {
     "clean": "rimraf build",

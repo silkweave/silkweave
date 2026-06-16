@@ -8,13 +8,15 @@
     "directory": "packages/nestjs"
   },
   "type": "module",
-  "main": "src/index.ts",
-  "publishConfig": {
-    "main": "build/index.mjs",
-    "exports": {
-      ".": "./build/index.mjs"
-    },
-    "types": "./build/index.d.ts"
+  "main": "./build/index.mjs",
+  "types": "./build/index.d.mts",
+  "files": ["build"],
+  "exports": {
+    ".": {
+      "@silkweave/source": "./src/index.ts",
+      "types": "./build/index.d.mts",
+      "default": "./build/index.mjs"
+    }
   },
   "scripts": {
     "clean": "rimraf build",
@@ -29,7 +31,7 @@
     "@nestjs/common": "^10.0.0 || ^11.0.0",
     "@nestjs/core": "^10.0.0 || ^11.0.0",
     "@nestjs/swagger": "^7.0.0 || ^8.0.0 || ^11.0.0",
-    "class-validator": "^0.14.0"
+    "class-validator": "^0.14.0 || ^0.15.0"
   },
   "peerDependenciesMeta": {
     "@nestjs/swagger": {

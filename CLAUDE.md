@@ -221,6 +221,27 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 - Imports use `.js` extensions (NodeNext module resolution)
 - Zod v4 (`zod@^4.3.6`)
 
+## Package resolution (dev source vs. published build)
+
+Each publishable package (`packages/*`, except the `silkweave` umbrella) resolves to **build output for everyone except our own tooling**, while in-repo tooling resolves to **TS source** - so cross-package edits need no rebuild, but external installs/`pnpm link`/registry consumers always get `build/`:
+
+```jsonc
+"main": "./build/index.mjs",
+"types": "./build/index.d.mts",          // matches tsdown's emitted .d.mts (NOT .d.ts)
+"exports": {
+  ".": {
+    "@silkweave/source": "./src/index.ts", // custom condition - ONLY our tooling enables it
+    "types": "./build/index.d.mts",
+    "default": "./build/index.mjs"         // external consumers land here
+  }
+}
+```
+
+- The condition is the **custom name `@silkweave/source`**, not the generic `development` - the latter is auto-enabled by Vite/Vitest, which would silently leak our raw `.ts` source to external consumers. A custom name is opt-in only.
+- Our tooling enables it explicitly: tsconfig `"customConditions": ["@silkweave/source"]` (every package + example tsconfig); `tsx --conditions=@silkweave/source …` and `node --conditions=@silkweave/source …` in example dev scripts; `resolve.conditions` in the Vite/Astro configs (`examples/ai/vite.config.ts`, `website/astro.config.mjs`).
+- There is **no `publishConfig`** - the resolved `main`/`types`/`exports` above are correct as-published; `pnpm pack` ships them verbatim.
+- **When adding a new package**, copy this `main`/`types`/`exports` block and add `"customConditions": ["@silkweave/source"]` to its tsconfig.
+
 ## Wrapup Config
 
 - check: `pnpm check` - always run from the **repo root** (not from a sub-package), so turbo runs lint + typecheck across every workspace package
