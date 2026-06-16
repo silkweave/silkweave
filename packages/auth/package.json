@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/auth",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Silkweave Auth - Bearer token and OAuth 2.1 support for MCP servers",
   "repository": {
     "type": "git",
