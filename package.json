@@ -1,14 +1,20 @@
 {
   "name": "silkweave",
-  "private": true,
   "description": "Silkweave Toolkit",
+  "license": "MIT",
+  "homepage": "https://www.silkweave.dev",
+  "bugs": {
+    "url": "https://github.com/silkweave/silkweave/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/silkweave/silkweave.git"
   },
+  "private": true,
   "scripts": {
     "mcp": "pnpm -F @silkweave/example-mcp stdio",
     "image": "node --env-file-if-exists=.env scripts/generate-image.ts",
+    "sync-releases": "tsx scripts/sync-releases.ts",
     "build": "turbo build",
     "lint": "turbo lint",
     "roam": "roam index && roam fitness && roam rules --ci",

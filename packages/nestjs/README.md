@@ -119,6 +119,20 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 | `pipes` | `'apply' \| 'skip'` | `'apply'` | Whether to run parameter-bound pipes (`@Param('id', ParseIntPipe)`) when re-binding |
 | `result` | `'json' \| 'smart'` | `'smart'` | Default MCP result format - `'json'` returns compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and offloads large ones to an embedded resource (`smartToolResult`). A client that sends `_meta.disposition` on the call overrides it |
 
+### Result format
+
+`@Mcp({ result })` sets the format for one tool. To set a default for **every** tool, pass `defaultResult` to the module:
+
+```ts
+SilkweaveModule.forRoot({
+  silkweave: { name: 'my-api', version: '1.0.0' },
+  adapters: [mcp()],
+  defaultResult: 'json'   // module-wide default; a per-method @Mcp({ result }) still wins
+})
+```
+
+Precedence (highest first): a client's per-call `_meta.disposition` → `@Mcp({ result })` → module `defaultResult` → `'smart'`.
+
 ## How reflection works
 
 For each `@Mcp` method the adapter builds **one flat Zod input object** by merging, per field, in increasing precedence:

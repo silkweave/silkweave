@@ -1,0 +1,36 @@
+{
+  "name": "@silkweave/example-nextjs",
+  "version": "2.4.0",
+  "description": "Silkweave Next.js App Router example - one action set as MCP tools + tRPC endpoint",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 8080",
+    "build": "next build",
+    "start": "next start -p 8080",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "check": "pnpm typecheck"
+  },
+  "dependencies": {
+    "@silkweave/core": "workspace:*",
+    "@silkweave/nextjs": "workspace:*",
+    "@silkweave/trpc": "workspace:*",
+    "@trpc/client": "^11.7.1",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^10.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}

@@ -1,7 +1,12 @@
 {
   "name": "@silkweave/cli",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Silkweave CLI Adapter",
+  "license": "MIT",
+  "homepage": "https://www.silkweave.dev",
+  "bugs": {
+    "url": "https://github.com/silkweave/silkweave/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/silkweave/silkweave.git",

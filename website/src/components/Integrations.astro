@@ -33,12 +33,12 @@ const integrations = [
     label: 'Next.js',
     logo: '/nextjs.svg',
     logoAlt: 'Next.js',
-    status: 'Coming soon',
-    summary: 'App Router route helpers that mount actions as MCP and tRPC endpoints, sharing the Next request context. Today: use <code>trpcFetch()</code> and <code>vercel()</code> in route handlers.',
+    status: 'Beta',
+    summary: 'App Router adapter. <code>defineSilkweave({ actions })</code> projects one action set onto route handlers - MCP tools for agents and a typed tRPC endpoint for your frontend - from a single source of truth. Additive, App Router only.',
     bullets: [
-      'File-based MCP routes (planned)',
-      'App-Router-shaped tRPC + MCP helpers (planned)',
-      'Use <code>trpcFetch</code> / <code>vercel</code> today'
+      '<code>app.mcp()</code> + <code>app.trpc()</code> route handlers from one action set',
+      'End-to-end-typed tRPC for your frontend, MCP tools for agents',
+      'Wraps <code>vercel()</code> + <code>trpcFetch()</code>; no <code>next</code>/<code>react</code> dependency'
     ],
     href: '/docs#integration-nextjs'
   }
@@ -59,7 +59,7 @@ const integrations = [
           <div class="integration-header">
             <img src={i.logo} alt={i.logoAlt} class="integration-logo" width="40" height="40" />
             <h3 class="integration-name">{i.label}</h3>
-            <span class={`integration-status ${i.status === 'Coming soon' ? 'soon' : 'stable'}`}>{i.status}</span>
+            <span class={`integration-status ${i.status === 'Coming soon' ? 'soon' : i.status === 'Beta' ? 'beta' : 'stable'}`}>{i.status}</span>
           </div>
           <p class="integration-summary" set:html={i.summary} />
           <ul class="integration-bullets">
@@ -147,6 +147,12 @@ const integrations = [
   .integration-status.soon {
     color: var(--text-muted);
     background: rgba(255, 255, 255, 0.03);
+  }
+
+  .integration-status.beta {
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(56, 189, 248, 0.1);
   }
 
   .integration-summary {

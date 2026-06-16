@@ -2,7 +2,7 @@
 
 **Write your logic once. Run it everywhere.**
 
-Silkweave is a TypeScript toolkit that lets you define application logic as portable **Actions** and instantly expose them through any combination of transports - MCP servers (stdio and HTTP), REST APIs with auto-generated OpenAPI docs, and fully-featured CLIs. No glue code required.
+Silkweave is a TypeScript toolkit that lets you define application logic as portable **Actions** and instantly expose them through any combination of transports - MCP servers (stdio, HTTP, and serverless), end-to-end-typed tRPC, REST APIs with auto-generated OpenAPI docs, and fully-featured CLIs. It also meets your framework where it is: expose existing **NestJS** controllers as MCP tools, project one action set onto **Next.js** App Router route handlers, or stream to the **Vercel AI SDK**'s `useChat`. No glue code required.
 
 ```
                   ┌───────────────────────────────────┐
@@ -39,9 +39,14 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
 - [Adapters in Depth](#adapters-in-depth)
   - [MCP Stdio](#mcp-stdio)
   - [MCP Streamable HTTP](#mcp-streamable-http)
+  - [tRPC](#trpc)
   - [Fastify REST API](#fastify-rest-api)
   - [CLI](#cli)
   - [Vercel Serverless](#vercel-serverless)
+- [Framework Integrations](#framework-integrations)
+  - [NestJS](#nestjs)
+  - [Next.js](#nextjs)
+  - [Vercel AI SDK](#vercel-ai-sdk)
 - [Logging and Progress](#logging-and-progress)
 - [Advanced Patterns](#advanced-patterns)
   - [Multiple Adapters Simultaneously](#multiple-adapters-simultaneously)
@@ -59,9 +64,11 @@ Building an MCP server usually means wiring up transports, registering tools, se
 
 Silkweave eliminates this duplication. You define an **Action** - a name, a Zod schema, and an async function - and Silkweave handles the rest:
 
-- **MCP adapters** register your actions as MCP tools with proper notifications, progress reporting, and error handling
+- **MCP adapters** register your actions as MCP tools with proper notifications, progress reporting, and error handling - over stdio, streamable HTTP, or stateless serverless (Vercel / Web Standard)
+- **tRPC adapter** exposes your actions as end-to-end type-safe procedures (`InferTrpcRouter<typeof server>`), as a standalone server or a fetch handler
 - **Fastify adapter** generates a REST API with full OpenAPI/Swagger documentation derived from your Zod schemas
 - **CLI adapter** builds a complete command-line interface with argument parsing, option flags, and beautiful terminal output via clack
+- **Framework integrations** meet you where you are - expose existing **NestJS** controllers as MCP tools via `@Mcp()`, project an action set onto **Next.js** App Router handlers (MCP + tRPC), or bridge a streaming action to the **Vercel AI SDK**'s `useChat`
 
 Your action doesn't know or care which transport is running it.
 
@@ -74,10 +81,16 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | Package | npm | Description |
 |---------|-----|-------------|
 | `@silkweave/core` | [![npm](https://img.shields.io/npm/v/@silkweave/core)](https://www.npmjs.com/package/@silkweave/core) | Core library - actions, adapters, builder, context, logger, utilities |
+| `@silkweave/auth` | [![npm](https://img.shields.io/npm/v/@silkweave/auth)](https://www.npmjs.com/package/@silkweave/auth) | Auth - OAuth 2.1 proxy (PKCE, refresh, dynamic client registration), bearer-token validation, protected-resource metadata (RFC 9728) |
 | `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
 | `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + clack terminal UI |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
-| `@silkweave/vercel` | [![npm](https://img.shields.io/npm/v/@silkweave/vercel)](https://www.npmjs.com/package/@silkweave/vercel) | Vercel serverless adapter - stateless MCP over Streamable HTTP |
+| `@silkweave/trpc` | [![npm](https://img.shields.io/npm/v/@silkweave/trpc)](https://www.npmjs.com/package/@silkweave/trpc) | tRPC adapter - end-to-end type-safe procedures (standalone server + fetch handler) |
+| `@silkweave/vercel` | [![npm](https://img.shields.io/npm/v/@silkweave/vercel)](https://www.npmjs.com/package/@silkweave/vercel) | Vercel serverless adapter - stateless MCP over Web Standard Streamable HTTP |
+| `@silkweave/nestjs` | [![npm](https://img.shields.io/npm/v/@silkweave/nestjs)](https://www.npmjs.com/package/@silkweave/nestjs) | NestJS adapter - expose existing controllers as MCP tools via `@Mcp()` (input reflected from route + param decorators + swagger/class-validator) |
+| `@silkweave/nextjs` | [![npm](https://img.shields.io/npm/v/@silkweave/nextjs)](https://www.npmjs.com/package/@silkweave/nextjs) | Next.js App Router adapter - `defineSilkweave({ actions })` projects one action set onto MCP + tRPC route handlers |
+| `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - wrap `streamText` as a streaming action and feed `useChat` over a tRPC subscription |
+| `@silkweave/typegen` | [![npm](https://img.shields.io/npm/v/@silkweave/typegen)](https://www.npmjs.com/package/@silkweave/typegen) | Type generator - emit `.d.ts` interfaces from action Zod schemas |
 | `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - pino, clack, and MCP notification support |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
@@ -86,17 +99,23 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 # MCP server (stdio or HTTP)
 pnpm add @silkweave/core @silkweave/mcp
 
+# tRPC (end-to-end typed)
+pnpm add @silkweave/core @silkweave/trpc
+
 # REST API with Swagger
 pnpm add @silkweave/core @silkweave/fastify
 
 # CLI tool
 pnpm add @silkweave/core @silkweave/cli
 
-# Vercel serverless MCP
+# Vercel / Web Standard serverless MCP
 pnpm add @silkweave/core @silkweave/vercel
 
-# All of the above
-pnpm add @silkweave/core @silkweave/mcp @silkweave/cli @silkweave/fastify @silkweave/vercel
+# NestJS controllers as MCP tools
+pnpm add @silkweave/core @silkweave/nestjs
+
+# Next.js App Router (MCP + tRPC)
+pnpm add @silkweave/core @silkweave/nextjs
 ```
 
 ---
@@ -319,6 +338,34 @@ CORS is configured out of the box, exposing MCP-specific headers (`Mcp-Session-I
 | `port` | `number` | Listen port |
 | `allowedHosts` | `string[]` | Hosts allowed to connect (passed to Express MCP app) |
 
+### tRPC
+
+Exposes your actions as **end-to-end type-safe** tRPC procedures. Each action becomes a `query` or `mutation` (per its `kind`) at `camelCase(action.name)`, and the exported `InferTrpcRouter<typeof server>` gives your client a fully-typed `AppRouter` - no code generation.
+
+```typescript
+import { silkweave } from '@silkweave/core'
+import { type InferTrpcRouter, trpc } from '@silkweave/trpc'
+
+const server = silkweave({ name: 'my-api', description: 'My API', version: '1.0.0' })
+  .adapter(trpc({ host: 'localhost', port: 8080 }))
+  .action(SearchAction)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+
+await server.start() // tRPC server on http://localhost:8080/trpc/
+```
+
+```typescript
+// client.ts - fully typed against your actions
+import { createTRPCClient, httpBatchLink } from '@trpc/client'
+import type { AppRouter } from './server.js'
+
+const client = createTRPCClient<AppRouter>({ links: [httpBatchLink({ url: 'http://localhost:8080/trpc' })] })
+const { results } = await client.search.query({ query: 'hello', limit: 5 })
+```
+
+For serverless runtimes (Astro, Vercel, Cloudflare Workers), use **`trpcFetch()`** instead - it returns a Web Standard `(Request) => Promise<Response>` handler (plus `GET`/`POST`) rather than binding a port. Streaming actions are registered as tRPC **subscriptions** automatically.
+
 ### Fastify REST API
 
 Turns your actions into a REST API with auto-generated OpenAPI documentation and an interactive Swagger UI powered by Scalar.
@@ -448,6 +495,69 @@ export { GET, POST, DELETE }
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enableJsonResponse` | `boolean` | `false` | Return JSON instead of SSE streams |
+
+---
+
+## Framework Integrations
+
+Beyond the transport adapters, Silkweave meets your framework where it is.
+
+### NestJS
+
+[`@silkweave/nestjs`](https://www.npmjs.com/package/@silkweave/nestjs) exposes your **existing NestJS controllers** as MCP tools - additively. Add `@Mcp()` to a route handler and its name, description, and input schema are **reflected** from the route, the `@Param`/`@Query`/`@Body` decorators, and any `@nestjs/swagger` / `class-validator` metadata the method already carries. On a tool call the validated input is split back into the method's positional arguments and the handler runs directly, with `@UseGuards()` applied first.
+
+```typescript
+@Controller('users')
+export class UsersController {
+  @Get(':id')
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @Mcp() // -> MCP tool "UsersGet", input { id: string }
+  get(@Param('id') id: string) {
+    return this.users.find(id)
+  }
+}
+
+@Module({
+  imports: [SilkweaveModule.forRoot({
+    silkweave: { name: 'my-app', description: 'My app', version: '1.0.0' },
+    adapters: [mcp({ basePath: '/mcp' })]
+  })],
+  controllers: [UsersController]
+})
+export class AppModule {}
+```
+
+Controllers keep serving HTTP unchanged; removing `@Mcp()` fully reverts a method.
+
+### Next.js
+
+[`@silkweave/nextjs`](https://www.npmjs.com/package/@silkweave/nextjs) projects **one action set** onto Next.js **App Router** route handlers - MCP tools for agents and a typed tRPC endpoint for your frontend - from a single source of truth. It's action-first and additive (it only adds route files), wrapping `@silkweave/vercel` and `@silkweave/trpc` with catch-all path normalization and end-to-end tRPC types. No `next`/`react` dependency.
+
+```typescript
+// silkweave/server.ts
+import { defineSilkweave } from '@silkweave/nextjs'
+import { banUser, listUsers } from './actions'
+
+export const app = defineSilkweave({
+  name: 'my-app', description: 'My app', version: '1.0.0',
+  actions: [listUsers, banUser]
+})
+export type AppRouter = typeof app.Router
+```
+
+```typescript
+// app/api/mcp/[[...mcp]]/route.ts  - one catch-all serves transport + OAuth + well-known
+export const { GET, POST, DELETE, OPTIONS } = app.mcp({ basePath: '/api/mcp' })
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+// app/api/trpc/[trpc]/route.ts
+export const { GET, POST, OPTIONS } = app.trpc({ endpoint: '/api/trpc' })
+```
+
+### Vercel AI SDK
+
+[`@silkweave/ai`](https://www.npmjs.com/package/@silkweave/ai) bridges the [Vercel AI SDK](https://ai-sdk.dev)'s `useChat` hook to a Silkweave **streaming action** over a tRPC subscription - no `/api/chat` route, no Data Stream Protocol parsing. `createChatAction()` wraps `streamText()` into a streaming action; `silkweaveTransport()` is a custom `ChatTransport` that turns a subscribe-style function into the `ReadableStream<UIMessageChunk>` `useChat` consumes directly.
 
 ---
 
@@ -674,11 +784,15 @@ interface Action<I, O> {
   name: string
   description: string
   input: z.ZodType<I> & { shape: Record<string, z.ZodTypeAny> }
-  args?: (keyof I)[]
+  output?: z.ZodType<O>                             // used by typegen + tRPC
+  kind?: 'query' | 'mutation'                       // tRPC dispatch (default 'mutation')
+  args?: (keyof I)[]                                // CLI positional args
   isEnabled?: (context: SilkweaveContext) => boolean
   run: (input: I, context: SilkweaveContext) => Promise<O>
 }
 ```
+
+Actions can also **stream**: declare a `chunk` Zod schema and an `async function*` `run` that yields chunks. Adapters detect this and switch to per-chunk delivery (MCP progress notifications, SSE/NDJSON over Fastify, tRPC subscriptions, NDJSON over the CLI). The `@silkweave/fastify` adapter additionally honors optional `method` / `path` / `queryParams` fields for REST routing.
 
 ### `Logger`
 
@@ -731,11 +845,24 @@ interface FastifyAdapterOptions {
 import { cli } from '@silkweave/cli'
 function cli(): AdapterFactory
 
+// tRPC - from @silkweave/trpc
+import { trpc, trpcFetch, type InferTrpcRouter } from '@silkweave/trpc'
+function trpc(options: { host: string; port: number; endpoint?: string; auth?: AuthConfig }): AdapterGenerator
+function trpcFetch(options?: { endpoint?: string; auth?: AuthConfig }): {
+  adapter: AdapterGenerator
+  handler: (req: Request) => Promise<Response>
+  GET: (req: Request) => Promise<Response>
+  POST: (req: Request) => Promise<Response>
+}
+type AppRouter = InferTrpcRouter<typeof server>  // typed client router
+
 // Vercel serverless - from @silkweave/vercel
 import { vercel } from '@silkweave/vercel'
 function vercel(options?: VercelAdapterOptions): VercelAdapter
 interface VercelAdapterOptions {
   enableJsonResponse?: boolean
+  auth?: AuthConfig
+  path?: string
 }
 interface VercelAdapter {
   adapter: AdapterGenerator          // Pass to silkweave().adapter()
@@ -744,6 +871,19 @@ interface VercelAdapter {
   POST: (req: Request) => Promise<Response>
   DELETE: (req: Request) => Promise<Response>
 }
+
+// Next.js App Router - from @silkweave/nextjs
+import { defineSilkweave } from '@silkweave/nextjs'
+function defineSilkweave(options: SilkweaveOptions & { actions: Action[] }): SilkweaveApp
+interface SilkweaveApp {
+  mcp(options: { basePath: string; auth?: AuthConfig }): { GET; POST; DELETE; OPTIONS }
+  trpc(options: { endpoint: string; auth?: AuthConfig; cors?: boolean }): { GET; POST; OPTIONS }
+  readonly Router: AppRouter         // type-only phantom: `typeof app.Router`
+}
+
+// NestJS - from @silkweave/nestjs
+import { mcp, Mcp, SilkweaveModule } from '@silkweave/nestjs'
+// @Mcp() decorates a controller route; SilkweaveModule.forRoot({ adapters: [mcp()] })
 ```
 
 ---
@@ -763,8 +903,12 @@ pnpm check
 # Run example servers
 pnpm -F @silkweave/example-mcp stdio       # MCP stdio server
 pnpm -F @silkweave/example-mcp http        # MCP streamable HTTP server on :8080
+pnpm -F @silkweave/example-trpc dev        # tRPC standalone server on :8080/trpc/
 pnpm -F @silkweave/example-fastify dev     # Fastify REST API with Swagger on :8080
 pnpm -F @silkweave/example-cli dev         # CLI mode
+pnpm -F @silkweave/example-vercel dev      # Stateless serverless MCP (Web Standard)
+pnpm -F @silkweave/example-nestjs dev      # NestJS controllers as MCP tools on :8080
+pnpm -F @silkweave/example-nextjs dev      # Next.js App Router: MCP (/api/mcp) + tRPC (/api/trpc) on :8080
 ```
 
 Requires Node.js >= 18.

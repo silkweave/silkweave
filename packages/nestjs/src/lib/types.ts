@@ -70,6 +70,13 @@ export interface SilkweaveModuleOptions {
    * authentication still works.
    */
   globalGuards?: Type<CanActivate>[]
+  /**
+   * Default MCP result format for every `@Mcp` tool - `'json'` (compact JSON,
+   * `jsonToolResult`) or `'smart'` (inline small / embedded-resource large,
+   * `smartToolResult`). Defaults to `'smart'`. A per-method `@Mcp({ result })`
+   * overrides this, and a client's per-call `_meta.disposition` overrides both.
+   */
+  defaultResult?: 'json' | 'smart'
 }
 
 export const SILKWEAVE_MODULE_OPTIONS = '__silkweave_module_options__'

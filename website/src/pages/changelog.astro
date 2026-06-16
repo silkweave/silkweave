@@ -1,0 +1,321 @@
+---
+import Footer from '../components/Footer.astro'
+import Nav from '../components/Nav.astro'
+import { releases, REPO_URL, type Change } from '../data/changelog.ts'
+import Layout from '../layouts/Layout.astro'
+
+const badge: Record<Change['type'], string> = {
+  breaking: 'Breaking',
+  feature: 'New',
+  improvement: 'Improved',
+  fix: 'Fixed'
+}
+
+const fmtDate = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+
+const latest = releases[0]?.version
+
+const isMajor = (version: string) => /^\d+\.0\.0$/.test(version)
+---
+
+<Layout
+  title="Changelog - Silkweave"
+  description="What's new in Silkweave - new adapters, integrations, and fixes across every release."
+  slug="changelog"
+>
+  <Nav />
+  <main class="changelog">
+    <div class="container">
+      <header class="changelog-header">
+        <p class="section-label">Changelog</p>
+        <h1 class="section-title">What's new</h1>
+        <p class="section-desc">
+          Every release at a glance. Want the detail? Each entry links to its commit, and every version has a
+          <a href={`${REPO_URL}/releases`} target="_blank" rel="noopener">GitHub release</a>.
+        </p>
+      </header>
+
+      <ol class="releases">
+        {releases.map(release => (
+          <li class={`release${isMajor(release.version) ? ' release-major' : ''}`}>
+            <div class="release-meta">
+              <div class="release-version">
+                {release.unreleased ? (
+                  <span class="version-static">v{release.version}</span>
+                ) : (
+                  <a href={`${REPO_URL}/releases/tag/v${release.version}`} target="_blank" rel="noopener">
+                    v{release.version}
+                  </a>
+                )}
+                {release.version === latest && <span class="tag-latest">Latest</span>}
+                {release.unreleased && <span class="tag-proto">Prototype</span>}
+              </div>
+              {isMajor(release.version) && <span class="tag-major">Major release</span>}
+              <time datetime={release.date}>{fmtDate(release.date)}</time>
+            </div>
+            <div class="release-body">
+              {release.summary && <p class="release-summary">{release.summary}</p>}
+              <ul class="changes">
+                {release.changes.map(change => (
+                  <li class="change">
+                    <span class={`badge badge-${change.type}`}>{badge[change.type]}</span>
+                    <span class="change-text">
+                      {change.text}
+                      {change.commit && (
+                        <a
+                          class="commit-link"
+                          href={`${REPO_URL}/commit/${change.commit}`}
+                          target="_blank"
+                          rel="noopener"
+                          title={`View commit ${change.commit}`}
+                        >{change.commit}</a>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .changelog {
+    padding-top: 6rem;
+  }
+
+  .changelog-header {
+    margin-bottom: 3rem;
+    max-width: 720px;
+  }
+
+  .changelog-header .section-desc a {
+    color: var(--accent);
+  }
+
+  .releases {
+    list-style: none;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .release {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    gap: 1.5rem;
+    padding: 2rem 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .release:first-child {
+    border-top: none;
+  }
+
+  .release-major {
+    position: relative;
+    margin: 0.75rem -1rem;
+    padding: 2rem 1rem;
+    border-top: none;
+    border-radius: var(--radius);
+    background:
+      linear-gradient(var(--bg-surface), var(--bg-surface)) padding-box,
+      linear-gradient(135deg, var(--accent) 0%, #38bdf8 55%, var(--accent-dim) 100%) border-box;
+    border: 1px solid transparent;
+    box-shadow: 0 0 0 1px rgba(123, 126, 245, 0.15), 0 8px 40px -12px rgba(123, 126, 245, 0.4);
+    overflow: hidden;
+  }
+
+  .release-major::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(60% 80% at 0% 0%, rgba(123, 126, 245, 0.14), transparent 70%);
+    pointer-events: none;
+  }
+
+  .release-major + .release {
+    border-top: none;
+  }
+
+  .release-major .release-version a {
+    background: linear-gradient(135deg, var(--accent-hover), #7dd3fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .tag-major {
+    align-self: flex-start;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent-dim), #38bdf8);
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    box-shadow: 0 2px 10px -2px rgba(123, 126, 245, 0.6);
+  }
+
+  .release-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding-top: 0.1rem;
+  }
+
+  .release-version {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .release-version a {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .release-version a:hover {
+    color: var(--accent);
+  }
+
+  .version-static {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .tag-proto {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+  }
+
+  .tag-latest {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    background: var(--accent-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+  }
+
+  .release-meta time {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .release-summary {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  .changes {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .change {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+  }
+
+  .badge {
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: var(--radius-sm);
+    padding: 0.15rem 0.5rem;
+    border: 1px solid transparent;
+    min-width: 4.5rem;
+    text-align: center;
+  }
+
+  .badge-feature {
+    color: var(--accent-hover);
+    background: var(--accent-bg);
+    border-color: var(--border-light);
+  }
+
+  .badge-improvement {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border-color: rgba(56, 189, 248, 0.25);
+  }
+
+  .badge-fix {
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border-color: var(--border);
+  }
+
+  .badge-breaking {
+    color: var(--warning);
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+
+  .change-text {
+    font-size: 0.92rem;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  .commit-link {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-left: 0.4rem;
+    white-space: nowrap;
+    border-bottom: 1px dotted var(--text-dim);
+  }
+
+  .commit-link:hover {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  @media (max-width: 680px) {
+    .changelog {
+      padding-top: 5rem;
+    }
+
+    .release {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .release-meta {
+      flex-direction: row;
+      align-items: baseline;
+      gap: 0.75rem;
+    }
+  }
+</style>

@@ -63,18 +63,24 @@ const sections = [
   <Nav />
   <div class="docs-wrapper">
     <aside class="docs-sidebar">
-      <nav class="docs-nav">
-        {sections.map(section => (
-          <div class="nav-group">
-            <a href={`#${section.id}`} class="nav-group-title">{section.label}</a>
-            <ul>
-              {section.children.map(child => (
-                <li><a href={`#${child.id}`} class="nav-link" data-section={child.id}>{child.label}</a></li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </nav>
+      <details class="docs-toc">
+        <summary class="docs-toc-summary">
+          <span>On this page</span>
+          <svg class="docs-toc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <nav class="docs-nav">
+          {sections.map(section => (
+            <div class="nav-group">
+              <a href={`#${section.id}`} class="nav-group-title">{section.label}</a>
+              <ul>
+                {section.children.map(child => (
+                  <li><a href={`#${child.id}`} class="nav-link" data-section={child.id}>{child.label}</a></li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </details>
     </aside>
     <main class="docs-content">
       <slot />
@@ -115,6 +121,22 @@ const sections = [
     flex: 1;
     min-width: 0;
     padding-bottom: 4rem;
+  }
+
+  /* Desktop: force the <details> TOC always-open. Closed <details> hides content
+     via `display:none` (Firefox/Safari) or `::details-content` (Chrome) - override both. */
+  @media (min-width: 861px) {
+    .docs-toc-summary {
+      display: none;
+    }
+
+    .docs-toc > .docs-nav {
+      display: block !important;
+    }
+
+    .docs-toc::details-content {
+      content-visibility: visible !important;
+    }
   }
 
   .nav-group {
@@ -165,6 +187,7 @@ const sections = [
     .docs-wrapper {
       flex-direction: column;
       padding-top: 5rem;
+      gap: 1.5rem;
     }
 
     .docs-sidebar {
@@ -172,37 +195,52 @@ const sections = [
       top: 0;
       width: 100%;
       height: auto;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 1rem;
+      overflow: visible;
+      padding: 0;
     }
 
-    .docs-nav {
+    .docs-toc {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
+    }
+
+    .docs-toc-summary {
       display: flex;
-      gap: 1.5rem;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .docs-toc-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .docs-toc-chevron {
+      color: var(--text-muted);
+      transition: transform 0.2s ease;
+    }
+
+    .docs-toc[open] .docs-toc-chevron {
+      transform: rotate(180deg);
+    }
+
+    .docs-toc > .docs-nav {
+      padding: 0.5rem 1rem 1rem;
+      border-top: 1px solid var(--border);
+      max-height: 60vh;
+      overflow-y: auto;
     }
 
     .nav-group {
-      margin-bottom: 0;
-      flex-shrink: 0;
-    }
-
-    .nav-group ul {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .nav-link {
-      border-left: none;
-      padding: 0.2rem 0.5rem;
-      white-space: nowrap;
-    }
-
-    .nav-link.active {
-      border-left: none;
-      background: var(--accent-bg);
-      border-radius: var(--radius-sm);
+      margin-bottom: 1rem;
     }
   }
 </style>
@@ -225,4 +263,11 @@ const sections = [
   }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 })
 
   sections.forEach(s => observer.observe(s.el!))
+
+  const toc = document.querySelector<HTMLDetailsElement>('.docs-toc')
+  if (toc) {
+    toc.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+      if (window.matchMedia('(max-width: 860px)').matches) toc.open = false
+    }))
+  }
 </script>

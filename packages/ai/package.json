@@ -1,7 +1,12 @@
 {
   "name": "@silkweave/ai",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Silkweave Vercel AI SDK integration - custom ChatTransport bridging useChat to tRPC subscriptions, plus a chat action helper that wraps streamText into a streaming Silkweave action",
+  "license": "MIT",
+  "homepage": "https://www.silkweave.dev",
+  "bugs": {
+    "url": "https://github.com/silkweave/silkweave/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/silkweave/silkweave.git",

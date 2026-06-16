@@ -1,4 +1,20 @@
 ---
+const githubUrl = 'https://github.com/silkweave/silkweave'
+const sections = [
+  { href: '/#quickstart', label: 'Quick start' },
+  { href: '/#how-it-works', label: 'How it works' },
+  { href: '/#adapters', label: 'Adapters' },
+  { href: '/#integrations', label: 'Integrations' },
+  { href: '/#features', label: 'Features' }
+]
+const routes = [
+  { href: '/blog', label: 'Blog' },
+  { href: '/changelog', label: 'Changelog' },
+  { href: '/docs', label: 'Docs' }
+]
+
+const githubPath = 'M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.04-.02-2.05-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22 0 1.61-.01 2.9-.01 3.29 0 .32.21.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z'
+const chevron = 'M9 6l6 6-6 6'
 ---
 
 <nav>
@@ -8,21 +24,41 @@
       <span class="logo-text">Silkweave</span>
     </a>
     <div class="nav-links">
-      <a href="/#how-it-works">How it works</a>
-      <a href="/#adapters">Adapters</a>
-      <a href="/#integrations">Integrations</a>
-      <a href="/#features">Features</a>
-      <a href="/blog">Blog</a>
-      <a href="/docs">Docs</a>
-      <a href="https://github.com/silkweave/silkweave" target="_blank" rel="noopener" class="nav-github">
-        GitHub
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M7 17L17 7M17 7H7M17 7V17" />
-        </svg>
-      </a>
+      <div class="nav-group nav-sections">
+        {sections.map(s => <a href={s.href}>{s.label}</a>)}
+      </div>
+      <span class="nav-divider" aria-hidden="true"></span>
+      <div class="nav-group nav-routes">
+        {routes.map(r => <a href={r.href}>{r.label}</a>)}
+        <a href={githubUrl} target="_blank" rel="noopener" class="nav-github" aria-label="Silkweave on GitHub" title="GitHub">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={githubPath} /></svg>
+        </a>
+      </div>
     </div>
+    <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+      <svg class="icon-menu" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="icon-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
   </div>
 </nav>
+
+<div class="mobile-menu" id="mobile-menu" hidden>
+  <div class="mobile-menu-inner" role="navigation" aria-label="Mobile">
+    {[...sections, ...routes].map(item => (
+      <a href={item.href} class="mobile-link">
+        <span class="mobile-link-label">{item.label}</span>
+        <svg class="mobile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={chevron} /></svg>
+      </a>
+    ))}
+    <a href={githubUrl} target="_blank" rel="noopener" class="mobile-link">
+      <span class="mobile-link-label">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={githubPath} /></svg>
+        GitHub
+      </span>
+      <svg class="mobile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={chevron} /></svg>
+    </a>
+  </div>
+</div>
 
 <style>
   nav {
@@ -37,7 +73,8 @@
     transition: background 0.3s, backdrop-filter 0.3s, border-color 0.3s;
   }
 
-  nav.scrolled {
+  nav.scrolled,
+  nav.menu-open {
     background: rgba(10, 10, 15, 0.7);
     backdrop-filter: blur(16px);
     border-bottom-color: var(--border);
@@ -75,8 +112,14 @@
   .nav-links {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    font-size: 0.95rem;
+    gap: 1.25rem;
+    font-size: 0.9rem;
+  }
+
+  .nav-group {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
   }
 
   .nav-links a {
@@ -88,24 +131,159 @@
     color: #fff;
   }
 
+  .nav-divider {
+    width: 1px;
+    height: 1.1rem;
+    background: var(--border-light);
+  }
+
   .nav-github {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    color: rgba(228, 228, 239, 0.7);
   }
 
-  @media (max-width: 640px) {
-    .nav-links a:not(.nav-github) {
+  .nav-github:hover {
+    color: #fff;
+  }
+
+  .nav-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-right: -0.5rem;
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .nav-toggle .icon-close {
+    display: none;
+  }
+
+  nav.menu-open .nav-toggle .icon-menu {
+    display: none;
+  }
+
+  nav.menu-open .nav-toggle .icon-close {
+    display: block;
+  }
+
+  .mobile-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100dvh;
+    z-index: 99;
+    padding: calc(var(--nav-height, 5rem) + 1px) 0 2rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    overflow-y: auto;
+    transform: translateY(-100%);
+    opacity: 0;
+    transition: transform 0.28s ease, opacity 0.28s ease;
+  }
+
+  .mobile-menu.open {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .mobile-menu[hidden] {
+    display: block;
+  }
+
+  .mobile-menu-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.875rem 0;
+    font-size: 1.05rem;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-link:last-child {
+    border-bottom: none;
+  }
+
+  .mobile-link-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .mobile-chevron {
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 940px) {
+    .nav-links {
       display: none;
+    }
+
+    .nav-toggle {
+      display: flex;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-menu {
+      transition: none;
     }
   }
 </style>
 
 <script>
   const nav = document.querySelector('nav')!
+  const toggle = nav.querySelector<HTMLButtonElement>('.nav-toggle')!
+  const menu = document.getElementById('mobile-menu')!
+
   function onScroll() {
-    nav.classList.toggle('scrolled', window.scrollY > 20)
+    const scrolled = window.scrollY > 20
+    nav.classList.toggle('scrolled', scrolled)
+    document.documentElement.style.setProperty('--nav-height', scrolled ? '3.5rem' : '5rem')
   }
   window.addEventListener('scroll', onScroll, { passive: true })
   requestAnimationFrame(onScroll)
+
+  function setMenu(open: boolean) {
+    nav.classList.toggle('menu-open', open)
+    toggle.setAttribute('aria-expanded', String(open))
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu')
+    document.body.style.overflow = open ? 'hidden' : ''
+    if (open) {
+      menu.hidden = false
+      menu.scrollTop = 0
+      requestAnimationFrame(() => menu.classList.add('open'))
+    } else {
+      menu.classList.remove('open')
+      const done = () => { if (!menu.classList.contains('open')) menu.hidden = true }
+      menu.addEventListener('transitionend', done, { once: true })
+    }
+  }
+
+  toggle.addEventListener('click', () => setMenu(!nav.classList.contains('menu-open')))
+  menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setMenu(false)))
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && nav.classList.contains('menu-open')) setMenu(false)
+  })
+  window.matchMedia('(min-width: 941px)').addEventListener('change', (e) => {
+    if (e.matches && nav.classList.contains('menu-open')) setMenu(false)
+  })
 </script>

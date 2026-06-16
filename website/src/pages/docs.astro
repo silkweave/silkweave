@@ -270,15 +270,24 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 /* ── highlighted code blocks ─────────────────────────────────────── */
 
 function hl(raw: string): string {
-  return raw
+  const escaped = raw
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\b(import|from|export|const|let|async|await|return|throw|if|new)\b/g, '<span class="token-keyword">$1</span>')
-    .replace(/'([^']*)'/g, `<span class="token-string">'$1'</span>`)
-    .replace(/`([^`]*)`/g, '<span class="token-string">`$1`</span>')
-    .replace(/\b(\d+)\b/g, '<span class="token-number">$1</span>')
-    .replace(/\/\/(.*)$/gm, '<span class="token-comment">//$1</span>')
+  // Single-pass tokenizer: alternation is tried left-to-right at each position,
+  // so each character is consumed exactly once - no re-scanning of inserted
+  // markup (which a chained `.replace()` would corrupt, e.g. capitalising type
+  // names inside an already-wrapped string span).
+  const pattern = /(\/\/[^\n]*)|('[^']*'|`[^`]*`)|\b(import|from|export|default|const|let|var|async|await|return|throw|yield|if|else|for|while|switch|case|break|new|delete|interface|type|class|function|extends|implements|readonly|enum|public|private|protected|static|abstract|as|satisfies|typeof|keyof|instanceof|in|of|void|never)\b|\b(string|number|boolean|undefined|null|unknown|any|object|symbol|bigint|this)\b|\b([A-Z][A-Za-z0-9_]*)\b|\b(\d[\d_]*)\b/g
+  return escaped.replace(pattern, (match, comment, str, keyword, primitive, type, num) => {
+    if (comment) { return `<span class="token-comment">${comment}</span>` }
+    if (str) { return `<span class="token-string">${str}</span>` }
+    if (keyword) { return `<span class="token-keyword">${keyword}</span>` }
+    if (primitive) { return `<span class="token-type">${primitive}</span>` }
+    if (type) { return `<span class="token-type">${type}</span>` }
+    if (num) { return `<span class="token-number">${num}</span>` }
+    return match
+  })
 }
 ---
 
@@ -920,13 +929,67 @@ export class AppModule {}`)} /></pre>
   </section>
 
   <section id="integration-nextjs">
-    <h3><img src="/nextjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Next.js <span class="badge-soon">coming soon</span></h3>
-    <p><code>@silkweave/nextjs</code> will provide App Router route helpers that mount your actions as MCP and tRPC endpoints at the file-system path of your choice, sharing the Next request context (headers, cookies, server actions). Until it ships, target Next.js with the standalone adapters today:</p>
+    <h3><img src="/nextjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Next.js</h3>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nextjs"><code>@silkweave/nextjs</code></a> package projects <strong>one action set</strong> onto Next.js <strong>App Router</strong> route handlers - <strong>MCP tools</strong> for agents and a typed <strong>tRPC endpoint</strong> for your frontend - from a single source of truth. It's <strong>action-first</strong> (define a Silkweave action, then mount it) and <strong>additive</strong> (it only adds route files). Under the hood it wraps <a href="#adapter-vercel"><code>vercel()</code></a> (MCP) and <a href="#adapter-trpc"><code>trpcFetch()</code></a>, adding catch-all path normalization and end-to-end tRPC types. App Router only; the package has no <code>next</code>/<code>react</code> dependency.</p>
+    <h4>Install</h4>
+    <div class="code-block">
+      <pre><code set:html={hl(`pnpm add @silkweave/nextjs @silkweave/core
+# typed tRPC client on the frontend:
+pnpm add @trpc/client`)} /></pre>
+    </div>
+    <h4>Define your app once</h4>
+    <div class="code-block">
+      <pre><code set:html={hl(`// silkweave/server.ts
+import { defineSilkweave } from '@silkweave/nextjs'
+import { banUser, listUsers } from './actions'
+
+export const app = defineSilkweave({
+  name: 'my-app',
+  description: 'My app exposed to agents + frontend',
+  version: '1.0.0',
+  actions: [listUsers, banUser]
+})
+
+// Type-only export for the tRPC client:
+export type AppRouter = typeof app.Router`)} /></pre>
+    </div>
+    <h4>Mount the route handlers</h4>
+    <p>The MCP route is a single optional catch-all file - it serves the transport plus any OAuth / well-known sub-paths. <code>basePath</code> must equal the route file's directory.</p>
+    <div class="code-block">
+      <pre><code set:html={hl(`// app/api/mcp/[[...mcp]]/route.ts
+import { app } from '@/silkweave/server'
+
+export const { GET, POST, DELETE, OPTIONS } = app.mcp({ basePath: '/api/mcp' })
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'`)} /></pre>
+    </div>
+    <div class="code-block">
+      <pre><code set:html={hl(`// app/api/trpc/[trpc]/route.ts
+import { app } from '@/silkweave/server'
+
+export const { GET, POST, OPTIONS } = app.trpc({ endpoint: '/api/trpc' })
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'`)} /></pre>
+    </div>
+    <h4>Call it from your frontend, fully typed</h4>
+    <div class="code-block">
+      <pre><code set:html={hl(`import { createTRPCClient, httpBatchLink } from '@trpc/client'
+import type { AppRouter } from '@/silkweave/server'
+
+const trpc = createTRPCClient<AppRouter>({
+  links: [httpBatchLink({ url: '/api/trpc' })]
+})
+
+const { users } = await trpc.listUsers.query({ activeOnly: true })`)} /></pre>
+    </div>
     <ul>
-      <li><strong>tRPC:</strong> use <a href="#adapter-trpc"><code>trpcFetch()</code></a> in a Route Handler - its <code>{'{ GET, POST }'}</code> exports drop straight into <code>app/api/trpc/[...trpc]/route.ts</code>.</li>
-      <li><strong>MCP:</strong> use <a href="#adapter-vercel"><code>vercel()</code></a> - its <code>{'{ GET, POST, DELETE }'}</code> exports are App-Router-compatible. Stateless and Edge-runtime-friendly.</li>
+      <li><strong>One source, many surfaces.</strong> <code>app.mcp()</code> and <code>app.trpc()</code> each build their own internal Silkweave instance, so mounting both from the same <code>app</code> is safe. The same actions are reachable as MCP tools (<code>ListUsers</code> / <code>BanUser</code>) and tRPC procedures (<code>listUsers</code> / <code>banUser</code>).</li>
+      <li><strong>Path normalization.</strong> The MCP handler matches absolute paths, so the catch-all route strips <code>basePath</code> from each request - one <code>[[...mcp]]</code> file covers the transport, OAuth routes, and protected-resource metadata.</li>
+      <li><strong>Runtime.</strong> Use <code>runtime = 'nodejs'</code> (the MCP transport needs Node APIs) and <code>dynamic = 'force-dynamic'</code> (these handlers are never statically cached).</li>
+      <li><strong>CORS.</strong> tRPC CORS is opt-in (<code>app.trpc(&#123; cors: true &#125;)</code>) - a same-origin Next.js frontend needs none. The MCP route is permissive by default.</li>
+      <li><strong>Auth.</strong> Pass <code>auth</code> to <code>app.mcp()</code> / <code>app.trpc()</code> for bearer-token / OAuth 2.1 (see <a href="https://www.npmjs.com/package/@silkweave/auth"><code>@silkweave/auth</code></a>).</li>
     </ul>
-    <p>Follow progress: <a href="https://github.com/silkweave/silkweave/issues">github.com/silkweave/silkweave/issues</a>.</p>
+    <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nextjs#readme"><code>@silkweave/nextjs</code> README</a>.</p>
   </section>
 
   <section id="integration-ai-sdk">
@@ -1005,7 +1068,7 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
       <pre><code set:html={hl(smartResultRaw)} /></pre>
     </div>
     <p>Return <code>undefined</code> from <code>toolResult</code> to fall through to the default <code>smartToolResult</code> behavior. The hook only affects MCP adapters - CLI and Fastify handle serialization independently.</p>
-    <p>For the common case of just choosing compact JSON over smart splitting (without a hook), set <code>disposition: 'json'</code> on the action. It is only a <em>default</em> - a client that sends <code>_meta.disposition</code> on the tool call overrides it (resolution order: client <code>_meta.disposition</code> &rarr; action <code>disposition</code> &rarr; <code>'smart'</code>). In <a href="#integration-nestjs">NestJS</a> this is exposed as <code>@Mcp(&#123; result: 'json' &#125;)</code>.</p>
+    <p>For the common case of just choosing compact JSON over smart splitting (without a hook), set <code>disposition: 'json'</code> on the action. It is only a <em>default</em> - a client that sends <code>_meta.disposition</code> on the tool call overrides it (resolution order: client <code>_meta.disposition</code> &rarr; action <code>disposition</code> &rarr; <code>'smart'</code>). In <a href="#integration-nestjs">NestJS</a> this is exposed per-tool as <code>@Mcp(&#123; result: 'json' &#125;)</code>, or module-wide via <code>SilkweaveModule.forRoot(&#123; defaultResult: 'json' &#125;)</code> (per-method <code>result</code> wins over the module default, and a client's <code>_meta.disposition</code> wins over both).</p>
   </section>
 
   <section id="result-utilities">

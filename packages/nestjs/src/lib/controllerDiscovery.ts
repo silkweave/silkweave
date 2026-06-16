@@ -43,7 +43,7 @@ export class ControllerDiscovery {
    * arguments (with `@UseGuards` guards - and any opted-in `globalGuards` -
    * applied first).
    */
-  discover(openapi?: OpenApiDocument, globalGuards: Type<CanActivate>[] = []): Action[] {
+  discover(openapi?: OpenApiDocument, globalGuards: Type<CanActivate>[] = [], defaultResult?: 'json' | 'smart'): Action[] {
     const lookup = openapi ? buildOpenApiLookup(openapi) : undefined
     const discovered: DiscoveredMcp[] = []
     for (const wrapper of this.discovery.getProviders().concat(this.discovery.getControllers())) {
@@ -60,10 +60,10 @@ export class ControllerDiscovery {
         discovered.push({ instance, classRef, method, methodName, meta })
       }
     }
-    return discovered.map((d) => this.toAction(d, lookup, globalGuards))
+    return discovered.map((d) => this.toAction(d, lookup, globalGuards, defaultResult))
   }
 
-  private toAction(d: DiscoveredMcp, lookup: OpenApiLookup | undefined, globalGuards: Type<CanActivate>[]): Action {
+  private toAction(d: DiscoveredMcp, lookup: OpenApiLookup | undefined, globalGuards: Type<CanActivate>[], defaultResult?: 'json' | 'smart'): Action {
     const proto = Object.getPrototypeOf(d.instance) as object
     const route = reflectRoute(d.classRef, d.method)
     const slots = readParamSlots(d.classRef, d.methodName, proto)
@@ -106,8 +106,9 @@ export class ControllerDiscovery {
       name,
       description,
       input: z.object(shape),
-      // Default result format for the tool; a client `_meta.disposition` still wins.
-      ...(d.meta.result ? { disposition: d.meta.result } : {}),
+      // Result format: per-method @Mcp({ result }) wins over the module-wide
+      // default; a client `_meta.disposition` overrides both at call time.
+      ...((d.meta.result ?? defaultResult) ? { disposition: d.meta.result ?? defaultResult } : {}),
       // Only the MCP adapter exposes `@Mcp` methods; a future `@Trpc` decorator
       // would tag its own actions for the tRPC adapter.
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',

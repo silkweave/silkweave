@@ -2,6 +2,7 @@
 !.roam/fitness.yaml
 node_modules/
 build/
+.next/
 plans/
 resources/
 .claude/
