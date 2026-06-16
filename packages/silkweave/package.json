@@ -1,6 +1,6 @@
 {
   "name": "silkweave",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Silkweave Umbrella Package",
   "repository": {
     "type": "git",
@@ -8,7 +8,9 @@
     "directory": "packages/silkweave"
   },
   "type": "module",
-  "files": ["build"],
+  "files": [
+    "build"
+  ],
   "exports": {
     "./auth": {
       "types": "./build/auth.d.mts",

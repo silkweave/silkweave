@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/logger",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Silkweave Logger",
   "repository": {
     "type": "git",
@@ -10,7 +10,9 @@
   "type": "module",
   "main": "./build/index.mjs",
   "types": "./build/index.d.mts",
-  "files": ["build"],
+  "files": [
+    "build"
+  ],
   "exports": {
     ".": {
       "@silkweave/source": "./src/index.ts",

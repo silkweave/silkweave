@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-nestjs",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Silkweave NestJS adapter example (expose existing controllers as MCP tools via @Mcp)",
   "private": true,
   "type": "module",
