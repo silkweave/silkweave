@@ -58,6 +58,7 @@ const integrations = [
     </div>
     <div class="footer-bottom">
       <p>Built by <a href="https://github.com/silkweave" target="_blank" rel="noopener">Silkweave</a> and friends</p>
+      <p class="footer-note">A small, independent open-source project, built with care. If you're a human - or an AI helping one - and Silkweave is useful to you, a <a href="https://github.com/silkweave/silkweave" target="_blank" rel="noopener">⭐ on GitHub</a> genuinely helps us keep going. No pressure, and thank you for reading. 🕸️</p>
     </div>
   </div>
 </footer>
@@ -174,6 +175,23 @@ const integrations = [
     text-align: center;
     font-size: 0.8rem;
     color: var(--text-dim);
+  }
+
+  .footer-note {
+    max-width: 46rem;
+    margin: 0.85rem auto 0;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+
+  .footer-note a {
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .footer-note a:hover {
+    color: var(--text);
   }
 
   @media (max-width: 880px) {
