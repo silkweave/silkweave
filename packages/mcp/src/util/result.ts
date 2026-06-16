@@ -43,9 +43,14 @@ export function handleToolError(error: unknown): CallToolResult {
   if (error instanceof SilkweaveError) {
     return jsonToolResult({ success: false, name: error.name, message: error.message, code: error.code }, true)
   } else if (error instanceof Error) {
-    return jsonToolResult({ success: false, name: error.name, message: error.message, stack: error.stack }, true)
+    // Log the full error (incl. stack) to stderr only - never put the stack trace
+    // on the wire, where it would leak server internals to the MCP client.
+    console.error(error)
+    return jsonToolResult({ success: false, name: error.name, message: error.message }, true)
   } else {
-    return jsonToolResult({ success: false, name: 'Unknown error', message: 'An unknown error occurred', error }, true)
+    // Likewise keep the raw thrown value server-side - only a generic message goes out.
+    console.error('Unknown tool error:', error)
+    return jsonToolResult({ success: false, name: 'Unknown error', message: 'An unknown error occurred' }, true)
   }
 }
 
