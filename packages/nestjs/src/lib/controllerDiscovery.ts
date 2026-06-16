@@ -78,12 +78,13 @@ export class ControllerDiscovery {
     const applyParamPipes = d.meta.pipes !== 'skip'
 
     const guards = collectGuards(this.reflector, d.classRef, d.method)
+    const pathFields = pathParamFields(bindings)
     const { moduleRef, reflector, appConfig } = this
     const classRef = d.classRef
     const method = d.method
     const instance = d.instance
 
-    const applyGuards = async (context: SilkweaveContext): Promise<void> => {
+    const applyGuards = async (context: SilkweaveContext, input: object): Promise<void> => {
       // Resolved at call time - `APP_GUARD` instances aren't populated until
       // `app.init()` finishes. Globals run before the route/class guards,
       // mirroring Nest's request pipeline.
@@ -93,6 +94,11 @@ export class ControllerDiscovery {
       const response = context.getOptional<unknown>('response') ?? null
       const hasRequest = request != null
       const guardRequest = hasRequest ? request : { headers: {}, params: {}, query: {} }
+      // Mirror REST: surface URL path params on `request.params` so guards that
+      // scope by path (e.g. a session-bound API-key guard) see them. Over MCP the
+      // request stand-in has empty `params`; populate only the reflected path
+      // fields (as raw strings, like Express), leaving any pre-existing params be.
+      populatePathParams(guardRequest, pathFields, input as Record<string, unknown>)
       await runGuards(all, moduleRef, reflector, classRef, method, guardRequest, response, hasRequest ? 'http' : 'rpc')
     }
 
@@ -104,7 +110,7 @@ export class ControllerDiscovery {
       // would tag its own actions for the tRPC adapter.
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',
       run: async (input: object, context: SilkweaveContext): Promise<object> => {
-        await applyGuards(context)
+        await applyGuards(context, input)
         const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
         const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes)
         return (result ?? {})
@@ -151,6 +157,30 @@ export class ControllerDiscovery {
     Object.assign(shape, d.meta.input ?? {})
 
     return { shape, bindings }
+  }
+}
+
+/** Input field names that originate from the URL path (`@Param`), per the re-bind plan. */
+function pathParamFields(bindings: Binding[]): string[] {
+  const fields: string[] = []
+  for (const b of bindings) {
+    if (b.kind === 'params') { fields.push(...b.fields) } else if (b.kind === 'value' && b.source === 'path') { fields.push(b.field) }
+  }
+  return fields
+}
+
+/**
+ * Fill `request.params` with the reflected path fields from the validated input,
+ * matching what Express would populate over REST (raw string values). Only adds
+ * keys that are absent, so a real REST request's params are never overwritten.
+ */
+function populatePathParams(request: unknown, pathFields: string[], input: Record<string, unknown>): void {
+  if (pathFields.length === 0 || typeof request !== 'object' || request === null) { return }
+  const params = ((request as { params?: Record<string, unknown> }).params ??= {})
+  for (const field of pathFields) {
+    if (!(field in params) && input[field] !== undefined) {
+      params[field] = String(input[field])
+    }
   }
 }
 
