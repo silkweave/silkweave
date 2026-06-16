@@ -1,3 +1,4 @@
+import type { CanActivate, Type } from '@nestjs/common'
 import type { HttpAdapterHost } from '@nestjs/core'
 import type { Action, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 import type { OpenApiDocument } from './reflect/openapi.js'
@@ -56,6 +57,19 @@ export interface SilkweaveModuleOptions {
    * reflection when an operation or field isn't present.
    */
   openapi?: OpenApiDocument
+  /**
+   * Opt-in allow-list of app-global guard classes (registered via
+   * `app.useGlobalGuards()` or `{ provide: APP_GUARD, useClass }`) to run on
+   * every MCP tool call, before each method/class `@UseGuards`. Listed by
+   * class - a blanket "run all globals" is deliberately not offered, since
+   * unrelated globals (e.g. a `ThrottlerGuard` that needs a writable response)
+   * would misbehave over MCP. Empty/omitted ⇒ no global guards run.
+   *
+   * Note: over MCP the request stand-in is headers-only (`params`/`query` are
+   * empty), so per-session or IP-derived guard logic won't apply; header-based
+   * authentication still works.
+   */
+  globalGuards?: Type<CanActivate>[]
 }
 
 export const SILKWEAVE_MODULE_OPTIONS = '__silkweave_module_options__'

@@ -178,11 +178,23 @@ Native NestJS `@UseGuards()` on `@Mcp` methods run before the handler is invoked
 - A guard that denies (returns `false` or throws) produces a clean MCP tool error (`ForbiddenException`), not an HTTP 500.
 - For OAuth 2.1 / bearer-token MCP auth, prefer `mcp({ auth })` and read the resolved identity from the silkweave context (`ctx.get('auth')`); the header stand-in is for custom request-reading guards.
 
+**Global guards (opt-in).** App-global guards - registered via `app.useGlobalGuards(new X())` or `{ provide: APP_GUARD, useClass }` - do **not** run on tool calls by default. Opt them in by class with `globalGuards`:
+
+```ts
+SilkweaveModule.forRoot({
+  silkweave: { name: 'app', description: 'My App', version: '1.0.0' },
+  adapters: [mcp({ basePath: '/mcp' })],
+  globalGuards: [ApiKeyGuard]   // runs before each method/class @UseGuards; throttler etc. deliberately excluded
+})
+```
+
+The allow-list is explicit-by-class on purpose - a blanket "run every global" would also fire unrelated globals (e.g. a `ThrottlerGuard`, which assumes a writable response MCP doesn't provide). Listed guards run **before** the method/class `@UseGuards`, mirroring Nest's request pipeline. The same headers-only caveat applies: a global guard's per-session (`params`) or IP-derived (`query`) logic won't apply over MCP, but header-based authentication works unchanged.
+
 Controllers are normal Nest providers - inject services via the constructor as usual.
 
 ## What does *not* run
 
-Because the handler is invoked directly (not through Nest's HTTP request pipeline), the following do **not** apply on a tool call - only `@UseGuards()` and parameter-bound pipes do:
+Because the handler is invoked directly (not through Nest's HTTP request pipeline), the following do **not** apply on a tool call - only `@UseGuards()` (plus any opted-in `globalGuards`) and parameter-bound pipes do:
 
 - Globally-registered `ValidationPipe` / interceptors / exception filters (MCP input is instead validated against the reflected Zod schema).
 - DTO class instantiation - whole-DTO `@Body()`/`@Query()` arguments arrive as plain objects, so `@Transform` and DTO methods do not fire.

@@ -58,7 +58,7 @@ export class SilkweaveModule implements NestModule {
     if (!httpAdapter) {
       throw new Error('@silkweave/nestjs: HttpAdapterHost.httpAdapter is not available.')
     }
-    const allActions = this.discovery.discover(this.options.openapi)
+    const allActions = this.discovery.discover(this.options.openapi, this.options.globalGuards)
     for (const adapter of this.options.adapters) {
       const baseContext = createContext({ ...(this.options.context ?? {}), adapter: adapter.name })
       const actions = adapter.allActions

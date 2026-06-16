@@ -1,10 +1,38 @@
 import { ForbiddenException, type CanActivate, type Type } from '@nestjs/common'
 import { GUARDS_METADATA } from '@nestjs/common/constants.js'
-import { ModuleRef, Reflector } from '@nestjs/core'
+import { ApplicationConfig, ModuleRef, Reflector } from '@nestjs/core'
 import { isObservable, lastValueFrom } from 'rxjs'
 import { SilkweaveExecutionContext } from './executionContext.js'
 
 type GuardRef = Type<CanActivate> | CanActivate
+
+/**
+ * Collect the app's global guards that match an opt-in allow-list of classes.
+ *
+ * Reads both registration styles Nest exposes via `ApplicationConfig`:
+ * `useGlobalGuards(new X())` instances (`getGlobalGuards()`) and
+ * `{ provide: APP_GUARD, useClass }` DI guards (`getGlobalRequestGuards()`,
+ * which yields `InstanceWrapper`s - we read `.instance` off each).
+ *
+ * The allow-list is intentionally explicit-by-class: a blanket "run every
+ * global" would also fire unrelated globals (e.g. a `ThrottlerGuard` that
+ * assumes a writable response) on every tool call. An empty allow-list runs
+ * no globals, preserving the prior behavior.
+ *
+ * Call this at tool-call time, not at discovery time: `APP_GUARD` instances
+ * aren't populated until `app.init()` finishes.
+ */
+export function collectGlobalGuards(
+  appConfig: ApplicationConfig,
+  allowList: Type<CanActivate>[]
+): CanActivate[] {
+  if (allowList.length === 0) { return [] }
+  const globals: CanActivate[] = [
+    ...appConfig.getGlobalGuards(),
+    ...appConfig.getGlobalRequestGuards().map((w) => w.instance)
+  ].filter((g): g is CanActivate => g != null)
+  return globals.filter((g) => allowList.some((c) => g instanceof c))
+}
 
 /**
  * Read `@UseGuards(...)` metadata for both the method and its class and merge

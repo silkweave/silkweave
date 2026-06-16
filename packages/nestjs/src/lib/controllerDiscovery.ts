@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, type Type } from '@nestjs/common'
-import { DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
+import { Injectable, type CanActivate, type Type } from '@nestjs/common'
+import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
 import { createAction, type Action, type SilkweaveContext } from '@silkweave/core'
 import { z } from 'zod/v4'
-import { collectGuards, runGuards } from './guards.js'
+import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
 import { MCP_METADATA, type McpMetadata } from './metadata.js'
 import { invokeRebound, specialBinding, type Binding } from './rebind.js'
 import { buildOpenApiLookup, openApiFields, type OpenApiDocument, type OpenApiLookup } from './reflect/openapi.js'
@@ -31,7 +31,8 @@ export class ControllerDiscovery {
     private readonly discovery: DiscoveryService,
     private readonly scanner: MetadataScanner,
     private readonly reflector: Reflector,
-    private readonly moduleRef: ModuleRef
+    private readonly moduleRef: ModuleRef,
+    private readonly appConfig: ApplicationConfig
   ) { }
 
   /**
@@ -39,9 +40,10 @@ export class ControllerDiscovery {
    * and build a core `Action` per method whose input schema is reflected from
    * the route + parameter decorators (+ optional OpenAPI document) and whose
    * `run` re-binds the validated input back into the method's positional
-   * arguments (with `@UseGuards` guards applied first).
+   * arguments (with `@UseGuards` guards - and any opted-in `globalGuards` -
+   * applied first).
    */
-  discover(openapi?: OpenApiDocument): Action[] {
+  discover(openapi?: OpenApiDocument, globalGuards: Type<CanActivate>[] = []): Action[] {
     const lookup = openapi ? buildOpenApiLookup(openapi) : undefined
     const discovered: DiscoveredMcp[] = []
     for (const wrapper of this.discovery.getProviders().concat(this.discovery.getControllers())) {
@@ -58,10 +60,10 @@ export class ControllerDiscovery {
         discovered.push({ instance, classRef, method, methodName, meta })
       }
     }
-    return discovered.map((d) => this.toAction(d, lookup))
+    return discovered.map((d) => this.toAction(d, lookup, globalGuards))
   }
 
-  private toAction(d: DiscoveredMcp, lookup: OpenApiLookup | undefined): Action {
+  private toAction(d: DiscoveredMcp, lookup: OpenApiLookup | undefined, globalGuards: Type<CanActivate>[]): Action {
     const proto = Object.getPrototypeOf(d.instance) as object
     const route = reflectRoute(d.classRef, d.method)
     const slots = readParamSlots(d.classRef, d.methodName, proto)
@@ -76,18 +78,22 @@ export class ControllerDiscovery {
     const applyParamPipes = d.meta.pipes !== 'skip'
 
     const guards = collectGuards(this.reflector, d.classRef, d.method)
-    const { moduleRef, reflector } = this
+    const { moduleRef, reflector, appConfig } = this
     const classRef = d.classRef
     const method = d.method
     const instance = d.instance
 
     const applyGuards = async (context: SilkweaveContext): Promise<void> => {
-      if (guards.length === 0) { return }
+      // Resolved at call time - `APP_GUARD` instances aren't populated until
+      // `app.init()` finishes. Globals run before the route/class guards,
+      // mirroring Nest's request pipeline.
+      const all = [...collectGlobalGuards(appConfig, globalGuards), ...guards]
+      if (all.length === 0) { return }
       const request = context.getOptional<unknown>('request')
       const response = context.getOptional<unknown>('response') ?? null
       const hasRequest = request != null
       const guardRequest = hasRequest ? request : { headers: {}, params: {}, query: {} }
-      await runGuards(guards, moduleRef, reflector, classRef, method, guardRequest, response, hasRequest ? 'http' : 'rpc')
+      await runGuards(all, moduleRef, reflector, classRef, method, guardRequest, response, hasRequest ? 'http' : 'rpc')
     }
 
     return createAction({
