@@ -918,13 +918,67 @@ export class AppModule {}`)} /></pre>
   </section>
 
   <section id="integration-nextjs">
-    <h3><img src="/nextjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Next.js <span class="badge-soon">coming soon</span></h3>
-    <p><code>@silkweave/nextjs</code> will provide App Router route helpers that mount your actions as MCP and tRPC endpoints at the file-system path of your choice, sharing the Next request context (headers, cookies, server actions). Until it ships, target Next.js with the standalone adapters today:</p>
+    <h3><img src="/nextjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Next.js</h3>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nextjs"><code>@silkweave/nextjs</code></a> package projects <strong>one action set</strong> onto Next.js <strong>App Router</strong> route handlers - <strong>MCP tools</strong> for agents and a typed <strong>tRPC endpoint</strong> for your frontend - from a single source of truth. It's <strong>action-first</strong> (define a Silkweave action, then mount it) and <strong>additive</strong> (it only adds route files). Under the hood it wraps <a href="#adapter-vercel"><code>vercel()</code></a> (MCP) and <a href="#adapter-trpc"><code>trpcFetch()</code></a>, adding catch-all path normalization and end-to-end tRPC types. App Router only; the package has no <code>next</code>/<code>react</code> dependency.</p>
+    <h4>Install</h4>
+    <div class="code-block">
+      <pre><code set:html={hl(`pnpm add @silkweave/nextjs @silkweave/core
+# typed tRPC client on the frontend:
+pnpm add @trpc/client`)} /></pre>
+    </div>
+    <h4>Define your app once</h4>
+    <div class="code-block">
+      <pre><code set:html={hl(`// silkweave/server.ts
+import { defineSilkweave } from '@silkweave/nextjs'
+import { banUser, listUsers } from './actions'
+
+export const app = defineSilkweave({
+  name: 'my-app',
+  description: 'My app exposed to agents + frontend',
+  version: '1.0.0',
+  actions: [listUsers, banUser]
+})
+
+// Type-only export for the tRPC client:
+export type AppRouter = typeof app.Router`)} /></pre>
+    </div>
+    <h4>Mount the route handlers</h4>
+    <p>The MCP route is a single optional catch-all file - it serves the transport plus any OAuth / well-known sub-paths. <code>basePath</code> must equal the route file's directory.</p>
+    <div class="code-block">
+      <pre><code set:html={hl(`// app/api/mcp/[[...mcp]]/route.ts
+import { app } from '@/silkweave/server'
+
+export const { GET, POST, DELETE, OPTIONS } = app.mcp({ basePath: '/api/mcp' })
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'`)} /></pre>
+    </div>
+    <div class="code-block">
+      <pre><code set:html={hl(`// app/api/trpc/[trpc]/route.ts
+import { app } from '@/silkweave/server'
+
+export const { GET, POST, OPTIONS } = app.trpc({ endpoint: '/api/trpc' })
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'`)} /></pre>
+    </div>
+    <h4>Call it from your frontend, fully typed</h4>
+    <div class="code-block">
+      <pre><code set:html={hl(`import { createTRPCClient, httpBatchLink } from '@trpc/client'
+import type { AppRouter } from '@/silkweave/server'
+
+const trpc = createTRPCClient<AppRouter>({
+  links: [httpBatchLink({ url: '/api/trpc' })]
+})
+
+const { users } = await trpc.listUsers.query({ activeOnly: true })`)} /></pre>
+    </div>
     <ul>
-      <li><strong>tRPC:</strong> use <a href="#adapter-trpc"><code>trpcFetch()</code></a> in a Route Handler - its <code>{'{ GET, POST }'}</code> exports drop straight into <code>app/api/trpc/[...trpc]/route.ts</code>.</li>
-      <li><strong>MCP:</strong> use <a href="#adapter-vercel"><code>vercel()</code></a> - its <code>{'{ GET, POST, DELETE }'}</code> exports are App-Router-compatible. Stateless and Edge-runtime-friendly.</li>
+      <li><strong>One source, many surfaces.</strong> <code>app.mcp()</code> and <code>app.trpc()</code> each build their own internal Silkweave instance, so mounting both from the same <code>app</code> is safe. The same actions are reachable as MCP tools (<code>ListUsers</code> / <code>BanUser</code>) and tRPC procedures (<code>listUsers</code> / <code>banUser</code>).</li>
+      <li><strong>Path normalization.</strong> The MCP handler matches absolute paths, so the catch-all route strips <code>basePath</code> from each request - one <code>[[...mcp]]</code> file covers the transport, OAuth routes, and protected-resource metadata.</li>
+      <li><strong>Runtime.</strong> Use <code>runtime = 'nodejs'</code> (the MCP transport needs Node APIs) and <code>dynamic = 'force-dynamic'</code> (these handlers are never statically cached).</li>
+      <li><strong>CORS.</strong> tRPC CORS is opt-in (<code>app.trpc(&#123; cors: true &#125;)</code>) - a same-origin Next.js frontend needs none. The MCP route is permissive by default.</li>
+      <li><strong>Auth.</strong> Pass <code>auth</code> to <code>app.mcp()</code> / <code>app.trpc()</code> for bearer-token / OAuth 2.1 (see <a href="https://www.npmjs.com/package/@silkweave/auth"><code>@silkweave/auth</code></a>).</li>
     </ul>
-    <p>Follow progress: <a href="https://github.com/silkweave/silkweave/issues">github.com/silkweave/silkweave/issues</a>.</p>
+    <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nextjs#readme"><code>@silkweave/nextjs</code> README</a>.</p>
   </section>
 
   <section id="integration-ai-sdk">

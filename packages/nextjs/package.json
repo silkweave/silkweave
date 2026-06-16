@@ -1,0 +1,51 @@
+{
+  "name": "@silkweave/nextjs",
+  "version": "2.2.0",
+  "description": "Silkweave Next.js App Router Adapter",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/silkweave/silkweave.git",
+    "directory": "packages/nextjs"
+  },
+  "type": "module",
+  "main": "./build/index.mjs",
+  "types": "./build/index.d.mts",
+  "files": [
+    "build"
+  ],
+  "exports": {
+    ".": {
+      "@silkweave/source": "./src/index.ts",
+      "types": "./build/index.d.mts",
+      "default": "./build/index.mjs"
+    }
+  },
+  "scripts": {
+    "clean": "rimraf build",
+    "build": "tsdown",
+    "prepack": "pnpm clean && pnpm build",
+    "watch": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "check": "pnpm lint && pnpm typecheck"
+  },
+  "dependencies": {
+    "@silkweave/auth": "workspace:*",
+    "@silkweave/core": "workspace:*",
+    "@silkweave/trpc": "workspace:*",
+    "@silkweave/vercel": "workspace:*",
+    "@trpc/server": "^11.7.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^10.4.0",
+    "rimraf": "^6.1.3",
+    "tsdown": "^0.21.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}
