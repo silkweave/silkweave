@@ -117,6 +117,7 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 | `description` | `string` | `@ApiOperation` summary/description, else generated | Tool description |
 | `input` | `Record<string, z.ZodType>` | - | Zod raw-shape override merged over the reflected fields (per-field). The escape hatch for shapes reflection can't express - discriminated unions, custom validators, `@Transform` |
 | `pipes` | `'apply' \| 'skip'` | `'apply'` | Whether to run parameter-bound pipes (`@Param('id', ParseIntPipe)`) when re-binding |
+| `result` | `'json' \| 'smart'` | `'smart'` | Default MCP result format - `'json'` returns compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and offloads large ones to an embedded resource (`smartToolResult`). A client that sends `_meta.disposition` on the call overrides it |
 
 ## How reflection works
 

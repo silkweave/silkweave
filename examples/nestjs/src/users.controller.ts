@@ -39,7 +39,9 @@ export class UsersController {
   @Get()
   @ApiOperation({ summary: 'List users' })
   @ApiQuery({ name: 'activeOnly', required: false, type: Boolean, description: 'Only return active users' })
-  @Mcp({ description: 'List users based on filters' })
+  // `result: 'json'` returns compact JSON text instead of the default smart
+  // formatter (a client can still override via `_meta.disposition`).
+  @Mcp({ description: 'List users based on filters', result: 'json' })
   list(@Query('activeOnly') activeOnly?: boolean) {
     return { users: activeOnly ? USERS.filter((u) => u.active) : USERS }
   }

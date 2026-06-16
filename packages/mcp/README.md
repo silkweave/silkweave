@@ -163,6 +163,22 @@ const MyAction = createAction({
 
 Return `undefined` from `toolResult` to fall through to the default `smartToolResult` behavior.
 
+### Default `disposition`
+
+For the common case of simply choosing `jsonToolResult` over `smartToolResult` (without a hook), set `disposition` on the action:
+
+```typescript
+createAction({
+  name: 'my-action',
+  description: 'Returns compact JSON by default',
+  input: z.object({}),
+  disposition: 'json',           // 'json' ⇒ jsonToolResult, 'smart' (default) ⇒ smartToolResult
+  run: async () => fetchData()
+})
+```
+
+This is only a **default** - a client that sends `_meta.disposition` on the tool call always wins. Resolution order: client `_meta.disposition` → action `disposition` → `'smart'`. (`@silkweave/nestjs` exposes this as `@Mcp({ result: 'json' })`.)
+
 ## MCP Result Utilities
 
 All result utilities are exported from `@silkweave/mcp`:

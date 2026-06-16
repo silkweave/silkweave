@@ -35,4 +35,12 @@ export interface McpMetadata {
    * the method is invoked directly, not through Nest's HTTP request pipeline.
    */
   pipes?: 'apply' | 'skip'
+  /**
+   * Default MCP result format for this tool. `'json'` returns compact JSON text
+   * (`jsonToolResult`); `'smart'` (the default when unset) inlines small
+   * payloads and offloads large ones to an embedded resource (`smartToolResult`).
+   * This is only a default - a client that sends `_meta.disposition` on the tool
+   * call overrides it.
+   */
+  result?: 'json' | 'smart'
 }

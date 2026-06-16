@@ -106,6 +106,8 @@ export class ControllerDiscovery {
       name,
       description,
       input: z.object(shape),
+      // Default result format for the tool; a client `_meta.disposition` still wins.
+      ...(d.meta.result ? { disposition: d.meta.result } : {}),
       // Only the MCP adapter exposes `@Mcp` methods; a future `@Trpc` decorator
       // would tag its own actions for the tRPC adapter.
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',

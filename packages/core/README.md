@@ -69,6 +69,7 @@ Returns a builder with `.adapter()`, `.action()`, `.actions()`, `.set()`, and `.
 | `path` | `string` | Optional REST route template, may contain `:param` placeholders (e.g. `'spaces/:spaceId/users'`). Each placeholder must be a key of `input`. See [REST routing](#rest-routing). |
 | `queryParams` | `(keyof I)[]` | Optional input fields read from the URL query string instead of the body (e.g. `['offset', 'limit']`). See [REST routing](#rest-routing). |
 | `args` | `(keyof I)[]` | Fields to expose as CLI positional arguments |
+| `disposition` | `'json' \| 'smart'` | Optional default MCP result format - `'json'` ⇒ `jsonToolResult`, `'smart'` (default) ⇒ `smartToolResult`. A client's `_meta.disposition` overrides it. MCP adapters only. |
 | `isEnabled` | `(context) => boolean` | Gate action availability per adapter |
 | `run` | `(input, context) => Promise<O>` *or* `async function*(input, context): AsyncGenerator<Chunk>` | The action implementation. Use a regular `async` function for buffered request/response; use an `async function*` and declare `chunk` to stream. |
 | `toolResult` | `(response, context) => CallToolResult \| undefined` | Custom MCP result formatting (optional). For streaming actions, `response` is the buffered array of chunks (used when the client did not request streaming). |

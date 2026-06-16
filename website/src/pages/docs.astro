@@ -359,6 +359,7 @@ function hl(raw: string): string {
   path?: string                     // REST route, e.g. 'spaces/:spaceId/users'
   queryParams?: (keyof I)[]         // input fields read from the query string
   args?: (keyof I)[]
+  disposition?: 'json' | 'smart'    // default MCP result format
   isEnabled?: (context: SilkweaveContext) => boolean
   run:
     | ((input: I, context: SilkweaveContext) => Promise<O>)
@@ -376,6 +377,7 @@ function hl(raw: string): string {
       <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
       <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
       <li><strong><code>toolResult</code></strong> - Optional hook to customize how the return value is formatted as an MCP <code>CallToolResult</code>. Return <code>undefined</code> to use the default <a href="#smart-tool-results"><code>smartToolResult</code></a> behavior. Only affects MCP adapters.</li>
+      <li><strong><code>disposition</code></strong> - Optional default MCP result format - <code>'json'</code> (<code>jsonToolResult</code>) or <code>'smart'</code> (the default, <code>smartToolResult</code>). A simpler alternative to a <code>toolResult</code> hook when you just want compact JSON; a client's <code>_meta.disposition</code> still overrides it. MCP adapters only.</li>
     </ul>
   </section>
 
@@ -1003,6 +1005,7 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
       <pre><code set:html={hl(smartResultRaw)} /></pre>
     </div>
     <p>Return <code>undefined</code> from <code>toolResult</code> to fall through to the default <code>smartToolResult</code> behavior. The hook only affects MCP adapters - CLI and Fastify handle serialization independently.</p>
+    <p>For the common case of just choosing compact JSON over smart splitting (without a hook), set <code>disposition: 'json'</code> on the action. It is only a <em>default</em> - a client that sends <code>_meta.disposition</code> on the tool call overrides it (resolution order: client <code>_meta.disposition</code> &rarr; action <code>disposition</code> &rarr; <code>'smart'</code>). In <a href="#integration-nestjs">NestJS</a> this is exposed as <code>@Mcp(&#123; result: 'json' &#125;)</code>.</p>
   </section>
 
   <section id="result-utilities">

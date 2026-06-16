@@ -48,6 +48,15 @@ export interface Action<
    */
   queryParams?: (keyof I)[]
   args?: (keyof I)[]
+  /**
+   * Default MCP result disposition for this action - `'json'` formats the
+   * response with `jsonToolResult` (compact JSON text), `'smart'` (the default
+   * when unset) uses `smartToolResult` (inlines small payloads, offloads large
+   * ones to an embedded resource). This is only a default: a client that sends
+   * `_meta.disposition` on the tool call always wins. Ignored by non-MCP
+   * adapters.
+   */
+  disposition?: 'json' | 'smart'
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O> | ActionStreamRun<I, C>
   toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
@@ -63,6 +72,7 @@ export interface NonStreamingActionInput<I extends object, O extends object, N e
   path?: string
   queryParams?: (keyof I)[]
   args?: (keyof I)[]
+  disposition?: 'json' | 'smart'
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O>
   toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
@@ -78,6 +88,7 @@ export interface StreamingActionInput<I extends object, C, N extends string, K e
   path?: string
   queryParams?: (keyof I)[]
   args?: (keyof I)[]
+  disposition?: 'json' | 'smart'
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionStreamRun<I, C>
   toolResult?: (response: C[], context: SilkweaveContext) => CallToolResult | undefined

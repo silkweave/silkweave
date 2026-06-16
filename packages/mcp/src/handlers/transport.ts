@@ -50,7 +50,9 @@ function registerTools(server: McpServer, actions: Action[], context: SilkweaveC
         request: requestFromExtra(extra.requestInfo),
         ...(currentAuth ? { auth: currentAuth } : {})
       })
-      const disposition = extra._meta?.disposition
+      // Client-sent `_meta.disposition` wins; otherwise fall back to the
+      // action's configured default (`smart` when neither is set).
+      const disposition = extra._meta?.disposition ?? action.disposition
       const progressToken = extra._meta?.progressToken
       try {
         let result: object | object[]
