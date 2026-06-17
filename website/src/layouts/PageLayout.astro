@@ -1,0 +1,222 @@
+---
+import Footer from '../components/Footer.astro'
+import Nav from '../components/Nav.astro'
+import Layout from './Layout.astro'
+
+interface Props {
+  title: string
+  description: string
+  slug: string
+  eyebrow: string
+  heading: string
+  intro: string
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[]
+}
+
+const { title, description, slug, eyebrow, heading, intro, jsonLd } = Astro.props
+---
+
+<Layout title={`${title} - Silkweave`} description={description} slug={slug} jsonLd={jsonLd}>
+  <Nav />
+  <main class="page">
+    <div class="page-inner">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true">/</span>
+        <span>{eyebrow}</span>
+      </nav>
+      <header class="page-header">
+        <p class="section-label">{eyebrow}</p>
+        <h1>{heading}</h1>
+        <p class="lede">{intro}</p>
+      </header>
+      <div class="prose">
+        <slot />
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 7rem 1.5rem 5rem;
+  }
+
+  .crumbs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-bottom: 2rem;
+  }
+
+  .crumbs a {
+    color: var(--text-muted);
+  }
+
+  .crumbs a:hover {
+    color: var(--accent);
+  }
+
+  .page-header {
+    margin-bottom: 3rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.25rem;
+  }
+
+  .lede {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .prose {
+    line-height: 1.8;
+    color: var(--text);
+  }
+
+  .prose :global(h2) {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-top: 3rem;
+    margin-bottom: 1rem;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    scroll-margin-top: 5rem;
+  }
+
+  .prose :global(h3) {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .prose :global(p) {
+    margin-bottom: 1.25rem;
+  }
+
+  .prose :global(ul) {
+    margin-bottom: 1.25rem;
+    padding-left: 1.25rem;
+    list-style: none;
+  }
+
+  .prose :global(li) {
+    margin-bottom: 0.6rem;
+    position: relative;
+    padding-left: 1rem;
+  }
+
+  .prose :global(li::before) {
+    content: '·';
+    position: absolute;
+    left: -0.25rem;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .prose :global(a) {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: rgba(123, 126, 245, 0.4);
+  }
+
+  .prose :global(a:hover) {
+    color: var(--accent-hover);
+    text-decoration-color: var(--accent-hover);
+  }
+
+  .prose :global(strong) {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .prose :global(:not(pre) > code) {
+    background: var(--accent-bg);
+    color: var(--text);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  .prose :global(pre) {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 1.5rem 0;
+    tab-size: 2;
+  }
+
+  .prose :global(pre code) {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  /* Cross-link cards at the foot of each page */
+  .prose :global(.next-links) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 3rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .prose :global(.next-links li) {
+    margin: 0;
+    padding: 0;
+  }
+
+  .prose :global(.next-links li::before) {
+    content: none;
+  }
+
+  .prose :global(.next-links a) {
+    display: block;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 600;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+
+  .prose :global(.next-links a:hover) {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    .page-header h1 {
+      font-size: 2rem;
+    }
+  }
+</style>

@@ -1,0 +1,100 @@
+---
+import PageLayout from '../layouts/PageLayout.astro'
+
+export const prerender = true
+
+const slug = 'integrations'
+const title = 'Integrations: NestJS, Next.js & More'
+const eyebrow = 'Integrations'
+const heading = 'Native to the framework you already use.'
+const description =
+  'Silkweave integrations make actions feel native to your stack: expose NestJS controllers as MCP tools with one @Mcp decorator, project an action set onto Next.js App Router as MCP + tRPC, or compose adapters standalone.'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.silkweave.dev' },
+    { '@type': 'ListItem', position: 2, name: 'Integrations', item: 'https://www.silkweave.dev/integrations' }
+  ]
+}
+---
+
+<PageLayout
+  title={title}
+  description={description}
+  slug={slug}
+  eyebrow={eyebrow}
+  heading={heading}
+  intro="Adapters are one transport each. Integrations compose them with the conventions of a host framework - decorators, dependency injection, file-based routing - so Silkweave feels native rather than bolted on. They go in two directions: reflect an existing app into MCP, or project actions onto a framework's routes."
+  jsonLd={jsonLd}
+>
+  <h2 id="nestjs">NestJS - reflect controllers into MCP tools</h2>
+  <p>
+    The <a href="/docs#integration-nestjs">NestJS integration</a> is <strong>additive controller
+    reflection</strong>. Add <code>@Mcp()</code> to a route a controller already has, and it becomes
+    an MCP tool - nothing is re-declared. The tool's name, description, and input schema are
+    reflected from metadata the method already carries: the route and <code>@Param</code> /
+    <code>@Query</code> / <code>@Body</code> decorators, plus <code>@nestjs/swagger</code> and
+    <code>class-validator</code> annotations (and an optional OpenAPI document).
+  </p>
+  <pre><code>{`@Controller('users')
+export class UsersController {
+  @Get(':id')
+  @Mcp({ description: 'Fetch a user by id' })
+  findOne(@Param('id') id: string) {
+    return this.users.find(id)
+  }
+}`}</code></pre>
+  <p>
+    On a tool call the validated input is re-bound into the method's positional arguments, guards run
+    first, and a header-reading <code>@UseGuards()</code> guard sees the inbound tool-call headers -
+    so the same auth that protects your REST route protects it over MCP. Your controllers keep serving
+    HTTP unchanged.
+  </p>
+
+  <h2 id="nextjs">Next.js - one action set, MCP and tRPC</h2>
+  <p>
+    The <a href="/docs#integration-nextjs">Next.js integration</a> goes the other way:
+    <strong>action-first projection</strong>. Define your actions once and project them onto App
+    Router route handlers. <code>defineSilkweave(&#123; actions &#125;)</code> returns
+    <code>app.mcp()</code> (MCP tools for agents) and <code>app.trpc()</code> (a typed tRPC endpoint
+    for your frontend) - a single source of truth serving both audiences.
+  </p>
+  <pre><code>{`// app/api/mcp/[[...slug]]/route.ts
+export const { GET, POST, DELETE, OPTIONS } = app.mcp()
+
+// app/api/trpc/[trpc]/route.ts
+export const { GET, POST, OPTIONS } = app.trpc()`}</code></pre>
+  <p>
+    <code>typeof app.Router</code> carries the fully typed <code>AppRouter</code> for
+    <code>createTRPCClient</code>, so your frontend gets end-to-end types with no manual plumbing.
+    It is App Router only and has no <code>next</code> or <code>react</code> dependency - the handlers
+    are Web-Standard <code>Request</code> / <code>Response</code>.
+  </p>
+
+  <h2 id="standalone">Standalone - compose it yourself</h2>
+  <p>
+    You do not need a host framework. Compose the fluent builder directly, pick whichever adapters
+    fit, and run it as a Node process, a container, or a serverless function. Chain unlimited
+    adapters, gate actions per transport with <code>isEnabled</code>, and drop into Astro, Vercel, or
+    Cloudflare Workers via the fetch handlers. See <a href="/docs#integration-standalone">standalone usage</a>.
+  </p>
+
+  <h2 id="ai-sdk">Vercel AI SDK - useChat over tRPC</h2>
+  <p>
+    <a href="/docs#integration-ai-sdk">@silkweave/ai</a> bridges the Vercel AI SDK's
+    <code>useChat</code> to a Silkweave streaming action over a tRPC subscription, skipping the Data
+    Stream Protocol entirely. <code>createChatAction()</code> wraps <code>streamText</code> into a
+    streaming action; <code>silkweaveTransport()</code> adapts the subscription into the
+    <code>ReadableStream</code> that <code>useChat</code> consumes - typed chunks, no
+    <code>/api/chat</code> route.
+  </p>
+
+  <h2 id="next">Keep exploring</h2>
+  <ul class="next-links">
+    <li><a href="/how-it-works">How it works &rarr;<br /><span>The Action model</span></a></li>
+    <li><a href="/adapters">Adapters &rarr;<br /><span>The underlying transports</span></a></li>
+    <li><a href="/docs#integration-nestjs">Integration docs &rarr;<br /><span>Setup & options</span></a></li>
+  </ul>
+</PageLayout>

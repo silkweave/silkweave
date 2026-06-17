@@ -1,0 +1,112 @@
+---
+import PageLayout from '../layouts/PageLayout.astro'
+
+export const prerender = true
+
+const slug = 'how-it-works'
+const title = 'How It Works: The Action Model'
+const eyebrow = 'How It Works'
+const heading = 'One action. Every transport.'
+const description =
+  'How Silkweave works: define an Action once with a Zod schema and an async handler, then expose it through any adapter - MCP, REST, tRPC, or CLI - via a fluent builder.'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.silkweave.dev' },
+    { '@type': 'ListItem', position: 2, name: 'How It Works', item: 'https://www.silkweave.dev/how-it-works' }
+  ]
+}
+---
+
+<PageLayout
+  title={title}
+  description={description}
+  slug={slug}
+  eyebrow={eyebrow}
+  heading={heading}
+  intro="Silkweave has one core idea: write your business logic once as an Action, then let adapters project it onto whatever transport an agent or human needs. No transport code leaks into your logic, and adding a new door never means rewriting the room behind it."
+  jsonLd={jsonLd}
+>
+  <h2 id="the-three-pieces">The three pieces</h2>
+  <p>
+    Everything in Silkweave is a composition of three concepts. Learn these and the rest of the
+    toolkit is just adapters that follow the same contract.
+  </p>
+
+  <h3>1. Action - what your code does</h3>
+  <p>
+    An <strong>Action</strong> is a named operation with a Zod <code>input</code> schema, an
+    optional <code>output</code> schema, and an async <code>run(input, context)</code> function.
+    Actions are deliberately transport-agnostic: they never import an HTTP framework, never read a
+    socket, never format an MCP result. They receive a typed <code>context</code> (logger, auth,
+    request metadata) and return plain data.
+  </p>
+  <pre><code>{`export const GreetAction = createAction({
+  name: 'greet',
+  description: 'Greet a person by name',
+  input: z.object({ name: z.string() }),
+  output: z.object({ message: z.string() }),
+  run: async ({ name }, { logger }) => {
+    logger.info('greeting', { name })
+    return { message: \`Hello, \${name}!\` }
+  }
+})`}</code></pre>
+  <p>
+    Because the schema is Zod, you get runtime validation, static type inference, and generated docs
+    from a single declaration. The same schema drives MCP tool definitions, OpenAPI specs, tRPC
+    procedure types, and CLI option parsing.
+  </p>
+
+  <h3>2. Adapter - the door to a transport</h3>
+  <p>
+    An <strong>Adapter</strong> translates actions into one specific transport. It takes config,
+    receives your actions at <code>start()</code>, and owns all the protocol-specific work -
+    registering MCP tools in <code>PascalCase</code>, building Fastify routes, mapping Zod types to
+    CLI flags. Each adapter is a separate package, so you only install the transports you actually
+    ship.
+  </p>
+
+  <h3>3. Silkweave - the fluent builder</h3>
+  <p>
+    <strong>Silkweave</strong> is the builder that wires actions to adapters:
+  </p>
+  <pre><code>{`silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())
+  .action(GreetAction)
+  .start()`}</code></pre>
+  <p>
+    The builder is generic over the actions you add, so <code>typeof server</code> carries every
+    action's name and type forward. That is what lets type-aware adapters like tRPC infer a fully
+    typed router with zero hand-written glue.
+  </p>
+
+  <h2 id="why-this-matters">Why decouple logic from transport?</h2>
+  <p>
+    Agents need services, and services need many doors: an MCP tool for a coding agent, a REST
+    endpoint for a dashboard, a tRPC procedure for your own frontend, a CLI for local scripting.
+    Built the usual way, each door is a fresh re-implementation of the same logic, drifting out of
+    sync over time.
+  </p>
+  <p>
+    Silkweave collapses that to one definition and N adapters. Validation, types, auth, logging, and
+    context are shared; only the wire format differs. Add a transport later and your existing actions
+    light up on it for free.
+  </p>
+
+  <h2 id="streaming">Streaming actions</h2>
+  <p>
+    An action can also stream. Declare a <code>chunk</code> schema and make <code>run</code> an
+    <code>async function*</code> that yields chunks. Adapters detect this automatically and switch to
+    per-chunk delivery: MCP progress notifications, SSE or NDJSON over REST, or a tRPC subscription -
+    same action, transport-appropriate streaming. See <a href="/docs#streaming">streaming in the docs</a>.
+  </p>
+
+  <h2 id="next">Keep exploring</h2>
+  <ul class="next-links">
+    <li><a href="/adapters">Adapters &rarr;<br /><span>The seven transports, compared</span></a></li>
+    <li><a href="/integrations">Integrations &rarr;<br /><span>NestJS, Next.js & standalone</span></a></li>
+    <li><a href="/docs#actions">Action reference &rarr;<br /><span>Full API in the docs</span></a></li>
+  </ul>
+</PageLayout>

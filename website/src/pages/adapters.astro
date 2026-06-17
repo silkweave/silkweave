@@ -1,0 +1,108 @@
+---
+import PageLayout from '../layouts/PageLayout.astro'
+
+export const prerender = true
+
+const slug = 'adapters'
+const title = 'Adapters: One Action, Every Transport'
+const eyebrow = 'Adapters'
+const heading = 'Same action. Seven adapters.'
+const description =
+  'Silkweave adapters expose your actions over MCP (stdio & streamable HTTP), Fastify REST with Swagger, tRPC, a CLI, and Vercel serverless - each a separate package you opt into.'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.silkweave.dev' },
+    { '@type': 'ListItem', position: 2, name: 'Adapters', item: 'https://www.silkweave.dev/adapters' }
+  ]
+}
+
+const adapters = [
+  {
+    name: 'MCP stdio',
+    pkg: '@silkweave/mcp',
+    href: '/docs#adapter-mcp-stdio',
+    body: 'Run actions as Model Context Protocol tools over stdin/stdout - the transport Claude Desktop, Cursor, and most local agents speak. Tools are registered in PascalCase from your action names.'
+  },
+  {
+    name: 'MCP streamable HTTP',
+    pkg: '@silkweave/mcp',
+    href: '/docs#adapter-mcp-http',
+    body: 'The same MCP tools over Streamable HTTP with session management, ready for remote agents. Pairs with @silkweave/auth for bearer tokens or full OAuth 2.1.'
+  },
+  {
+    name: 'Fastify REST',
+    pkg: '@silkweave/fastify',
+    href: '/docs#adapter-fastify',
+    body: 'Turn actions into a REST API with auto-generated OpenAPI and an interactive Swagger UI. Map a single input schema across path params, query string, and body with method/path/queryParams.'
+  },
+  {
+    name: 'tRPC',
+    pkg: '@silkweave/trpc',
+    href: '/docs#adapter-trpc',
+    body: 'Each action becomes a typed tRPC procedure - query or mutation by kind. Export InferTrpcRouter<typeof server> for an end-to-end typed client with no codegen step.'
+  },
+  {
+    name: 'CLI',
+    pkg: '@silkweave/cli',
+    href: '/docs#adapter-cli',
+    body: 'Expose actions as a command-line tool with Commander and Clack prompts. Zod types map to flags and arguments; commands use kebab-case.'
+  },
+  {
+    name: 'Vercel serverless',
+    pkg: '@silkweave/vercel',
+    href: '/docs#adapter-vercel',
+    body: 'Stateless MCP over Streamable HTTP on Web Standard Request/Response - deploy to Vercel, Cloudflare Workers, or Bun with zero lock-in.'
+  }
+]
+---
+
+<PageLayout
+  title={title}
+  description={description}
+  slug={slug}
+  eyebrow={eyebrow}
+  heading={heading}
+  intro="An adapter is a single transport. Chain as many as you like onto one Silkweave instance and the same actions are served everywhere at once - an MCP tool for the agent, a REST endpoint for the dashboard, a CLI for your terminal - all from one definition."
+  jsonLd={jsonLd}
+>
+  <h2 id="how-adapters-compose">How adapters compose</h2>
+  <p>
+    Adapters are additive. You add them to the builder and call <code>.start()</code> once; each
+    adapter receives the full action set and registers it in its own dialect. Per-action
+    <code>isEnabled</code> filtering lets you gate an action to specific transports - say, an admin
+    action that is exposed over the CLI but not over public MCP.
+  </p>
+  <pre><code>{`silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())     // MCP for the agent
+  .adapter(fastify())   // REST for the dashboard
+  .adapter(trpc())      // typed procedures for the frontend
+  .action(GreetAction)
+  .start()`}</code></pre>
+
+  <h2 id="the-adapters">The adapters</h2>
+  {adapters.map((a) => (
+    <>
+      <h3>{a.name}</h3>
+      <p>{a.body}</p>
+      <p><a href={a.href}>{a.name} in the docs &rarr;</a> &nbsp;<code>{a.pkg}</code></p>
+    </>
+  ))}
+
+  <h2 id="streaming">Streaming, per transport</h2>
+  <p>
+    A streaming action (an <code>async function*</code> with a <code>chunk</code> schema) is
+    delivered the right way by each adapter: MCP <code>notifications/progress</code>, SSE or NDJSON
+    over Fastify, and native tRPC subscriptions. You write the generator once; the wire format is the
+    adapter's problem. See <a href="/docs#streaming">streaming</a>.
+  </p>
+
+  <h2 id="next">Keep exploring</h2>
+  <ul class="next-links">
+    <li><a href="/how-it-works">How it works &rarr;<br /><span>The Action model</span></a></li>
+    <li><a href="/integrations">Integrations &rarr;<br /><span>Framework-native projection</span></a></li>
+    <li><a href="/docs">Full documentation &rarr;<br /><span>Every adapter, in detail</span></a></li>
+  </ul>
+</PageLayout>

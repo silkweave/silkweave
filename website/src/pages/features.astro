@@ -1,0 +1,81 @@
+---
+import PageLayout from '../layouts/PageLayout.astro'
+
+export const prerender = true
+
+const slug = 'features'
+const title = 'Features: Built for Production'
+const eyebrow = 'Features'
+const heading = "Everything you need. Nothing you don't."
+const description =
+  'Silkweave features: Zod-powered schemas, built-in OAuth 2.1, auto-generated Swagger, typed context, streaming actions, Vercel AI SDK support, serverless deploys, a CLI, and build-time type generation.'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.silkweave.dev' },
+    { '@type': 'ListItem', position: 2, name: 'Features', item: 'https://www.silkweave.dev/features' }
+  ]
+}
+---
+
+<PageLayout
+  title={title}
+  description={description}
+  slug={slug}
+  eyebrow={eyebrow}
+  heading={heading}
+  intro="Silkweave is small on purpose, but the things you actually need to ship a real server are built in - validation, auth, context, streaming, and docs - and they work the same across every transport because they live in the action layer, not the adapter."
+  jsonLd={jsonLd}
+>
+  <h2 id="schemas-and-types">Schemas and types, from one declaration</h2>
+  <p>
+    Inputs and outputs are <strong>Zod schemas</strong>, so a single declaration gives you runtime
+    validation, static type inference, and generated documentation. There is no second source of
+    truth to keep in sync. <a href="/docs#actions">Actions</a> thread those types all the way to the
+    edges: the tRPC adapter infers a typed router, Fastify emits OpenAPI, and the
+    <a href="/docs#adapter-typegen">typegen</a> adapter writes <code>.d.ts</code> interfaces from your schemas
+    at build time - zero runtime cost.
+  </p>
+
+  <h2 id="auth">Authentication, built in</h2>
+  <p>
+    <code>@silkweave/auth</code> ships a full <strong>OAuth 2.1</strong> proxy - PKCE, refresh tokens,
+    dynamic client registration, and protected resource metadata (RFC 9728) - plus simple bearer-token
+    validation when that is all you need. It is the same auth layer across MCP HTTP, REST, and tRPC.
+    See <a href="/docs#authentication">authentication</a>.
+  </p>
+
+  <h2 id="context">Typed context, no globals</h2>
+  <p>
+    Every action receives a typed <strong>context</strong> bag - logger, auth, request metadata -
+    via a fluent <code>.set()</code> API. No module-level singletons, no hidden globals: what an
+    action can see is exactly what you passed it. Read more on <a href="/docs#context">context</a>.
+  </p>
+
+  <h2 id="streaming">Streaming and AI</h2>
+  <p>
+    <strong>Streaming actions</strong> yield chunks from an async generator, and each adapter delivers
+    them appropriately - MCP progress, SSE, NDJSON, or tRPC subscriptions
+    (<a href="/docs#streaming">streaming docs</a>). On top of that, the
+    <a href="/docs#integration-ai-sdk">Vercel AI SDK bridge</a> wires <code>useChat</code> straight to
+    a streaming action over a tRPC subscription - typed <code>UIMessageChunk</code>s, no Data Stream
+    Protocol, no bespoke chat route.
+  </p>
+
+  <h2 id="deploy-anywhere">Deploy anywhere</h2>
+  <p>
+    Expose the same actions as a <a href="/docs#adapter-cli">CLI</a> with interactive prompts, ship a
+    stateless MCP server to <a href="/docs#adapter-vercel">Vercel, Cloudflare Workers, or Bun</a> on
+    Web Standard APIs, or serve an auto-generated <a href="/docs#adapter-fastify">Swagger UI</a> from
+    your REST adapter. One codebase, every surface your users reach for.
+  </p>
+
+  <h2 id="next">Keep exploring</h2>
+  <ul class="next-links">
+    <li><a href="/how-it-works">How it works &rarr;<br /><span>The Action model</span></a></li>
+    <li><a href="/adapters">Adapters &rarr;<br /><span>Every transport</span></a></li>
+    <li><a href="/docs">Full documentation &rarr;<br /><span>API reference</span></a></li>
+  </ul>
+</PageLayout>

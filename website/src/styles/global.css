@@ -188,6 +188,23 @@ section {
 .token-import { color: #c084fc; }
 .token-from { color: #c084fc; }
 
+/* "Dive deeper" link that sends a homepage section to its deep-dive page */
+.section-deeper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 2.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--accent);
+  transition: gap 0.15s, color 0.15s;
+}
+
+.section-deeper:hover {
+  color: var(--accent-hover);
+  gap: 0.7rem;
+}
+
 @media (max-width: 768px) {
   :root {
     --section-gap: 4rem;
