@@ -190,12 +190,11 @@ const integrations = [
     font-weight: 500;
   }
 
-  .integration-card code {
-    font-size: 0.78rem;
-    padding: 0.05rem 0.3rem;
-    /* Brighter than --text-dim so inline code clears the 4.5:1 contrast bar on the card background */
-    color: #9a9ab0;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 3px;
+  /* Card inline code is injected via set:html, so it carries no Astro scoping
+     attribute - it must be targeted with :global() to be matched at all. Inside the
+     dim card text it inherits --text-dim (#7e7e94 ⇒ only 4.03:1 on --accent-bg);
+     use full-strength --text so it reads clearly and clears the 4.5:1 WCAG AA bar. */
+  .integration-card :global(code) {
+    color: var(--text);
   }
 </style>
