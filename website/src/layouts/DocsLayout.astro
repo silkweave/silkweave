@@ -5,9 +5,15 @@ import Footer from '../components/Footer.astro'
 
 interface Props {
   title?: string
+  description?: string
+  slug?: string
 }
 
-const { title = 'Documentation - Silkweave' } = Astro.props
+const {
+  title = 'Documentation - Silkweave',
+  description = 'Silkweave documentation - actions, adapters, and integrations for building MCP servers and CLI tools from a single set of Actions.',
+  slug = 'docs'
+} = Astro.props
 
 const sections = [
   { id: 'getting-started', label: 'Getting Started', children: [
@@ -59,7 +65,7 @@ const sections = [
 ]
 ---
 
-<Layout title={title}>
+<Layout title={title} description={description} slug={slug}>
   <Nav />
   <div class="docs-wrapper">
     <aside class="docs-sidebar">
