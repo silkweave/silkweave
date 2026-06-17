@@ -1,12 +1,13 @@
 ---
 import PageLayout from '../layouts/PageLayout.astro'
+import { hl } from '../lib/highlight.ts'
 
 export const prerender = true
 
 const slug = 'integrations'
 const title = 'Integrations: NestJS, Next.js & More'
 const eyebrow = 'Integrations'
-const heading = 'Native to the framework you already use.'
+const heading = 'Native to the framework <span class="grad">you already use.</span>'
 const description =
   'Silkweave integrations make actions feel native to your stack: expose NestJS controllers as MCP tools with one @Mcp decorator, project an action set onto Next.js App Router as MCP + tRPC, or compose adapters standalone.'
 
@@ -18,6 +19,21 @@ const jsonLd = {
     { '@type': 'ListItem', position: 2, name: 'Integrations', item: 'https://www.silkweave.dev/integrations' }
   ]
 }
+
+const nestCode = `@Controller('users')
+export class UsersController {
+  @Get(':id')
+  @Mcp({ description: 'Fetch a user by id' })
+  findOne(@Param('id') id: string) {
+    return this.users.find(id)
+  }
+}`
+
+const nextCode = `// app/api/mcp/[[...slug]]/route.ts
+export const { GET, POST, DELETE, OPTIONS } = app.mcp()
+
+// app/api/trpc/[trpc]/route.ts
+export const { GET, POST, OPTIONS } = app.trpc()`
 ---
 
 <PageLayout
@@ -26,32 +42,40 @@ const jsonLd = {
   slug={slug}
   eyebrow={eyebrow}
   heading={heading}
-  intro="Adapters are one transport each. Integrations compose them with the conventions of a host framework - decorators, dependency injection, file-based routing - so Silkweave feels native rather than bolted on. They go in two directions: reflect an existing app into MCP, or project actions onto a framework's routes."
+  intro="Adapters are one transport each. Integrations compose them with the conventions of a host framework - decorators, dependency injection, file-based routing - so Silkweave feels native rather than bolted on."
   jsonLd={jsonLd}
 >
+  <h2 id="two-directions">Two directions</h2>
+  <p class="lead-p">Integrations meet your codebase wherever it is - reflecting an existing app into MCP, or projecting fresh actions onto a framework's routes.</p>
+  <ul class="dd-cards">
+    <li class="dd-card">
+      <div class="dd-card-title">Reflect &rarr; MCP</div>
+      <p>Already have controllers? <strong>NestJS</strong> reads the route and decorators you wrote and
+      exposes them as MCP tools. Nothing re-declared.</p>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Project &rarr; everywhere</div>
+      <p>Starting fresh? <strong>Next.js</strong> and the standalone builder take one action set and
+      project it onto MCP, tRPC, REST, and more.</p>
+    </li>
+  </ul>
+
   <h2 id="nestjs">NestJS - reflect controllers into MCP tools</h2>
   <p>
     The <a href="/docs#integration-nestjs">NestJS integration</a> is <strong>additive controller
     reflection</strong>. Add <code>@Mcp()</code> to a route a controller already has, and it becomes
-    an MCP tool - nothing is re-declared. The tool's name, description, and input schema are
-    reflected from metadata the method already carries: the route and <code>@Param</code> /
-    <code>@Query</code> / <code>@Body</code> decorators, plus <code>@nestjs/swagger</code> and
-    <code>class-validator</code> annotations (and an optional OpenAPI document).
+    an MCP tool - nothing is re-declared. The tool's name, description, and input schema are reflected
+    from metadata the method already carries: the route and <code>@Param</code> / <code>@Query</code> /
+    <code>@Body</code> decorators, plus <code>@nestjs/swagger</code> and <code>class-validator</code>
+    annotations (and an optional OpenAPI document).
   </p>
-  <pre><code>{`@Controller('users')
-export class UsersController {
-  @Get(':id')
-  @Mcp({ description: 'Fetch a user by id' })
-  findOne(@Param('id') id: string) {
-    return this.users.find(id)
-  }
-}`}</code></pre>
-  <p>
-    On a tool call the validated input is re-bound into the method's positional arguments, guards run
-    first, and a header-reading <code>@UseGuards()</code> guard sees the inbound tool-call headers -
-    so the same auth that protects your REST route protects it over MCP. Your controllers keep serving
-    HTTP unchanged.
-  </p>
+  <pre><code set:html={hl(nestCode)} /></pre>
+  <div class="callout tip">
+    <span class="callout-icon">🔐</span>
+    <p>On a tool call, guards run first and a header-reading <code>@UseGuards()</code> sees the inbound
+    tool-call headers - so the same auth that protects your REST route protects it over MCP. Your
+    controllers keep serving HTTP unchanged.</p>
+  </div>
 
   <h2 id="nextjs">Next.js - one action set, MCP and tRPC</h2>
   <p>
@@ -61,11 +85,7 @@ export class UsersController {
     <code>app.mcp()</code> (MCP tools for agents) and <code>app.trpc()</code> (a typed tRPC endpoint
     for your frontend) - a single source of truth serving both audiences.
   </p>
-  <pre><code>{`// app/api/mcp/[[...slug]]/route.ts
-export const { GET, POST, DELETE, OPTIONS } = app.mcp()
-
-// app/api/trpc/[trpc]/route.ts
-export const { GET, POST, OPTIONS } = app.trpc()`}</code></pre>
+  <pre><code set:html={hl(nextCode)} /></pre>
   <p>
     <code>typeof app.Router</code> carries the fully typed <code>AppRouter</code> for
     <code>createTRPCClient</code>, so your frontend gets end-to-end types with no manual plumbing.
@@ -76,9 +96,9 @@ export const { GET, POST, OPTIONS } = app.trpc()`}</code></pre>
   <h2 id="standalone">Standalone - compose it yourself</h2>
   <p>
     You do not need a host framework. Compose the fluent builder directly, pick whichever adapters
-    fit, and run it as a Node process, a container, or a serverless function. Chain unlimited
-    adapters, gate actions per transport with <code>isEnabled</code>, and drop into Astro, Vercel, or
-    Cloudflare Workers via the fetch handlers. See <a href="/docs#integration-standalone">standalone usage</a>.
+    fit, and run it as a Node process, a container, or a serverless function. Chain unlimited adapters,
+    gate actions per transport with <code>isEnabled</code>, and drop into Astro, Vercel, or Cloudflare
+    Workers via the fetch handlers. See <a href="/docs#integration-standalone">standalone usage</a>.
   </p>
 
   <h2 id="ai-sdk">Vercel AI SDK - useChat over tRPC</h2>
@@ -93,8 +113,8 @@ export const { GET, POST, OPTIONS } = app.trpc()`}</code></pre>
 
   <h2 id="next">Keep exploring</h2>
   <ul class="next-links">
-    <li><a href="/how-it-works">How it works &rarr;<br /><span>The Action model</span></a></li>
-    <li><a href="/adapters">Adapters &rarr;<br /><span>The underlying transports</span></a></li>
-    <li><a href="/docs#integration-nestjs">Integration docs &rarr;<br /><span>Setup & options</span></a></li>
+    <li><a href="/how-it-works">How it works &rarr;<span>The Action model</span></a></li>
+    <li><a href="/adapters">Adapters &rarr;<span>The underlying transports</span></a></li>
+    <li><a href="/docs#integration-nestjs">Integration docs &rarr;<span>Setup &amp; options</span></a></li>
   </ul>
 </PageLayout>

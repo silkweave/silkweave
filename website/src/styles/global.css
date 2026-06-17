@@ -188,21 +188,29 @@ section {
 .token-import { color: #c084fc; }
 .token-from { color: #c084fc; }
 
-/* "Dive deeper" link that sends a homepage section to its deep-dive page */
+/* "Dive deeper" button that sends a homepage section to its deep-dive page.
+   Centered outline button, styled like the header "Read the Docs" CTA. */
 .section-deeper {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 2.5rem;
-  font-size: 0.95rem;
+  gap: 0.5rem;
+  margin: 3rem auto 0;
+  padding: 0.7rem 1.6rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
   font-weight: 600;
-  color: var(--accent);
-  transition: gap 0.15s, color 0.15s;
+  color: var(--text);
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s, gap 0.15s;
 }
 
 .section-deeper:hover {
-  color: var(--accent-hover);
-  gap: 0.7rem;
+  background: var(--bg-surface);
+  border-color: var(--accent);
+  color: var(--text);
+  gap: 0.8rem;
 }
 
 @media (max-width: 768px) {

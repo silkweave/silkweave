@@ -1,12 +1,13 @@
 ---
 import PageLayout from '../layouts/PageLayout.astro'
+import { hl } from '../lib/highlight.ts'
 
 export const prerender = true
 
 const slug = 'how-it-works'
 const title = 'How It Works: The Action Model'
 const eyebrow = 'How It Works'
-const heading = 'One action. Every transport.'
+const heading = 'One action. <span class="grad">Every transport.</span>'
 const description =
   'How Silkweave works: define an Action once with a Zod schema and an async handler, then expose it through any adapter - MCP, REST, tRPC, or CLI - via a fluent builder.'
 
@@ -18,6 +19,22 @@ const jsonLd = {
     { '@type': 'ListItem', position: 2, name: 'How It Works', item: 'https://www.silkweave.dev/how-it-works' }
   ]
 }
+
+const actionCode = `export const GreetAction = createAction({
+  name: 'greet',
+  description: 'Greet a person by name',
+  input: z.object({ name: z.string() }),
+  output: z.object({ message: z.string() }),
+  run: async ({ name }, { logger }) => {
+    logger.info('greeting', { name })
+    return { message: \`Hello, \${name}!\` }
+  }
+})`
+
+const builderCode = `silkweave({ name: 'my-server', version: '1.0.0' })
+  .adapter(stdio())
+  .action(GreetAction)
+  .start()`
 ---
 
 <PageLayout
@@ -30,52 +47,60 @@ const jsonLd = {
   jsonLd={jsonLd}
 >
   <h2 id="the-three-pieces">The three pieces</h2>
-  <p>
+  <p class="lead-p">
     Everything in Silkweave is a composition of three concepts. Learn these and the rest of the
     toolkit is just adapters that follow the same contract.
   </p>
 
-  <h3>1. Action - what your code does</h3>
-  <p>
-    An <strong>Action</strong> is a named operation with a Zod <code>input</code> schema, an
-    optional <code>output</code> schema, and an async <code>run(input, context)</code> function.
-    Actions are deliberately transport-agnostic: they never import an HTTP framework, never read a
-    socket, never format an MCP result. They receive a typed <code>context</code> (logger, auth,
-    request metadata) and return plain data.
-  </p>
-  <pre><code>{`export const GreetAction = createAction({
-  name: 'greet',
-  description: 'Greet a person by name',
-  input: z.object({ name: z.string() }),
-  output: z.object({ message: z.string() }),
-  run: async ({ name }, { logger }) => {
-    logger.info('greeting', { name })
-    return { message: \`Hello, \${name}!\` }
-  }
-})`}</code></pre>
-  <p>
-    Because the schema is Zod, you get runtime validation, static type inference, and generated docs
-    from a single declaration. The same schema drives MCP tool definitions, OpenAPI specs, tRPC
-    procedure types, and CLI option parsing.
-  </p>
+  <ul class="dd-cards">
+    <li class="dd-card">
+      <span class="dd-num">1</span>
+      <div class="dd-card-title">Action</div>
+      <p>What your code does. A Zod <code>input</code> schema, an optional <code>output</code>, and an
+      async <code>run()</code> - and nothing about transports.</p>
+    </li>
+    <li class="dd-card">
+      <span class="dd-num">2</span>
+      <div class="dd-card-title">Adapter</div>
+      <p>The door to one transport. It takes your actions and speaks the protocol - MCP tools, REST
+      routes, CLI flags - so your logic never has to.</p>
+    </li>
+    <li class="dd-card">
+      <span class="dd-num">3</span>
+      <div class="dd-card-title">Silkweave</div>
+      <p>The fluent builder that wires actions to adapters and carries every action's types forward to
+      type-aware adapters like tRPC.</p>
+    </li>
+  </ul>
 
-  <h3>2. Adapter - the door to a transport</h3>
+  <h2 id="action">1. Action - what your code does</h2>
+  <p>
+    An <strong>Action</strong> is a named operation with a Zod <code>input</code> schema, an optional
+    <code>output</code> schema, and an async <code>run(input, context)</code> function. Actions are
+    deliberately transport-agnostic: they never import an HTTP framework, never read a socket, never
+    format an MCP result. They receive a typed <code>context</code> (logger, auth, request metadata)
+    and return plain data.
+  </p>
+  <pre><code set:html={hl(actionCode)} /></pre>
+  <div class="callout">
+    <span class="callout-icon">✦</span>
+    <p>Because the schema is Zod, one declaration drives MCP tool definitions, OpenAPI specs, tRPC
+    procedure types, <em>and</em> CLI option parsing - validation and types for free, no second source
+    of truth.</p>
+  </div>
+
+  <h2 id="adapter">2. Adapter - the door to a transport</h2>
   <p>
     An <strong>Adapter</strong> translates actions into one specific transport. It takes config,
     receives your actions at <code>start()</code>, and owns all the protocol-specific work -
     registering MCP tools in <code>PascalCase</code>, building Fastify routes, mapping Zod types to
     CLI flags. Each adapter is a separate package, so you only install the transports you actually
-    ship.
+    ship. <a href="/adapters">See all seven adapters &rarr;</a>
   </p>
 
-  <h3>3. Silkweave - the fluent builder</h3>
-  <p>
-    <strong>Silkweave</strong> is the builder that wires actions to adapters:
-  </p>
-  <pre><code>{`silkweave({ name: 'my-server', version: '1.0.0' })
-  .adapter(stdio())
-  .action(GreetAction)
-  .start()`}</code></pre>
+  <h2 id="silkweave">3. Silkweave - the fluent builder</h2>
+  <p><strong>Silkweave</strong> is the builder that wires actions to adapters:</p>
+  <pre><code set:html={hl(builderCode)} /></pre>
   <p>
     The builder is generic over the actions you add, so <code>typeof server</code> carries every
     action's name and type forward. That is what lets type-aware adapters like tRPC infer a fully
@@ -105,8 +130,8 @@ const jsonLd = {
 
   <h2 id="next">Keep exploring</h2>
   <ul class="next-links">
-    <li><a href="/adapters">Adapters &rarr;<br /><span>The seven transports, compared</span></a></li>
-    <li><a href="/integrations">Integrations &rarr;<br /><span>NestJS, Next.js & standalone</span></a></li>
-    <li><a href="/docs#actions">Action reference &rarr;<br /><span>Full API in the docs</span></a></li>
+    <li><a href="/adapters">Adapters &rarr;<span>The seven transports, compared</span></a></li>
+    <li><a href="/integrations">Integrations &rarr;<span>NestJS, Next.js &amp; standalone</span></a></li>
+    <li><a href="/docs#actions">Action reference &rarr;<span>Full API in the docs</span></a></li>
   </ul>
 </PageLayout>

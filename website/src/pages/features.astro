@@ -6,7 +6,7 @@ export const prerender = true
 const slug = 'features'
 const title = 'Features: Built for Production'
 const eyebrow = 'Features'
-const heading = "Everything you need. Nothing you don't."
+const heading = 'Everything you need. <span class="grad">Nothing you don\'t.</span>'
 const description =
   'Silkweave features: Zod-powered schemas, built-in OAuth 2.1, auto-generated Swagger, typed context, streaming actions, Vercel AI SDK support, serverless deploys, a CLI, and build-time type generation.'
 
@@ -32,50 +32,76 @@ const jsonLd = {
   <h2 id="schemas-and-types">Schemas and types, from one declaration</h2>
   <p>
     Inputs and outputs are <strong>Zod schemas</strong>, so a single declaration gives you runtime
-    validation, static type inference, and generated documentation. There is no second source of
-    truth to keep in sync. <a href="/docs#actions">Actions</a> thread those types all the way to the
-    edges: the tRPC adapter infers a typed router, Fastify emits OpenAPI, and the
-    <a href="/docs#adapter-typegen">typegen</a> adapter writes <code>.d.ts</code> interfaces from your schemas
-    at build time - zero runtime cost.
+    validation, static type inference, and generated documentation. There is no second source of truth
+    to keep in sync.
   </p>
+  <ul class="dd-cards">
+    <li class="dd-card">
+      <div class="dd-card-title">Zod-powered schemas</div>
+      <p>Validation, type inference, and docs from one input/output declaration per action.</p>
+      <a class="dd-card-link" href="/docs#actions">Actions &rarr;</a>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Typed context, no globals</div>
+      <p>A fluent <code>.set()</code> API hands each action a typed bag - logger, auth, request - with no module singletons.</p>
+      <a class="dd-card-link" href="/docs#context">Context &rarr;</a>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Build-time type generation</div>
+      <p>Emit <code>.d.ts</code> interfaces from your Zod schemas at build time. Zero runtime cost.</p>
+      <a class="dd-card-link" href="/docs#adapter-typegen">Typegen &rarr;</a>
+    </li>
+  </ul>
 
   <h2 id="auth">Authentication, built in</h2>
   <p>
     <code>@silkweave/auth</code> ships a full <strong>OAuth 2.1</strong> proxy - PKCE, refresh tokens,
     dynamic client registration, and protected resource metadata (RFC 9728) - plus simple bearer-token
     validation when that is all you need. It is the same auth layer across MCP HTTP, REST, and tRPC.
-    See <a href="/docs#authentication">authentication</a>.
   </p>
-
-  <h2 id="context">Typed context, no globals</h2>
-  <p>
-    Every action receives a typed <strong>context</strong> bag - logger, auth, request metadata -
-    via a fluent <code>.set()</code> API. No module-level singletons, no hidden globals: what an
-    action can see is exactly what you passed it. Read more on <a href="/docs#context">context</a>.
-  </p>
+  <div class="callout tip">
+    <span class="callout-icon">🔐</span>
+    <p>Auth lives in the action/context layer, so a guard you write once applies the same way whether a
+    request arrives over REST, tRPC, or an MCP tool call. See <a href="/docs#authentication">authentication</a>.</p>
+  </div>
 
   <h2 id="streaming">Streaming and AI</h2>
-  <p>
-    <strong>Streaming actions</strong> yield chunks from an async generator, and each adapter delivers
-    them appropriately - MCP progress, SSE, NDJSON, or tRPC subscriptions
-    (<a href="/docs#streaming">streaming docs</a>). On top of that, the
-    <a href="/docs#integration-ai-sdk">Vercel AI SDK bridge</a> wires <code>useChat</code> straight to
-    a streaming action over a tRPC subscription - typed <code>UIMessageChunk</code>s, no Data Stream
-    Protocol, no bespoke chat route.
-  </p>
+  <ul class="dd-cards">
+    <li class="dd-card">
+      <div class="dd-card-title">Streaming actions</div>
+      <p>Yield chunks from an async generator; each adapter delivers them as MCP progress, SSE, NDJSON, or tRPC subscriptions.</p>
+      <a class="dd-card-link" href="/docs#streaming">Streaming &rarr;</a>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Vercel AI SDK native</div>
+      <p><code>useChat</code> wired straight to a streaming action over tRPC - typed <code>UIMessageChunk</code>s, no Data Stream Protocol.</p>
+      <a class="dd-card-link" href="/docs#integration-ai-sdk">AI SDK &rarr;</a>
+    </li>
+  </ul>
 
   <h2 id="deploy-anywhere">Deploy anywhere</h2>
-  <p>
-    Expose the same actions as a <a href="/docs#adapter-cli">CLI</a> with interactive prompts, ship a
-    stateless MCP server to <a href="/docs#adapter-vercel">Vercel, Cloudflare Workers, or Bun</a> on
-    Web Standard APIs, or serve an auto-generated <a href="/docs#adapter-fastify">Swagger UI</a> from
-    your REST adapter. One codebase, every surface your users reach for.
-  </p>
+  <ul class="dd-cards">
+    <li class="dd-card">
+      <div class="dd-card-title">CLI with prompts</div>
+      <p>The same actions as a command-line tool with interactive Clack prompts.</p>
+      <a class="dd-card-link" href="/docs#adapter-cli">CLI &rarr;</a>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Serverless &amp; edge</div>
+      <p>Stateless MCP on Web Standard APIs - Vercel, Cloudflare Workers, or Bun.</p>
+      <a class="dd-card-link" href="/docs#adapter-vercel">Vercel adapter &rarr;</a>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Auto-generated Swagger</div>
+      <p>The Fastify adapter emits OpenAPI specs and an interactive Swagger UI for free.</p>
+      <a class="dd-card-link" href="/docs#adapter-fastify">REST adapter &rarr;</a>
+    </li>
+  </ul>
 
   <h2 id="next">Keep exploring</h2>
   <ul class="next-links">
-    <li><a href="/how-it-works">How it works &rarr;<br /><span>The Action model</span></a></li>
-    <li><a href="/adapters">Adapters &rarr;<br /><span>Every transport</span></a></li>
-    <li><a href="/docs">Full documentation &rarr;<br /><span>API reference</span></a></li>
+    <li><a href="/how-it-works">How it works &rarr;<span>The Action model</span></a></li>
+    <li><a href="/adapters">Adapters &rarr;<span>Every transport</span></a></li>
+    <li><a href="/docs">Full documentation &rarr;<span>API reference</span></a></li>
   </ul>
 </PageLayout>
