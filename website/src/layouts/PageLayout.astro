@@ -237,6 +237,25 @@ const { title, description, slug, eyebrow, heading, intro, jsonLd } = Astro.prop
     gap: 1.25rem;
   }
 
+  /* Tighter min so four peer cards sit on one row at desktop width */
+  .prose :global(.dd-cards-quad) {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+
+  .prose :global(.dd-card-logo) {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0 0 0.9rem;
+    flex-shrink: 0;
+  }
+
+  /* The Vercel mark is a currentColor (black) triangle - invert it to white
+     so it reads on the dark card, matching Vercel's own dark-mode treatment. */
+  .prose :global(.dd-card-logo-invert) {
+    filter: invert(1);
+  }
+
   /* Grid cells stretch so a card (whether the <li> itself or an <a> inside it)
      fills the cell to equal heights. */
   .prose :global(.dd-cards > li) {

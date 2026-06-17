@@ -33,7 +33,8 @@ const adapters = [
   { name: 'Fastify REST', pkg: '@silkweave/fastify', href: '/docs#adapter-fastify', body: 'Turn actions into a REST API with auto-generated OpenAPI and an interactive Swagger UI. Map one input schema across path params, query string, and body.' },
   { name: 'tRPC', pkg: '@silkweave/trpc', href: '/docs#adapter-trpc', body: 'Each action becomes a typed tRPC procedure - query or mutation by kind. Export InferTrpcRouter<typeof server> for an end-to-end typed client, no codegen.' },
   { name: 'CLI', pkg: '@silkweave/cli', href: '/docs#adapter-cli', body: 'Expose actions as a command-line tool with Commander and Clack prompts. Zod types map to flags and arguments; commands use kebab-case.' },
-  { name: 'Vercel serverless', pkg: '@silkweave/vercel', href: '/docs#adapter-vercel', body: 'Stateless MCP over Streamable HTTP on Web Standard Request/Response - deploy to Vercel, Cloudflare Workers, or Bun with zero lock-in.' }
+  { name: 'Vercel serverless', pkg: '@silkweave/vercel', href: '/docs#adapter-vercel', body: 'Stateless MCP over Streamable HTTP on Web Standard Request/Response - deploy to Vercel, Cloudflare Workers, or Bun with zero lock-in.' },
+  { name: 'Typegen', pkg: '@silkweave/typegen', href: '/docs#adapter-typegen', body: 'A build-time adapter: emit .d.ts interfaces from your action Zod schemas at build, for full type safety with zero runtime cost.' }
 ]
 ---
 
