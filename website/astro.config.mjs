@@ -8,7 +8,7 @@ const serverConditions = ['module', 'node', 'development|production']
 
 export default defineConfig({
   output: 'server',
-  adapter: vercel({ maxDuration: 60 }),
+  adapter: vercel({ maxDuration: 60, imageService: true }),
   site: 'https://www.silkweave.dev',
   outDir: './build',
   publicDir: './static',
