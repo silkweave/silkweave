@@ -9,9 +9,34 @@ import Integrations from '../components/Integrations.astro'
 import Features from '../components/Features.astro'
 import QuickStart from '../components/QuickStart.astro'
 import Footer from '../components/Footer.astro'
+
+// Keyword-led homepage title/description: lead with the search intent ("MCP servers",
+// "TypeScript"), keep the brand + tagline as the trailing hook.
+const title = 'Silkweave - TypeScript Toolkit for MCP Servers, REST APIs & CLI Tools'
+const description =
+  'Silkweave is an open-source TypeScript toolkit for building MCP (Model Context Protocol) servers, REST APIs, tRPC, and CLI tools from a single set of Actions. Define once, deploy everywhere - no framework lock-in.'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Silkweave',
+  description,
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'Node.js (cross-platform)',
+  url: 'https://www.silkweave.dev',
+  downloadUrl: 'https://www.npmjs.com/package/@silkweave/core',
+  license: 'https://github.com/silkweave/silkweave/blob/master/LICENSE',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  author: { '@type': 'Organization', name: 'Silkweave', url: 'https://github.com/silkweave' },
+  sameAs: [
+    'https://github.com/silkweave/silkweave',
+    'https://www.npmjs.com/org/silkweave',
+    'https://x.com/tstrebitzer'
+  ]
+}
 ---
 
-<Layout>
+<Layout title={title} description={description} jsonLd={jsonLd}>
   <Nav />
   <main>
     <Hero />

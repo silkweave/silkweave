@@ -9,6 +9,7 @@ interface Props {
   ogImage?: string
   slug?: string
   type?: string
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[]
 }
 
 const siteUrl = 'https://www.silkweave.dev'
@@ -19,11 +20,15 @@ const {
   keywords,
   ogImage,
   slug,
-  type = 'website'
+  type = 'website',
+  jsonLd
 } = Astro.props
 
 const canonicalUrl = slug ? `${siteUrl}/${slug}` : siteUrl
-const ogImageUrl = ogImage ? `${siteUrl}${ogImage}` : undefined
+// Every page falls back to the branded social card so shares always render an image.
+const usingDefaultOgImage = !ogImage
+const ogImageUrl = `${siteUrl}${ogImage ?? '/og.png'}`
+const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
 ---
 
 <!doctype html>
@@ -38,6 +43,7 @@ const ogImageUrl = ogImage ? `${siteUrl}${ogImage}` : undefined
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/logo-color.svg" />
     <link rel="apple-touch-icon" href="/logo-color.svg" />
+    <link rel="alternate" type="application/rss+xml" title="Silkweave Blog" href="/rss.xml" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -54,15 +60,24 @@ const ogImageUrl = ogImage ? `${siteUrl}${ogImage}` : undefined
       />
     </noscript>
 
+    <meta property="og:site_name" content="Silkweave" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canonicalUrl} />
-    {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+    <meta property="og:image" content={ogImageUrl} />
+    {usingDefaultOgImage && <meta property="og:image:width" content="1200" />}
+    {usingDefaultOgImage && <meta property="og:image:height" content="630" />}
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@tstrebitzer" />
+    <meta name="twitter:creator" content="@tstrebitzer" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
+    <meta name="twitter:image" content={ogImageUrl} />
+
+    {jsonLdBlocks.map((block) => (
+      <script type="application/ld+json" set:html={JSON.stringify(block)} />
+    ))}
   </head>
   <body>
     <slot />

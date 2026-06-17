@@ -15,6 +15,33 @@ const {
   slug = 'docs'
 } = Astro.props
 
+const siteUrl = 'https://www.silkweave.dev'
+const pageUrl = `${siteUrl}/${slug}`
+
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: title,
+    description,
+    url: pageUrl,
+    author: { '@type': 'Organization', name: 'Silkweave', url: 'https://github.com/silkweave' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Silkweave',
+      logo: { '@type': 'ImageObject', url: `${siteUrl}/logo-color.svg` }
+    }
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Docs', item: `${siteUrl}/docs` }
+    ]
+  }
+]
+
 const sections = [
   { id: 'getting-started', label: 'Getting Started', children: [
     { id: 'installation', label: 'Installation' },
@@ -65,7 +92,7 @@ const sections = [
 ]
 ---
 
-<Layout title={title} description={description} slug={slug}>
+<Layout title={title} description={description} slug={slug} jsonLd={jsonLd}>
   <Nav />
   <div class="docs-wrapper">
     <aside class="docs-sidebar">

@@ -14,6 +14,7 @@
     "prepack": "pnpm clean && pnpm build"
   },
   "dependencies": {
+    "@astrojs/rss": "^4.0.18",
     "@astrojs/vercel": "^10.0.4",
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
