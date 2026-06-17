@@ -234,7 +234,7 @@ const { title, description, slug, eyebrow, heading, intro, jsonLd } = Astro.prop
     margin: 1.75rem 0;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1rem;
+    gap: 1.25rem;
   }
 
   /* Grid cells stretch so a card (whether the <li> itself or an <a> inside it)
@@ -242,6 +242,11 @@ const { title, description, slug, eyebrow, heading, intro, jsonLd } = Astro.prop
   .prose :global(.dd-cards > li) {
     display: flex;
     margin: 0;
+  }
+
+  /* Only zero out the wrapper <li> when the card is an inner <a>; a bare
+     li.dd-card keeps its own padding. */
+  .prose :global(.dd-cards > li:not(.dd-card)) {
     padding: 0;
   }
 

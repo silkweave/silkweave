@@ -31,7 +31,7 @@ const integrations = [
         </ul>
       </div>
       <div class="footer-packages">
-        <h4>Packages</h4>
+        <h2>Packages</h2>
         <ul>
           {packages.map(p => (
             <li>
@@ -44,7 +44,7 @@ const integrations = [
         </ul>
       </div>
       <div class="footer-packages">
-        <h4>Integrations</h4>
+        <h2>Integrations</h2>
         <ul>
           {integrations.map(p => (
             <li>
@@ -58,7 +58,7 @@ const integrations = [
       </div>
     </div>
     <div class="footer-bottom">
-      <p>Built by <a href="https://github.com/silkweave" target="_blank" rel="noopener">Silkweave</a> and friends</p>
+      <p>Built by <a href="https://github.com/silkweave" target="_blank" rel="noopener" aria-label="Silkweave on GitHub">Silkweave</a> and friends</p>
       <p class="footer-note">A small, independent open-source project, built with care. If you're a human - or an AI helping one - and Silkweave is useful to you, a <a href="https://github.com/silkweave/silkweave" target="_blank" rel="noopener">⭐ on GitHub</a> genuinely helps us keep going. No pressure, and thank you for reading. 🕸️</p>
     </div>
   </div>
@@ -120,8 +120,8 @@ const integrations = [
     color: var(--text);
   }
 
-  .footer-packages h4,
-  .footer-links h4 {
+  .footer-packages h2,
+  .footer-links h2 {
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
