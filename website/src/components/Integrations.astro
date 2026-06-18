@@ -54,7 +54,7 @@ const integrations = [
       {integrations.map((i) => (
         <a href={i.href} class={`integration-card ${i.status === 'Coming soon' ? 'soon' : ''}`}>
           <div class="integration-header">
-            <img src={i.logo} alt="" class="integration-logo" width="40" height="40" />
+            <img src={i.logo} alt={`${i.label} logo`} class="integration-logo" width="40" height="40" />
             <h3 class="integration-name">{i.label}</h3>
             <span class={`integration-status ${i.status === 'Coming soon' ? 'soon' : i.status === 'Beta' ? 'beta' : 'stable'}`}>{i.status}</span>
           </div>

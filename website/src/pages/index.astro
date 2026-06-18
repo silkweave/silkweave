@@ -14,19 +14,22 @@ import Footer from '../components/Footer.astro'
 // "TypeScript"), keep the brand + tagline as the trailing hook.
 const title = 'Silkweave - TypeScript Toolkit for MCP Servers, REST APIs & CLI Tools'
 const description =
-  'Silkweave is an open-source TypeScript toolkit for building MCP (Model Context Protocol) servers, REST APIs, tRPC, and CLI tools from a single set of Actions. Define once, deploy everywhere - no framework lock-in.'
+  'Open-source TypeScript toolkit for building MCP servers, REST APIs, tRPC, and CLI tools from one set of Actions. Define once, deploy everywhere.'
 
+// Silkweave is an open-source TypeScript library distributed on npm, so it is modeled
+// as SoftwareSourceCode rather than SoftwareApplication: Google's "Software App" rich
+// result requires an aggregateRating/review we have no honest data for, and a code
+// toolkit is not an installable end-user app anyway.
 const jsonLd = {
   '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
+  '@type': 'SoftwareSourceCode',
   name: 'Silkweave',
   description,
-  applicationCategory: 'DeveloperApplication',
-  operatingSystem: 'Node.js (cross-platform)',
   url: 'https://www.silkweave.dev',
-  downloadUrl: 'https://www.npmjs.com/package/@silkweave/core',
+  codeRepository: 'https://github.com/silkweave/silkweave',
+  programmingLanguage: 'TypeScript',
+  runtimePlatform: 'Node.js',
   license: 'https://github.com/silkweave/silkweave/blob/master/LICENSE',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   author: { '@type': 'Organization', name: 'Silkweave', url: 'https://github.com/silkweave' },
   sameAs: [
     'https://github.com/silkweave/silkweave',

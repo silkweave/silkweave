@@ -798,7 +798,7 @@ export { GET, POST, DELETE }`)} /></pre>
   </section>
 
   <section id="integration-standalone">
-    <h3><img src="/logo-color.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Standalone</h3>
+    <h3><img src="/logo-color.svg" alt="Silkweave logo" class="integration-heading-logo" width="28" height="28" /> Standalone</h3>
     <p>The default. Compose the fluent builder yourself, pick whichever adapters fit, run it however you like - Node entrypoint, Docker container, serverless function, anywhere a Node process can boot.</p>
     <div class="code-block">
       <div class="code-block-header"><span>main.ts</span></div>
@@ -821,7 +821,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
   </section>
 
   <section id="integration-nestjs">
-    <h3><img src="/nestjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> NestJS</h3>
+    <h3><img src="/nestjs.svg" alt="NestJS logo" class="integration-heading-logo" width="28" height="28" /> NestJS</h3>
     <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes your <strong>existing NestJS controllers</strong> as MCP tools (<code>@Mcp()</code>) and end-to-end-typed <strong>tRPC procedures</strong> (<code>@Trpc()</code>). Add a decorator to a route handler and its name, description, and input schema are <strong>reflected</strong> from the route, the <code>@Param</code>/<code>@Query</code>/<code>@Body</code> decorators, and any <code>@nestjs/swagger</code> / <code>class-validator</code> metadata the method already carries. On a call the validated input is split back into the method's positional arguments and the handler is invoked directly, with <code>@UseGuards()</code> guards applied first. It is <strong>additive</strong> - controllers keep serving HTTP unchanged, and the same method can carry both <code>@Mcp()</code> (for agents) and <code>@Trpc()</code> (for your frontend).</p>
     <div class="code-block">
       <div class="code-block-header"><span>install</span></div>
@@ -932,7 +932,7 @@ export class AppModule {}`)} /></pre>
   </section>
 
   <section id="integration-nextjs">
-    <h3><img src="/nextjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Next.js</h3>
+    <h3><img src="/nextjs.svg" alt="Next.js logo" class="integration-heading-logo" width="28" height="28" /> Next.js</h3>
     <p>The <a href="https://www.npmjs.com/package/@silkweave/nextjs"><code>@silkweave/nextjs</code></a> package projects <strong>one action set</strong> onto Next.js <strong>App Router</strong> route handlers - <strong>MCP tools</strong> for agents and a typed <strong>tRPC endpoint</strong> for your frontend - from a single source of truth. It's <strong>action-first</strong> (define a Silkweave action, then mount it) and <strong>additive</strong> (it only adds route files). Under the hood it wraps <a href="#adapter-vercel"><code>vercel()</code></a> (MCP) and <a href="#adapter-trpc"><code>trpcFetch()</code></a>, adding catch-all path normalization and end-to-end tRPC types. App Router only; the package has no <code>next</code>/<code>react</code> dependency.</p>
     <h4>Install</h4>
     <div class="code-block">
@@ -996,7 +996,7 @@ const { users } = await trpc.listUsers.query({ activeOnly: true })`)} /></pre>
   </section>
 
   <section id="integration-ai-sdk">
-    <h3><img src="/vercel-ai.svg" alt="" class="integration-heading-logo" width="28" height="28" /> Vercel AI SDK</h3>
+    <h3><img src="/vercel-ai.svg" alt="Vercel AI SDK logo" class="integration-heading-logo" width="28" height="28" /> Vercel AI SDK</h3>
     <p>The <a href="https://www.npmjs.com/package/@silkweave/ai"><code>@silkweave/ai</code></a> package wires <a href="https://ai-sdk.dev">Vercel AI SDK</a>'s <code>useChat</code> hook to a <a href="#streaming">Silkweave streaming action</a> over a tRPC subscription. No <code>/api/chat</code> route, no AI SDK Data Stream Protocol parsing - <code>useChat</code> consumes <code>UIMessageChunk</code> objects directly from your typed tRPC client.</p>
     <p>The integration is two pieces:</p>
     <ul>

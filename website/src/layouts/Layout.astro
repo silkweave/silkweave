@@ -9,6 +9,7 @@ interface Props {
   ogImage?: string
   slug?: string
   type?: string
+  noindex?: boolean
   jsonLd?: Record<string, unknown> | Record<string, unknown>[]
 }
 
@@ -21,6 +22,7 @@ const {
   ogImage,
   slug,
   type = 'website',
+  noindex = false,
   jsonLd
 } = Astro.props
 
@@ -37,6 +39,7 @@ const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
     {keywords?.length && <meta name="keywords" content={keywords.join(', ')} />}
     <title>{title}</title>
 
