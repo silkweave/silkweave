@@ -30,7 +30,7 @@ export interface NestAdapterRegisterContext {
  */
 export interface NestSilkweaveAdapter {
   /** Adapter discriminator - set on the silkweave context as `ctx.get('adapter')`. */
-  readonly name: 'mcp'
+  readonly name: 'mcp' | 'trpc' | 'typegen'
   /** URL prefix the adapter mounts on (e.g. `'/mcp'`). Surfaced for introspection. */
   readonly basePath?: string
   /**
@@ -46,7 +46,7 @@ export interface NestSilkweaveAdapter {
 export interface SilkweaveModuleOptions {
   /** Identity for the silkweave instance - surfaced to MCP clients, OpenAPI, etc. */
   silkweave: SilkweaveOptions
-  /** Adapters to mount. Currently `mcp()`. */
+  /** Adapters to mount - any of `mcp()`, `trpc()`, `typegen()`. */
   adapters: NestSilkweaveAdapter[]
   /** Initial context keys merged into every adapter's `baseContext`. */
   context?: Record<string, unknown>

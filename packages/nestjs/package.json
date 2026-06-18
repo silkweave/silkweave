@@ -23,6 +23,21 @@
       "@silkweave/source": "./src/index.ts",
       "types": "./build/index.d.mts",
       "default": "./build/index.mjs"
+    },
+    "./mcp": {
+      "@silkweave/source": "./src/mcp.ts",
+      "types": "./build/mcp.d.mts",
+      "default": "./build/mcp.mjs"
+    },
+    "./trpc": {
+      "@silkweave/source": "./src/trpc.ts",
+      "types": "./build/trpc.d.mts",
+      "default": "./build/trpc.mjs"
+    },
+    "./typegen": {
+      "@silkweave/source": "./src/typegen.ts",
+      "types": "./build/typegen.d.mts",
+      "default": "./build/typegen.mjs"
     }
   },
   "scripts": {
@@ -38,10 +53,27 @@
     "@nestjs/common": "^10.0.0 || ^11.0.0",
     "@nestjs/core": "^10.0.0 || ^11.0.0",
     "@nestjs/swagger": "^7.0.0 || ^8.0.0 || ^11.0.0",
+    "rxjs": "^7.0.0",
+    "@silkweave/mcp": "workspace:^",
+    "@silkweave/trpc": "workspace:^",
+    "@silkweave/typegen": "workspace:^",
+    "@trpc/server": "^11.7.1",
     "class-validator": "^0.14.0 || ^0.15.0"
   },
   "peerDependenciesMeta": {
     "@nestjs/swagger": {
+      "optional": true
+    },
+    "@silkweave/mcp": {
+      "optional": true
+    },
+    "@silkweave/trpc": {
+      "optional": true
+    },
+    "@silkweave/typegen": {
+      "optional": true
+    },
+    "@trpc/server": {
       "optional": true
     },
     "class-validator": {
@@ -49,9 +81,7 @@
     }
   },
   "dependencies": {
-    "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "@silkweave/mcp": "workspace:*",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "zod": "^3.25.0"
@@ -61,7 +91,12 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
+    "@silkweave/auth": "workspace:*",
+    "@silkweave/mcp": "workspace:*",
+    "@silkweave/trpc": "workspace:*",
+    "@silkweave/typegen": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "@trpc/server": "^11.7.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",

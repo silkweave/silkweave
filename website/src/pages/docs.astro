@@ -471,7 +471,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
         </tr>
         <tr>
           <td>NestJS (<code>trpc</code>)</td>
-          <td>Same as tRPC above - an <code>async function*</code> <code>@Action</code> (with a <code>chunk</code> schema) is discovered as a streaming action and registered as a <code>.subscription()</code></td>
+          <td>Same as tRPC above - an <code>async function*</code> controller method carrying <code>@Trpc()</code> (with a <code>chunk</code> type) is discovered as a streaming action and registered as a <code>.subscription()</code></td>
           <td>Decorated method is an <code>async function*</code></td>
           <td>n/a</td>
         </tr>
@@ -822,17 +822,22 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 
   <section id="integration-nestjs">
     <h3><img src="/nestjs.svg" alt="" class="integration-heading-logo" width="28" height="28" /> NestJS</h3>
-    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes your <strong>existing NestJS controllers</strong> as MCP tools. Add a <code>@Mcp()</code> decorator to a route handler and its name, description, and input schema are <strong>reflected</strong> from the route, the <code>@Param</code>/<code>@Query</code>/<code>@Body</code> decorators, and any <code>@nestjs/swagger</code> / <code>class-validator</code> metadata the method already carries. On a tool call the validated input is split back into the method's positional arguments and the handler is invoked directly, with <code>@UseGuards()</code> guards applied first. It is <strong>additive</strong> - controllers keep serving HTTP unchanged, and removing <code>@Mcp()</code> fully reverts a method.</p>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes your <strong>existing NestJS controllers</strong> as MCP tools (<code>@Mcp()</code>) and end-to-end-typed <strong>tRPC procedures</strong> (<code>@Trpc()</code>). Add a decorator to a route handler and its name, description, and input schema are <strong>reflected</strong> from the route, the <code>@Param</code>/<code>@Query</code>/<code>@Body</code> decorators, and any <code>@nestjs/swagger</code> / <code>class-validator</code> metadata the method already carries. On a call the validated input is split back into the method's positional arguments and the handler is invoked directly, with <code>@UseGuards()</code> guards applied first. It is <strong>additive</strong> - controllers keep serving HTTP unchanged, and the same method can carry both <code>@Mcp()</code> (for agents) and <code>@Trpc()</code> (for your frontend).</p>
     <div class="code-block">
       <div class="code-block-header"><span>install</span></div>
-      <pre><code set:html={hl(`pnpm add @silkweave/core @silkweave/nestjs @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata`)} /></pre>
+      <pre><code set:html={hl(`pnpm add @silkweave/core @silkweave/nestjs @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata
+
+# then add only the adapter packages you use (each is an optional peer):
+pnpm add @silkweave/mcp        # if you use mcp()
+pnpm add @silkweave/trpc       # if you use trpc()
+pnpm add @silkweave/typegen    # if you use typegen()`)} /></pre>
     </div>
-    <p><code>@nestjs/swagger</code> and <code>class-validator</code> are <strong>optional</strong> peers - install whichever your DTOs already use; the reflector reads both and falls back to TypeScript <code>design:type</code>.</p>
+    <p>Adapters live behind <strong>subpath exports</strong> (<code>@silkweave/nestjs/mcp</code>, <code>/trpc</code>, <code>/typegen</code>) and their stacks are <strong>optional peer dependencies</strong>, so an MCP-only app never pulls in <code>@trpc/server</code> and a tRPC-only app never pulls in the MCP SDK. The decorators and module come from the root. <code>@nestjs/swagger</code> and <code>class-validator</code> are <strong>optional</strong> peers too - install whichever your DTOs already use; the reflector reads both and falls back to TypeScript <code>design:type</code>.</p>
     <div class="code-block">
       <div class="code-block-header"><span>users.controller.ts</span></div>
-      <pre><code set:html={hl(`import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
-import { ApiOperation, ApiParam, ApiProperty, ApiQuery } from '@nestjs/swagger'
-import { Mcp } from '@silkweave/nestjs'
+      <pre><code set:html={hl(`import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { ApiOkResponse, ApiOperation, ApiParam, ApiProperty } from '@nestjs/swagger'
+import { Mcp, Trpc } from '@silkweave/nestjs'
 import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator'
 
 class BanUserDto {
@@ -852,34 +857,44 @@ export class UsersController {
   @Get(':id')                            // ordinary REST route - unchanged
   @ApiOperation({ summary: 'Get a single user by ID' })
   @ApiParam({ name: 'id', description: 'User ID' })
-  @Mcp()                                 // ...also an MCP tool
+  @ApiOkResponse({ type: UserDto })      // drives the tRPC output type
+  @Mcp()                                 // ...also an MCP tool  (UsersGet)
+  @Trpc()                                // ...also a tRPC query (usersGet)
   get(@Param('id') id: string) {
     return this.db.getUser(id)
   }
 
   @Post(':id/ban')
   @ApiParam({ name: 'id', description: 'User ID' })
-  @UseGuards(AdminGuard)                 // runs on MCP too
+  @UseGuards(AuthGuard)                  // reads the real request (cookie/header) on tRPC; headers on MCP
   @Mcp({ description: 'Ban a user (admin only).' })
-  ban(@Param('id') id: string, @Body() body: BanUserDto) {
-    return this.db.ban(id, body.reason, body.permanent ?? false)
+  @Trpc({ description: 'Ban a user (admin only).' })   // → mutation usersBan
+  ban(@Param('id') id: string, @Body() body: BanUserDto, @Req() req: AppRequest) {
+    return this.db.ban(req.user, id, body.reason, body.permanent ?? false)
   }
 }`)} /></pre>
     </div>
     <div class="code-block">
       <div class="code-block-header"><span>app.module.ts</span></div>
       <pre><code set:html={hl(`import { Module } from '@nestjs/common'
-import { mcp, SilkweaveModule } from '@silkweave/nestjs'
+import { SilkweaveModule } from '@silkweave/nestjs'
+import { mcp } from '@silkweave/nestjs/mcp'
+import { trpc } from '@silkweave/nestjs/trpc'
+import { typegen } from '@silkweave/nestjs/typegen'
 
 @Module({
   imports: [
     SilkweaveModule.forRoot({
       silkweave: { name: 'my-app', description: 'My App', version: '1.0.0' },
-      adapters: [mcp({ basePath: '/mcp' })]
+      adapters: [
+        mcp({ basePath: '/mcp' }),                       // @Mcp  methods → MCP tools
+        trpc({ basePath: '/trpc' }),                     // @Trpc methods → tRPC procedures
+        typegen({ path: '../app/src/types/appRouter.ts' })// @Trpc procedures → AppRouter type
+      ]
     })
   ],
   controllers: [UsersController],
-  providers: [AdminGuard]
+  providers: [AuthGuard]
 })
 export class AppModule {}`)} /></pre>
     </div>
@@ -897,12 +912,21 @@ export class AppModule {}`)} /></pre>
       </tbody>
     </table>
     <ul>
-      <li><strong>Opt-in.</strong> Only methods carrying <code>@Mcp()</code> are exposed - controllers are never auto-published. <code>@Mcp</code> is MCP-only; a <code>@Trpc</code> sibling is planned.</li>
+      <li><strong>Opt-in.</strong> Only methods carrying <code>@Mcp()</code> / <code>@Trpc()</code> are exposed - controllers are never auto-published.</li>
       <li><code>@UseGuards()</code> fires before the handler on a tool call. Guards get an <code>ExecutionContext</code> whose <code>switchToHttp().getRequest()</code> carries the inbound tool-call headers and <code>url</code> (from the SDK's <code>extra.requestInfo</code>), plus <code>params</code> populated from the route's reflected <code>@Param</code> fields - so a path-scoped guard (<code>getRequest().params['id']</code>) behaves like it does over REST. Only <code>query</code> is empty over MCP. A denying guard yields a clean MCP tool error, not a 500. For bearer-token/OAuth MCP auth use <code>mcp(&#123; auth &#125;)</code> and read <code>ctx.get('auth')</code>.</li>
       <li><strong>Global guards (opt-in).</strong> App-global guards (<code>app.useGlobalGuards()</code> or <code>&#123; provide: APP_GUARD, useClass &#125;</code>) don't run on tool calls by default. Opt them in by class via <code>globalGuards: [ApiKeyGuard]</code> on <code>SilkweaveModule.forRoot()</code> - they run before each method/class <code>@UseGuards</code>. It's an explicit allow-list on purpose: blanket-running every global would also fire unrelated ones (e.g. a <code>ThrottlerGuard</code> that needs a writable response MCP can't provide).</li>
       <li><strong>What does not run:</strong> the handler is invoked directly, so globally-registered <code>ValidationPipe</code> / interceptors / exception filters do not apply (MCP input is validated against the reflected Zod schema instead), and whole-DTO arguments arrive as plain objects (no <code>@Transform</code>). Only guards and parameter-bound pipes run. Express only by default.</li>
       <li><strong>Optional OpenAPI ingestion:</strong> pass <code>openapi: document</code> to <code>SilkweaveModule.forRoot()</code> to use a pre-built OpenAPI doc as the authoritative schema source, matched to each method by verb + path.</li>
       <li>Use <code>@swc-node/register</code> (<code>node --import @swc-node/register/esm-register</code>) or <code>nest start</code> for dev - plain <code>tsx</code> doesn't emit decorator metadata. Because the controllers are ordinary Nest controllers, <code>@nestjs/swagger</code> documents them natively - no Silkweave-specific merging needed.</li>
+    </ul>
+    <h4>tRPC procedures (<code>@Trpc</code>)</h4>
+    <p><code>@Trpc()</code> is the tRPC sibling of <code>@Mcp()</code> - same reflected input, plus the two things tRPC consumers need: <strong>precise output types</strong> in the generated router and <strong>subscriptions</strong> for <code>async *</code> routes. Procedure keys are <code>camelCase</code> of <code>&#123;ControllerBase&#125;.&#123;Method&#125;</code> (<code>UsersController.listBySpace</code> &rarr; <code>usersListBySpace</code>); <code>kind</code> is inferred (<code>@Get</code> &rarr; query, else mutation, <code>async *</code> &rarr; subscription) and overridable with <code>@Trpc(&#123; kind &#125;)</code>.</p>
+    <ul>
+      <li><strong>Output types.</strong> The generated <code>AppRouter</code> carries precise outputs, sourced (in order) from <code>@ApiOkResponse(&#123; type: Dto &#125;)</code> reflection or an explicit <code>@Trpc(&#123; output &#125;)</code> (a Zod schema, DTO class, or raw shape) that wins over it. Reflection is one level deep - nested DTOs / <code>Dto[]</code> degrade to <code>unknown</code>; pass <code>@Trpc(&#123; output &#125;)</code> a Zod schema for a precise nested shape.</li>
+      <li><strong>Subscriptions.</strong> An <code>async *</code> method registers as a tRPC subscription over SSE; <code>@Trpc(&#123; chunk &#125;)</code> types the stream element. It needs no HTTP verb - a verb-less <code>@Trpc(&#123; kind: 'subscription', chunk &#125;)</code> exposes it over tRPC <strong>without</strong> a public REST route. Guards run before the first chunk.</li>
+      <li><strong>Guards + cookie auth, no separate config.</strong> The <code>trpc()</code> adapter gives each procedure's <code>@UseGuards()</code> a real <code>ExecutionContext</code> whose <code>switchToHttp().getRequest()</code> is the <strong>actual Express request</strong> (cookies, headers, <code>req.user</code>) - so an <code>AuthGuard</code> reading an HttpOnly session cookie works with no auth config (the client sends <code>credentials: 'include'</code>). A denying guard surfaces as a <code>TRPCError</code> whose <code>data.httpStatus</code> is the guard's status (<code>401</code>/<code>403</code>).</li>
+      <li><strong>No public REST.</strong> Omit the HTTP-verb decorator to serve a method over tRPC/MCP only - Nest never maps it as REST, but <code>@Trpc(&#123; kind &#125;)</code> / <code>@Mcp()</code> still pick it up.</li>
+      <li><strong><code>typegen(&#123; path &#125;)</code></strong> writes the <code>AppRouter</code> type (a <code>TRPCBuiltRouter</code> over every <code>@Trpc</code> procedure) on boot - the exact contract <code>createTRPCClient&lt;AppRouter&gt;()</code> and <code>inferRouterInputs</code>/<code>inferRouterOutputs</code> consume. It sees <code>@Trpc</code> actions only, so the emitted router matches what <code>trpc()</code> serves.</li>
     </ul>
     <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nestjs#readme"><code>@silkweave/nestjs</code> README</a>.</p>
   </section>

@@ -1,28 +1,48 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, type CanActivate, type Type } from '@nestjs/common'
+import { HttpException, Injectable, type CanActivate, type Type } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { createAction, type Action, type SilkweaveContext } from '@silkweave/core'
+import { SilkweaveError, type Action, type ActionKind, type SilkweaveContext } from '@silkweave/core'
 import { z } from 'zod/v4'
 import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
-import { MCP_METADATA, type McpMetadata } from './metadata.js'
+import { MCP_METADATA, TRPC_METADATA, type McpMetadata, type TrpcMetadata } from './metadata.js'
 import { invokeRebound, specialBinding, type Binding } from './rebind.js'
 import { buildOpenApiLookup, openApiFields, type OpenApiDocument, type OpenApiLookup } from './reflect/openapi.js'
 import { PARAMTYPE, type ParamSlot, readParamSlots } from './reflect/params.js'
-import { reflectRoute } from './reflect/route.js'
+import { reflectDtoSchema, reflectResponseSchema } from './reflect/response.js'
+import { reflectRoute, type RouteInfo } from './reflect/route.js'
 import { type FieldDesc, fieldToZod, mergeField, reflectDtoFields } from './reflect/schema.js'
 import { reflectOperation } from './reflect/swagger.js'
 
-interface DiscoveredMcp {
+interface Discovered {
   instance: object
   classRef: Type<unknown>
   method: (...args: unknown[]) => unknown
   methodName: string
-  meta: McpMetadata
+  mcp?: McpMetadata
+  trpc?: TrpcMetadata
 }
 
 interface BuiltInput {
   shape: Record<string, z.ZodType>
   bindings: Binding[]
+}
+
+/** Shared reflection computed once per discovered method, reused across targets. */
+interface Reflected {
+  route: RouteInfo
+  base: string
+  description?: string
+  baseShape: Record<string, z.ZodType>
+  bindings: Binding[]
+  guards: ReturnType<typeof collectGuards>
+  pathFields: string[]
+  streaming: boolean
+}
+
+export interface DiscoverOptions {
+  openapi?: OpenApiDocument
+  globalGuards?: Type<CanActivate>[]
+  defaultResult?: 'json' | 'smart'
 }
 
 @Injectable()
@@ -36,16 +56,18 @@ export class ControllerDiscovery {
   ) { }
 
   /**
-   * Walk every Nest provider/controller, find methods annotated with `@Mcp`,
-   * and build a core `Action` per method whose input schema is reflected from
-   * the route + parameter decorators (+ optional OpenAPI document) and whose
-   * `run` re-binds the validated input back into the method's positional
-   * arguments (with `@UseGuards` guards - and any opted-in `globalGuards` -
-   * applied first).
+   * Walk every Nest provider/controller, find methods annotated with `@Mcp`
+   * and/or `@Trpc`, and build a core `Action` per decorator present on each
+   * method. The input schema is reflected from the route + parameter decorators
+   * (+ optional OpenAPI document) and the `run` re-binds the validated input back
+   * into the method's positional arguments (with `@UseGuards` guards applied
+   * first). A method carrying both decorators yields two actions - one gated to
+   * the `mcp` adapter, one to the `trpc`/`typegen` adapters - sharing the same
+   * reflected input, bindings, and guards.
    */
-  discover(openapi?: OpenApiDocument, globalGuards: Type<CanActivate>[] = [], defaultResult?: 'json' | 'smart'): Action[] {
-    const lookup = openapi ? buildOpenApiLookup(openapi) : undefined
-    const discovered: DiscoveredMcp[] = []
+  discover(options: DiscoverOptions = {}): Action[] {
+    const lookup = options.openapi ? buildOpenApiLookup(options.openapi) : undefined
+    const discovered: Discovered[] = []
     for (const wrapper of this.discovery.getProviders().concat(this.discovery.getControllers())) {
       const { instance } = wrapper
       if (!instance || typeof instance !== 'object') { continue }
@@ -55,112 +77,249 @@ export class ControllerDiscovery {
       for (const methodName of this.scanner.getAllMethodNames(proto)) {
         const method = (proto as Record<string, unknown>)[methodName] as ((...args: unknown[]) => unknown) | undefined
         if (typeof method !== 'function') { continue }
-        const meta = this.reflector.get<McpMetadata>(MCP_METADATA, method)
-        if (!meta) { continue }
-        discovered.push({ instance, classRef, method, methodName, meta })
+        const mcp = this.reflector.get<McpMetadata>(MCP_METADATA, method)
+        const trpc = this.reflector.get<TrpcMetadata>(TRPC_METADATA, method)
+        if (!mcp && !trpc) { continue }
+        discovered.push({ instance, classRef, method, methodName, mcp, trpc })
       }
     }
-    return discovered.map((d) => this.toAction(d, lookup, globalGuards, defaultResult))
+
+    const globalGuards = options.globalGuards ?? []
+    const actions: Action[] = []
+    for (const d of discovered) {
+      const shared = this.reflect(d, lookup)
+      if (d.mcp) { actions.push(this.mcpAction(d, shared, globalGuards, options.defaultResult)) }
+      if (d.trpc) { actions.push(this.trpcAction(d, shared, globalGuards)) }
+    }
+    return actions
   }
 
-  private toAction(d: DiscoveredMcp, lookup: OpenApiLookup | undefined, globalGuards: Type<CanActivate>[], defaultResult?: 'json' | 'smart'): Action {
+  /** Compute the per-method reflection shared by the `mcp` and `trpc` builders. */
+  private reflect(d: Discovered, lookup: OpenApiLookup | undefined): Reflected {
     const proto = Object.getPrototypeOf(d.instance) as object
     const route = reflectRoute(d.classRef, d.method)
     const slots = readParamSlots(d.classRef, d.methodName, proto)
     const operation = reflectOperation(d.method)
     const docFields = lookup ? openApiFields(lookup, route.method, route.openapiPath) : {}
 
-    const { shape, bindings } = this.buildInput(d, route.pathParams, slots, operation.params, docFields)
+    const { shape, bindings } = buildInput(proto, d.methodName, route.pathParams, slots, operation.params, docFields)
 
-    const base = d.classRef.name.replace(/Controller$/, '')
-    const name = d.meta.name ?? `${base}.${d.methodName}`
-    const description = d.meta.description ?? operation.description ?? `${d.methodName} (${route.method} /${route.path})`
-    const applyParamPipes = d.meta.pipes !== 'skip'
+    return {
+      route,
+      base: d.classRef.name.replace(/Controller$/, ''),
+      description: operation.description,
+      baseShape: shape,
+      bindings,
+      guards: collectGuards(this.reflector, d.classRef, d.method),
+      pathFields: pathParamFields(bindings),
+      streaming: isAsyncGeneratorFn(d.method)
+    }
+  }
 
-    const guards = collectGuards(this.reflector, d.classRef, d.method)
-    const pathFields = pathParamFields(bindings)
+  /** Build a guard-application closure shared by both run shapes. */
+  private guardRunner(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[]) {
     const { moduleRef, reflector, appConfig } = this
-    const classRef = d.classRef
-    const method = d.method
-    const instance = d.instance
-
-    const applyGuards = async (context: SilkweaveContext, input: object): Promise<void> => {
+    const { guards, pathFields } = shared
+    const { classRef, method } = d
+    return async (context: SilkweaveContext, input: object): Promise<void> => {
       // Resolved at call time - `APP_GUARD` instances aren't populated until
-      // `app.init()` finishes. Globals run before the route/class guards,
-      // mirroring Nest's request pipeline.
+      // `app.init()` finishes. Globals run before the route/class guards.
       const all = [...collectGlobalGuards(appConfig, globalGuards), ...guards]
       if (all.length === 0) { return }
       const request = context.getOptional<unknown>('request')
       const response = context.getOptional<unknown>('response') ?? null
       const hasRequest = request != null
       const guardRequest = hasRequest ? request : { headers: {}, params: {}, query: {} }
-      // Mirror REST: surface URL path params on `request.params` so guards that
-      // scope by path (e.g. a session-bound API-key guard) see them. Over MCP the
-      // request stand-in has empty `params`; populate only the reflected path
-      // fields (as raw strings, like Express), leaving any pre-existing params be.
       populatePathParams(guardRequest, pathFields, input as Record<string, unknown>)
       await runGuards(all, moduleRef, reflector, classRef, method, guardRequest, response, hasRequest ? 'http' : 'rpc')
     }
+  }
 
-    return createAction({
+  /** Synthesize the MCP-targeted action (unchanged behavior from v2.4). */
+  private mcpAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[], defaultResult?: 'json' | 'smart'): Action {
+    const meta = d.mcp!
+    const shape = { ...shared.baseShape, ...(meta.input ?? {}) }
+    const name = meta.name ?? `${shared.base}.${d.methodName}`
+    const description = meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
+    const applyParamPipes = meta.pipes !== 'skip'
+    const applyGuards = this.guardRunner(d, shared, globalGuards)
+    const { method, instance } = d
+    const { bindings, streaming } = shared
+
+    return {
       name,
       description,
       input: z.object(shape),
-      // Result format: per-method @Mcp({ result }) wins over the module-wide
-      // default; a client `_meta.disposition` overrides both at call time.
-      ...((d.meta.result ?? defaultResult) ? { disposition: d.meta.result ?? defaultResult } : {}),
-      // Only the MCP adapter exposes `@Mcp` methods; a future `@Trpc` decorator
-      // would tag its own actions for the tRPC adapter.
+      ...((meta.result ?? defaultResult) ? { disposition: meta.result ?? defaultResult } : {}),
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',
+      ...(streaming
+        ? { chunk: z.unknown(), run: streamingRun(applyGuards, method, instance, bindings, applyParamPipes, false) }
+        : {
+          run: async (input: object, context: SilkweaveContext): Promise<object> => {
+            await applyGuards(context, input)
+            const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
+            const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes)
+            return result ?? {}
+          }
+        })
+    } as Action
+  }
+
+  /** Synthesize the tRPC-targeted action (kind/output/subscription + httpStatus errors). */
+  private trpcAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[]): Action {
+    const meta = d.trpc!
+    const shape = { ...shared.baseShape, ...(meta.input ?? {}) }
+    const name = meta.name ?? `${shared.base}.${d.methodName}`
+    const description = meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
+    const applyParamPipes = meta.pipes !== 'skip'
+    const applyGuards = this.guardRunner(d, shared, globalGuards)
+    const { method, instance } = d
+    const { bindings, streaming } = shared
+
+    // tRPC and typegen both consume `@Trpc` actions; MCP never does.
+    const isEnabled = (ctx: SilkweaveContext): boolean => {
+      const adapter = ctx.getOptional<string>('adapter')
+      return adapter === 'trpc' || adapter === 'typegen'
+    }
+
+    if (streaming) {
+      return {
+        name,
+        description,
+        input: z.object(shape),
+        chunk: resolveSchema(meta.chunk) ?? z.unknown(),
+        isEnabled,
+        run: streamingRun(applyGuards, method, instance, bindings, applyParamPipes, true)
+      } as Action
+    }
+
+    const kind: ActionKind = meta.kind === 'query' || meta.kind === 'mutation'
+      ? meta.kind
+      : (shared.route.method === 'GET' ? 'query' : 'mutation')
+    const output = resolveOutput(meta, method)
+
+    return {
+      name,
+      description,
+      input: z.object(shape),
+      ...(output ? { output } : {}),
+      kind,
+      isEnabled,
       run: async (input: object, context: SilkweaveContext): Promise<object> => {
-        await applyGuards(context, input)
-        const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
-        const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes)
-        return (result ?? {})
+        try {
+          await applyGuards(context, input)
+          const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
+          const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes)
+          return result ?? {}
+        } catch (error) {
+          throw toSilkweaveError(error)
+        }
       }
-    }) as Action
+    } as Action
+  }
+}
+
+/** Build a streaming (`async *`) run that applies guards then yields the method's chunks. */
+function streamingRun(
+  applyGuards: (context: SilkweaveContext, input: object) => Promise<void>,
+  method: (...args: unknown[]) => unknown,
+  instance: object,
+  bindings: Binding[],
+  applyParamPipes: boolean,
+  mapErrors: boolean
+) {
+  return async function* (input: object, context: SilkweaveContext): AsyncGenerator<unknown, void, void> {
+    try {
+      await applyGuards(context, input)
+      const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
+      const gen = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes) as AsyncIterable<unknown>
+      for await (const chunk of gen) { yield chunk }
+    } catch (error) {
+      throw mapErrors ? toSilkweaveError(error) : error
+    }
+  }
+}
+
+/** Resolve a `@Trpc` action's output schema: explicit override wins over `@ApiOkResponse` reflection. */
+function resolveOutput(meta: TrpcMetadata, method: (...args: unknown[]) => unknown): z.ZodType | undefined {
+  return resolveSchema(meta.output) ?? reflectResponseSchema(method)
+}
+
+/**
+ * Coerce an `output`/`chunk` override to a Zod schema: a Zod schema passes
+ * through, a DTO class is reflected, and a raw shape is wrapped in `z.object`.
+ */
+function resolveSchema(value: TrpcMetadata['output']): z.ZodType | undefined {
+  if (value == null) { return undefined }
+  if (isZodSchema(value)) { return value }
+  if (typeof value === 'function') { return reflectDtoSchema(value) }
+  return z.object(value)
+}
+
+function isZodSchema(value: unknown): value is z.ZodType {
+  return Boolean(value) && typeof value === 'object' && typeof (value as { safeParse?: unknown }).safeParse === 'function'
+}
+
+function isAsyncGeneratorFn(fn: unknown): boolean {
+  return typeof fn === 'function' && (fn as { constructor?: { name?: string } }).constructor?.name === 'AsyncGeneratorFunction'
+}
+
+/**
+ * Convert a thrown Nest `HttpException` into a `SilkweaveError` carrying its HTTP
+ * status, so the tRPC adapter's `mapError` maps it to the right `TRPCError` code
+ * (and `data.httpStatus`) - e.g. a denying `AuthGuard`'s `UnauthorizedException`
+ * surfaces to the client as a `401`. Non-HTTP errors pass through unchanged.
+ */
+function toSilkweaveError(error: unknown): unknown {
+  if (error instanceof HttpException) {
+    const status = error.getStatus()
+    const response = error.getResponse()
+    const raw = typeof response === 'string'
+      ? response
+      : (response as { message?: unknown })?.message ?? error.message
+    const message = Array.isArray(raw) ? raw.join(', ') : String(raw)
+    return new SilkweaveError(message, 'http_error', status)
+  }
+  return error
+}
+
+/** Build the merged Zod input shape and the per-argument re-bind plan. */
+function buildInput(
+  proto: object,
+  methodName: string,
+  pathParams: string[],
+  slots: ReturnType<typeof readParamSlots>,
+  operationParams: Record<string, FieldDesc>,
+  docFields: Record<string, FieldDesc>
+): BuiltInput {
+  const designTypes = (Reflect.getMetadata('design:paramtypes', proto, methodName) as unknown[] | undefined) ?? []
+  const fields: Record<string, FieldDesc> = {}
+  const maxIndex = slots.reduce((m, s) => Math.max(m, s.index), -1)
+  const bindings: Binding[] = Array.from({ length: maxIndex + 1 }, () => ({ kind: 'missing' as const }))
+
+  const addField = (name: string, desc: FieldDesc): void => {
+    fields[name] = name in fields ? mergeField(fields[name], desc) : desc
   }
 
-  /** Build the merged Zod input shape and the per-argument re-bind plan. */
-  private buildInput(
-    d: DiscoveredMcp,
-    pathParams: string[],
-    slots: ReturnType<typeof readParamSlots>,
-    operationParams: Record<string, FieldDesc>,
-    docFields: Record<string, FieldDesc>
-  ): BuiltInput {
-    const proto = Object.getPrototypeOf(d.instance) as object
-    const designTypes = (Reflect.getMetadata('design:paramtypes', proto, d.methodName) as unknown[] | undefined) ?? []
-    const fields: Record<string, FieldDesc> = {}
-    const maxIndex = slots.reduce((m, s) => Math.max(m, s.index), -1)
-    const bindings: Binding[] = Array.from({ length: maxIndex + 1 }, () => ({ kind: 'missing' as const }))
-
-    const addField = (name: string, desc: FieldDesc): void => {
-      fields[name] = name in fields ? mergeField(fields[name], desc) : desc
-    }
-
-    for (const slot of slots) {
-      const { binding, fields: contributed } = contributeSlot(slot, pathParams, designTypes)
-      bindings[slot.index] = binding
-      for (const [name, desc] of Object.entries(contributed)) { addField(name, desc) }
-    }
-
-    // Layer operation-level (`@ApiParam`/`@ApiQuery`) then OpenAPI-document
-    // metadata over the structural fields (later sources win per field).
-    for (const [name, desc] of Object.entries(operationParams)) {
-      if (name in fields) { fields[name] = mergeField(fields[name], desc) }
-    }
-    for (const [name, desc] of Object.entries(docFields)) {
-      if (name in fields) { fields[name] = mergeField(fields[name], desc) }
-    }
-
-    const shape: Record<string, z.ZodType> = {}
-    for (const [name, desc] of Object.entries(fields)) { shape[name] = fieldToZod(desc) }
-    // `@Mcp({ input })` raw-shape override wins per field.
-    Object.assign(shape, d.meta.input ?? {})
-
-    return { shape, bindings }
+  for (const slot of slots) {
+    const { binding, fields: contributed } = contributeSlot(slot, pathParams, designTypes)
+    bindings[slot.index] = binding
+    for (const [name, desc] of Object.entries(contributed)) { addField(name, desc) }
   }
+
+  // Layer operation-level (`@ApiParam`/`@ApiQuery`) then OpenAPI-document
+  // metadata over the structural fields (later sources win per field).
+  for (const [name, desc] of Object.entries(operationParams)) {
+    if (name in fields) { fields[name] = mergeField(fields[name], desc) }
+  }
+  for (const [name, desc] of Object.entries(docFields)) {
+    if (name in fields) { fields[name] = mergeField(fields[name], desc) }
+  }
+
+  const shape: Record<string, z.ZodType> = {}
+  for (const [name, desc] of Object.entries(fields)) { shape[name] = fieldToZod(desc) }
+
+  return { shape, bindings }
 }
 
 /** Input field names that originate from the URL path (`@Param`), per the re-bind plan. */

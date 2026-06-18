@@ -94,5 +94,5 @@ export default defineConfig(eslint.configs.recommended, tseslint.configs.recomme
   files: ['eslint.config.mjs'],
   extends: [tseslint.configs.disableTypeChecked]
 }, {
-  ignores: ['build']
+  ignores: ['build', 'src/generated']
 })

@@ -7,11 +7,12 @@ import { SILKWEAVE_MODULE_OPTIONS, type SilkweaveModuleOptions } from './types.j
 /**
  * Root module for `@silkweave/nestjs`.
  *
- * Discovers every `@Mcp`-decorated **controller method** via `DiscoveryService`,
- * reflects each into a Silkweave action (input schema from the route + parameter
- * decorators + optional OpenAPI document; invocation by re-binding the validated
- * input back into the method), and registers the configured adapter(s) - `mcp()` -
- * directly on Nest's HTTP adapter inside `configure()`.
+ * Discovers every `@Mcp`/`@Trpc`-decorated **controller method** via
+ * `DiscoveryService`, reflects each into a Silkweave action (input schema from
+ * the route + parameter decorators + optional OpenAPI document; invocation by
+ * re-binding the validated input back into the method), and registers the
+ * configured adapter(s) - `mcp()`, `trpc()`, `typegen()` - directly on Nest's
+ * HTTP adapter inside `configure()`.
  *
  * Because `configure()` runs during `registerModules` - before Nest's
  * `registerRouter()` step - Silkweave's routes always sit ahead of every
@@ -58,7 +59,11 @@ export class SilkweaveModule implements NestModule {
     if (!httpAdapter) {
       throw new Error('@silkweave/nestjs: HttpAdapterHost.httpAdapter is not available.')
     }
-    const allActions = this.discovery.discover(this.options.openapi, this.options.globalGuards, this.options.defaultResult)
+    const allActions = this.discovery.discover({
+      openapi: this.options.openapi,
+      globalGuards: this.options.globalGuards,
+      defaultResult: this.options.defaultResult
+    })
     for (const adapter of this.options.adapters) {
       const baseContext = createContext({ ...(this.options.context ?? {}), adapter: adapter.name })
       const actions = adapter.allActions
