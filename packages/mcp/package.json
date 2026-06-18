@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/mcp",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Silkweave MCP Package",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
@@ -23,6 +23,11 @@
       "@silkweave/source": "./src/index.ts",
       "types": "./build/index.d.mts",
       "default": "./build/index.mjs"
+    },
+    "./cli-proxy": {
+      "@silkweave/source": "./src/cliProxy.ts",
+      "types": "./build/cliProxy.d.mts",
+      "default": "./build/cliProxy.mjs"
     }
   },
   "scripts": {
@@ -38,17 +43,29 @@
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
     "@silkweave/logger": "workspace:*",
-    "@clack/prompts": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "change-case": "^5.4.4",
-    "commander": "^13.1.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "zod": "^3.25.0"
   },
+  "peerDependencies": {
+    "@clack/prompts": "^1.0.1",
+    "commander": "^13.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@clack/prompts": {
+      "optional": true
+    },
+    "commander": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@clack/prompts": "^1.0.1",
     "@eslint/js": "^10.0.1",
     "@modelcontextprotocol/inspector": "^0.21.1",
+    "commander": "^13.1.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

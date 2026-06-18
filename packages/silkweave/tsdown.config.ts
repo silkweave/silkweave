@@ -10,6 +10,7 @@ export default defineConfig({
     'src/fastify.ts',
     'src/logger.ts',
     'src/mcp.ts',
+    'src/mcp-cli-proxy.ts',
     'src/typegen.ts',
     'src/vercel.ts'
   ]

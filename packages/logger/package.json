@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/logger",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Silkweave Logger",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
@@ -35,11 +35,18 @@
     "check": "pnpm lint && pnpm typecheck"
   },
   "dependencies": {
-    "@clack/prompts": "^1.0.1",
-    "pino": "^9.6.0",
     "zod": "^3.25.0"
   },
+  "peerDependencies": {
+    "@clack/prompts": "^1.0.1"
+  },
+  "peerDependenciesMeta": {
+    "@clack/prompts": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@clack/prompts": "^1.0.1",
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^22.0.0",

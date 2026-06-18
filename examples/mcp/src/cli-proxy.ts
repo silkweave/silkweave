@@ -1,5 +1,5 @@
 import { silkweave } from '@silkweave/core'
-import { cliProxy } from '@silkweave/mcp'
+import { cliProxy } from '@silkweave/mcp/cli-proxy'
 
 async function main() {
   await silkweave({ name: 'silkweave', description: 'Silkweave MCP cli-proxy example', version: '1.0.0' })

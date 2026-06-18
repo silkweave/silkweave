@@ -228,6 +228,9 @@ importers:
 
   examples/mcp:
     dependencies:
+      '@clack/prompts':
+        specifier: ^1.0.1
+        version: 1.4.0
       '@silkweave/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -240,6 +243,9 @@ importers:
       '@silkweave/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -630,9 +636,6 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../logger
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -725,16 +728,13 @@ importers:
 
   packages/logger:
     dependencies:
-      '@clack/prompts':
-        specifier: ^1.0.1
-        version: 1.4.0
-      pino:
-        specifier: ^9.6.0
-        version: 9.14.0
       zod:
         specifier: ^3.25.0
         version: 3.25.76
     devDependencies:
+      '@clack/prompts':
+        specifier: ^1.0.1
+        version: 1.4.0
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.0(jiti@2.7.0))
@@ -765,9 +765,6 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@clack/prompts':
-        specifier: ^1.0.1
-        version: 1.4.0
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
@@ -783,9 +780,6 @@ importers:
       change-case:
         specifier: ^5.4.4
         version: 5.4.4
-      commander:
-        specifier: ^13.1.0
-        version: 13.1.0
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -796,6 +790,9 @@ importers:
         specifier: ^3.25.0
         version: 3.25.76
     devDependencies:
+      '@clack/prompts':
+        specifier: ^1.0.1
+        version: 1.4.0
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.0(jiti@2.7.0))
@@ -814,6 +811,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.21
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
       eslint:
         specifier: ^10.4.0
         version: 10.4.0(jiti@2.7.0)

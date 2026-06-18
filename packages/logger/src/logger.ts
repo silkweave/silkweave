@@ -1,22 +1,28 @@
-import pino from 'pino'
 import { Logger, LogFn, LogLevel, LogLevels, ProgressOptions } from './types.js'
 
-type PinoLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
-
-const PINO_LEVEL_MAP: Record<LogLevel, PinoLevel> = {
-  emergency: 'fatal',
-  alert: 'fatal',
-  critical: 'fatal',
-  error: 'error',
-  warning: 'warn',
-  notice: 'info',
-  info: 'info',
-  debug: 'debug'
+// Severity ordering (lowest number = most verbose) used to gate writes by the
+// configured `level` threshold. Mirrors syslog-style precedence so a `level` of
+// e.g. `'warning'` suppresses `info`/`notice`/`debug`.
+const LEVEL_SEVERITY: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  notice: 30,
+  warning: 40,
+  error: 50,
+  critical: 60,
+  alert: 70,
+  emergency: 80
 }
 
 export interface CreateLoggerOptions {
   name?: string
-  level?: string
+  /** Minimum severity to write to `stream`. Defaults to `'debug'` (everything). */
+  level?: LogLevel
+  /**
+   * Destination stream for structured log lines, or `false` to discard them.
+   * Defaults to `process.stdout`. The `onLog` callback always fires regardless
+   * of this setting - the stream is just the diagnostic sink.
+   */
   stream?: NodeJS.WritableStream | false
   onLog?: (level: LogLevel, data: unknown) => void
   onProgress?: (options: ProgressOptions) => void
@@ -25,17 +31,21 @@ export interface CreateLoggerOptions {
 export function createLogger(options: CreateLoggerOptions = {}): Logger {
   const { name, level = 'debug', stream, onLog, onProgress } = options
 
-  const pinoOptions: pino.LoggerOptions = { name, level }
-  const instance = stream === false
-    ? pino(pinoOptions, pino.destination('/dev/null'))
-    : stream
-      ? pino(pinoOptions, stream)
-      : pino(pinoOptions)
+  const target = stream === false ? undefined : stream ?? process.stdout
+  const threshold = LEVEL_SEVERITY[level] ?? LEVEL_SEVERITY.debug
+
+  const write = (logLevel: LogLevel, data: unknown) => {
+    if (target && LEVEL_SEVERITY[logLevel] >= threshold) {
+      const line = typeof data === 'object' && data !== null
+        ? { level: logLevel, time: Date.now(), name, ...data }
+        : { level: logLevel, time: Date.now(), name, msg: data }
+      target.write(`${JSON.stringify(line)}\n`)
+    }
+  }
 
   const logLevels = Object.fromEntries(LogLevels.map((logLevel) => {
-    const pinoLevel = PINO_LEVEL_MAP[logLevel]
     return [logLevel, (data: unknown) => {
-      instance[pinoLevel](data)
+      write(logLevel, data)
       onLog?.(logLevel, data)
     }]
   })) as Record<LogLevel, LogFn>
@@ -46,7 +56,7 @@ export function createLogger(options: CreateLoggerOptions = {}): Logger {
       if (onProgress) {
         onProgress(progressOptions)
       } else {
-        instance.info({ ...progressOptions }, progressOptions.message)
+        write('info', { ...progressOptions })
       }
     }
   }

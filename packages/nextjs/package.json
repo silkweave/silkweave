@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/nextjs",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Silkweave Next.js App Router Adapter",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",

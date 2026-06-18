@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/core",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Silkweave Core",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
@@ -35,8 +35,7 @@
     "check": "pnpm lint && pnpm typecheck"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "@silkweave/logger": "workspace:*"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "peerDependencies": {
     "zod": "^3.25.0"

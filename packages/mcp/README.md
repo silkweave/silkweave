@@ -62,11 +62,11 @@ Exposes `POST /mcp` (invoke tools), `GET /mcp` (SSE stream), and `DELETE /mcp` (
 
 ### cliProxy
 
-MCP CLI proxy client - connects to a running HTTP MCP server and invokes tools from the command line.
+MCP CLI proxy client - connects to a running HTTP MCP server and invokes tools from the command line. Imported from the dedicated `@silkweave/mcp/cli-proxy` subpath (kept out of the package root so importing the `stdio`/`http` servers does not pull the CLI client's `commander` + `@clack/prompts` into the server path). Those two are **optional peer dependencies** - install them alongside `@silkweave/mcp` when you use the CLI proxy.
 
 ```typescript
 import { silkweave } from '@silkweave/core'
-import { cliProxy } from '@silkweave/mcp'
+import { cliProxy } from '@silkweave/mcp/cli-proxy'
 
 await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .adapter(cliProxy({ url: 'http://localhost:8080/mcp' }))

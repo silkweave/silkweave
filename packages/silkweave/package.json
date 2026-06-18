@@ -1,6 +1,6 @@
 {
   "name": "silkweave",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "Silkweave Umbrella Package",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
@@ -40,6 +40,10 @@
     "./mcp": {
       "types": "./build/mcp.d.mts",
       "default": "./build/mcp.mjs"
+    },
+    "./mcp/cli-proxy": {
+      "types": "./build/mcp-cli-proxy.d.mts",
+      "default": "./build/mcp-cli-proxy.mjs"
     },
     "./typegen": {
       "types": "./build/typegen.d.mts",
