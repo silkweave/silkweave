@@ -39,6 +39,33 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '2.6.1',
+    date: '2026-06-18',
+    summary: 'Slimmer dependency tree - pino dropped entirely, and the CLI proxy no longer leaks into the MCP server path.',
+    changes: [
+      {
+        type: 'improvement',
+        text: 'Dropped pino entirely. @silkweave/logger\'s createLogger() is now a zero-dependency structured logger (JSON lines to a stream, with a level threshold and onLog/onProgress callbacks) - same API, no behaviour change for the stdio/http/vercel adapters. The package\'s only hard dependency is now zod.',
+        commit: '6528d3b'
+      },
+      {
+        type: 'improvement',
+        text: '@silkweave/core no longer depends on @silkweave/logger (it never imported it - the logger reaches actions via context.get(\'logger\')). The @Mcp()/@Trpc() decorator import path in @silkweave/nestjs now pulls neither pino nor @clack/prompts on boot.',
+        commit: '6528d3b'
+      },
+      {
+        type: 'breaking',
+        text: 'The cliProxy adapter moved from the @silkweave/mcp root to the dedicated @silkweave/mcp/cli-proxy subpath, so importing the stdio/http servers no longer bundles the CLI client\'s commander + @clack/prompts. Update imports: import { cliProxy } from \'@silkweave/mcp/cli-proxy\'.',
+        commit: '6528d3b'
+      },
+      {
+        type: 'breaking',
+        text: 'commander and @clack/prompts are now optional peerDependencies of @silkweave/mcp (used only by the CLI proxy). Install them alongside @silkweave/mcp when you use @silkweave/mcp/cli-proxy; MCP server-only installs no longer pull them. @clack/prompts is likewise an optional peer of @silkweave/logger (needed only for createCLILogger()).',
+        commit: '6528d3b'
+      }
+    ]
+  },
+  {
     version: '2.6.0',
     date: '2026-06-18',
     summary: 'NestJS reflection gets louder and more precise - and @Res() works over tRPC.',
