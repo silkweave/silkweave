@@ -39,6 +39,33 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '2.5.0',
+    date: '2026-06-18',
+    summary: 'NestJS controllers gain end-to-end-typed tRPC, plus a much lighter install.',
+    changes: [
+      {
+        type: 'feature',
+        text: '@Trpc() decorator for @silkweave/nestjs - the tRPC sibling of @Mcp. Expose a controller route as an end-to-end-typed tRPC procedure, reflecting input from the same sources @Mcp uses. Adds precise output types (from @ApiOkResponse({ type }) or @Trpc({ output })), verb-inferred query/mutation kind, and async-generator routes as SSE subscriptions. One method can carry @Mcp + @Trpc + @UseGuards at once.',
+        commit: '6b01553'
+      },
+      {
+        type: 'feature',
+        text: 'trpc() and typegen() NestJS adapters. trpc() mounts httpBatch (query/mutation) + SSE (subscription) on Nest’s HTTP server; guards read the real Express request (cookie/header auth) and denials surface as a TRPCError carrying data.httpStatus. typegen() writes the AppRouter type for createTRPCClient<AppRouter>() on boot.',
+        commit: '6b01553'
+      },
+      {
+        type: 'improvement',
+        text: 'Lighter install - NestJS adapters now live behind subpath exports (@silkweave/nestjs/mcp, /trpc, /typegen) with their stacks as optional peer dependencies, so an MCP-only app never pulls in @trpc/server and a tRPC-only app never pulls in the MCP SDK. rxjs is now externalized instead of bundled, shrinking the core build from 360KB to 45KB.',
+        commit: '6b01553'
+      },
+      {
+        type: 'breaking',
+        text: 'NestJS adapter imports moved to subpaths: import { mcp } from \'@silkweave/nestjs/mcp\' (likewise /trpc, /typegen) instead of from \'@silkweave/nestjs\'. The @Mcp/@Trpc decorators and SilkweaveModule stay on the root. Add the adapter package(s) you use - @silkweave/mcp, @silkweave/trpc, @silkweave/typegen - as dependencies.',
+        commit: '6b01553'
+      }
+    ]
+  },
+  {
     version: '2.4.0',
     date: '2026-06-16',
     summary: 'A new Next.js App Router adapter joins the family.',
