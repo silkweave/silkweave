@@ -267,7 +267,7 @@ Each publishable package (`packages/*`, except the `silkweave` umbrella) resolve
 - push: yes
 - version_bump: yes (aligned across all packages)
   + `pnpm -r exec npm version 1.9.0 --no-git-tag-version --force`
-- publish: yes (manual - prompt to run `! pnpm publish:all`)
+- publish: yes (automated via GitHub Actions - **do not run `pnpm publish` locally**). Pushing a `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which builds, lints, and publishes every public package to npm via OIDC trusted publishing (`pnpm publish -r`). See [CI/CD](#cicd) below. The local `pnpm publish:all` script remains only as a manual fallback.
 - docs: per-package README.md + root CLAUDE.md as index + website docs page
 - frontend_smoke: N/A
 - changelog: yes - on every version bump, **prepend a new entry to `website/src/data/changelog.ts`** (the single source of truth; newest first; short user-facing highlights with commit hashes), then run `pnpm sync-releases` after the `vX.Y.Z` tag is pushed to create/update the matching GitHub release. The website `/changelog` page and GitHub releases must stay in sync - both render from that one data file.
@@ -288,3 +288,18 @@ The website `/changelog` page (`website/src/pages/changelog.astro`) and the GitH
 - **On each release**, prepend a `Release` entry (newest first). Keep highlights short and user-facing ("what's new at a glance"); set each change's `type` (`breaking | feature | improvement | fix`) and a short `commit` hash for the GitHub deep-dive link. A pre-tag/POC entry can set `unreleased: true` (rendered without a release link, skipped by the sync script). Major (`X.0.0`) releases render with a highlighted frame automatically.
 - **`pnpm sync-releases`** (`scripts/sync-releases.ts`, run via `tsx`) reads that file and creates/updates a GitHub release per `vX.Y.Z` tag (idempotent; notes grouped by change type; the newest entry is marked `--latest`). Requires the `vX.Y.Z` tags to be pushed first; `--dry-run` prints the notes without touching GitHub.
 - Release tags follow `vX.Y.Z` and must be pushed (`git push --tags`); every tagged version should have a matching GitHub release.
+- Pushing the `vX.Y.Z` tag also triggers the **publish workflow** ([CI/CD](#cicd)) - the tag push is what publishes the packages to npm, so create the tag only on a commit that already contains `.github/workflows/publish.yml`.
+
+## CI/CD
+
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+- **`ci.yml`** - runs on every push to `master` and every pull request. Installs (`--frozen-lockfile`), builds, then runs `pnpm exec turbo lint check` (lint + typecheck across all workspace packages). It deliberately does **not** run the root `pnpm check`'s trailing `pnpm roam` step, since the roam CLI isn't available on CI runners.
+- **`publish.yml`** - runs when a `vX.Y.Z` tag is pushed. Builds, lints, then runs `pnpm publish -r --access public --no-git-checks`. Publishing uses **npm trusted publishing (OIDC)** - there is **no `NPM_TOKEN`**; auth comes from the `id-token: write` permission, and npm auto-generates provenance attestations.
+
+Key facts for maintaining the publish flow:
+
+- **Trusted publisher config is per-package on npmjs.com** (one-time, manual): each package's Settings → Trusted Publisher → GitHub Actions points at org `silkweave`, repo `silkweave`, workflow `publish.yml`, allowed action `npm publish`. A newly added package must be configured there (and have an initial version) before the workflow can publish it.
+- **pnpm version matters**: pnpm's OIDC publishing regressed in 11.0.8 and was fixed in **11.1.0** (drops the unresolved `${NODE_AUTH_TOKEN}` placeholder that `actions/setup-node` writes). The repo pins `pnpm@11.1.1` via `packageManager`, which `pnpm/action-setup@v4` picks up automatically - do not pin pnpm to <= 11.0.8 or trusted publishing breaks.
+- `pnpm publish -r` skips versions already on the registry, so re-running a tag is safe (idempotent).
+- A tag must point at a commit that **contains `publish.yml`** - GitHub runs a tag's workflow from the tagged commit. (When first enabling this, the pre-existing `v2.5.0` tag had to be force-moved onto the commit that introduced the workflow.)
