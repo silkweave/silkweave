@@ -1,0 +1,55 @@
+name: Publish
+
+# Publishes every public workspace package to npm via trusted publishing (OIDC).
+# Triggered when a vX.Y.Z release tag is pushed (see the release flow in CLAUDE.md).
+# No NPM_TOKEN: auth is handled by the OIDC id-token below. Each package must have a
+# trusted publisher configured on npmjs.com pointing at this repo + this workflow file.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# id-token: write is what lets GitHub Actions mint the OIDC token npm exchanges for
+# short-lived publish credentials. Without it, trusted publishing cannot work.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build + publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      # registry-url writes an ~/.npmrc pointing at npmjs. The auth-token placeholder
+      # it leaves behind is dropped by pnpm >= 11.1.0 so OIDC takes over (the repo pins
+      # pnpm@11.1.1 via packageManager, which action-setup picks up automatically).
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Lint + typecheck
+        run: pnpm exec turbo lint check
+
+      # pnpm publish -r walks every public workspace package, runs its prepack
+      # (clean + build), and skips versions already on the registry, so re-running a
+      # tag is safe. --no-git-checks is required on a detached tag checkout.
+      - name: Publish
+        run: pnpm publish -r --access public --no-git-checks
