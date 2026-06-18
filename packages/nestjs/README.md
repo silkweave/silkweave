@@ -130,7 +130,7 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 |--------|------|---------|-------------|
 | `name` | `string` | `${ControllerBase}${MethodName}` (e.g. `UsersGet`) | MCP tool name override |
 | `description` | `string` | `@ApiOperation` summary/description, else generated | Tool description |
-| `input` | `Record<string, z.ZodType>` | - | Zod raw-shape override merged over the reflected fields (per-field). The escape hatch for shapes reflection can't express - discriminated unions, custom validators, `@Transform` |
+| `input` | `Record<string, z.ZodType> \| z.ZodObject` | - | Zod override merged over the reflected fields (per-field). A raw shape (`{ field: z.string() }`) **or** a whole `z.object({ ... })` (its `.shape` is unwrapped). The escape hatch for shapes reflection can't express - discriminated unions, custom validators, `@Transform`. It **adds to** the reflected fields; it does not replace them (see the warning below) |
 | `pipes` | `'apply' \| 'skip'` | `'apply'` | Whether to run parameter-bound pipes (`@Param('id', ParseIntPipe)`) when re-binding |
 | `result` | `'json' \| 'smart'` | `'smart'` | Default MCP result format - `'json'` returns compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and offloads large ones to an embedded resource (`smartToolResult`). A client that sends `_meta.disposition` on the call overrides it |
 
@@ -156,7 +156,7 @@ For each `@Mcp` method the adapter builds **one flat Zod input object** by mergi
 2. `class-validator` decorators (`@IsString`, `@MinLength`, `@IsOptional`, `@IsEnum`, ...) - **optional** peer
 3. `@nestjs/swagger` decorators - `@ApiParam`/`@ApiQuery` for scalar path/query params, `@ApiProperty` for whole-DTO properties - **optional** peer
 4. An ingested OpenAPI document, matched by HTTP verb + path (`SilkweaveModule.forRoot({ openapi })`)
-5. `@Mcp({ input })` raw-shape override
+5. `@Mcp({ input })` override (a raw shape or a `z.object({ ... })`)
 
 Field sources are derived from the parameter decorators:
 
@@ -168,9 +168,16 @@ Field sources are derived from the parameter decorators:
 | `@Query() dto: ListDto` | each property of `ListDto`, flattened to top level |
 | `@Body('x') x` | scalar field `x` |
 | `@Body() dto: CreateDto` | each property of `CreateDto`, flattened to top level |
-| `@Req`/`@Res`/`@Headers`/`@Ip`/`@Session`/files | not exposed; bound at call time (headers/req from the MCP request stand-in, the rest `undefined`) |
+| `@Req`/`@Headers`/`@Ip`/`@Session`/files | not exposed; bound at call time (headers/req from the MCP request stand-in, the rest `undefined`) |
+| `@Res() res` | not exposed; bound to the **real Express response over tRPC** (so `@Res({ passthrough: true })` can set cookies/headers), `undefined` over MCP (no HTTP response) |
 
 On a tool call the validated input is split back into the handler's positional arguments per the same parameter map, parameter-bound pipes run (unless `pipes: 'skip'`), and the method is invoked directly.
+
+> **Unreflectable parameter warning.** A whole-DTO `@Body()`/`@Query()` whose type can't be reflected logs a `Silkweave` warning at boot naming the controller method and parameter. The usual cause is an **intersection/union** type (e.g. `@Body() input: CreateDto & z.infer<typeof Extra>`): TypeScript erases it to `Object` under `design:type`, so the DTO class reference is lost and **none** of its `@ApiProperty`/`class-validator` fields reflect. A `@Mcp`/`@Trpc({ input })` override on the same method does **not** silence this - the override *adds* fields, it doesn't recover the dropped ones. Fix it by using a single DTO class, or by declaring every field via `({ input })`.
+
+### Nullable fields
+
+`@ApiProperty({ nullable: true })` (and OpenAPI `nullable: true`) reflect to a `.nullable()` Zod field (`string | null`). `class-validator`'s `@IsOptional()` only yields `string | undefined` (optional, not nullable) - it has no `null` signal - so for a `string | null` field add `@ApiProperty({ nullable: true })` or override the field via `({ input })`.
 
 ### Optional OpenAPI ingestion
 
@@ -230,7 +237,7 @@ export class UsersController {
 |--------|------|---------|-------------|
 | `name` | `string` | `${ControllerBase}.${MethodName}` | Procedure-name override (before camelCasing) |
 | `description` | `string` | `@ApiOperation` summary/description, else generated | Procedure description |
-| `input` | `Record<string, z.ZodType>` | - | Zod raw-shape override merged over reflected fields (same as `@Mcp({ input })`) |
+| `input` | `Record<string, z.ZodType> \| z.ZodObject` | - | Zod override merged over reflected fields - a raw shape or a `z.object({ ... })` (same as `@Mcp({ input })`) |
 | `output` | `z.ZodType \| DtoClass \| Record<string, z.ZodType>` | reflected from `@ApiOkResponse` | Explicit output schema driving the generated output type (wins over reflection) |
 | `chunk` | `z.ZodType \| DtoClass` | `unknown` | Element type for a subscription's `async *` stream |
 | `kind` | `'query' \| 'mutation' \| 'subscription'` | inferred | `@Get` ⇒ query, others ⇒ mutation, `async *` ⇒ subscription |
@@ -246,6 +253,12 @@ tRPC carries output types end-to-end, so the generated `AppRouter` needs them. I
 
 1. **`@ApiOkResponse({ type: Dto })`** (or any 2xx `@ApiResponse`) - the response DTO is flattened like an input DTO into the procedure's output type.
 2. **`@Trpc({ output })`** - an explicit Zod schema, DTO class, or raw shape. Wins over reflection. Use it when the return shape can't be reflected losslessly (e.g. **nested** DTOs and `Dto[]` arrays degrade to `unknown`/`unknown[]` - reflection is one level deep). For a precise nested shape, hand `@Trpc({ output })` a Zod schema.
+
+When a reflected output field degrades to `unknown`/`unknown[]`, the adapter logs a `Silkweave` warning at boot naming the controller method and the field(s) - so a silently-`unknown` grid/list/report output is visible instead of surfacing only at the client. The warning fires only for **reflected** outputs; an explicit `@Trpc({ output })` Zod schema is your own typing and is never flagged.
+
+### zod v3 / v4 interop
+
+The reflector builds schemas with Zod v4 internally, but `@Trpc({ input })`/`@Trpc({ output })`/`@Trpc({ chunk })` (and the `@Mcp({ input })` override) accept a schema from **either** Zod v3 or v4 - including `zod/v4` schemas from an app already migrated off Zod v3. The generated `AppRouter` input/output types resolve correctly across the boundary. Override detection is duck-typed (`safeParse`/`.shape`), so it does not depend on a shared Zod instance.
 
 ### Subscriptions (`async *` ⇒ SSE)
 

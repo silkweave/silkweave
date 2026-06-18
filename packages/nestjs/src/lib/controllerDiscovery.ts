@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { HttpException, Injectable, type CanActivate, type Type } from '@nestjs/common'
+import { HttpException, Injectable, Logger, type CanActivate, type Type } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
 import { SilkweaveError, type Action, type ActionKind, type SilkweaveContext } from '@silkweave/core'
 import { z } from 'zod/v4'
@@ -8,10 +8,13 @@ import { MCP_METADATA, TRPC_METADATA, type McpMetadata, type TrpcMetadata } from
 import { invokeRebound, specialBinding, type Binding } from './rebind.js'
 import { buildOpenApiLookup, openApiFields, type OpenApiDocument, type OpenApiLookup } from './reflect/openapi.js'
 import { PARAMTYPE, type ParamSlot, readParamSlots } from './reflect/params.js'
-import { reflectDtoSchema, reflectResponseSchema } from './reflect/response.js'
+import { reflectDtoSchema, reflectResponseFields, reflectResponseSchema } from './reflect/response.js'
 import { reflectRoute, type RouteInfo } from './reflect/route.js'
-import { type FieldDesc, fieldToZod, mergeField, reflectDtoFields } from './reflect/schema.js'
+import { type FieldDesc, fieldToZod, mergeField, reflectDtoFields, unreflectedFields } from './reflect/schema.js'
 import { reflectOperation } from './reflect/swagger.js'
+
+/** Discovery-time diagnostics (unreflectable params, degraded outputs). */
+const logger = new Logger('Silkweave')
 
 interface Discovered {
   instance: object
@@ -25,6 +28,8 @@ interface Discovered {
 interface BuiltInput {
   shape: Record<string, z.ZodType>
   bindings: Binding[]
+  /** Human-readable notes about params reflection could not turn into fields. */
+  warnings: string[]
 }
 
 /** Shared reflection computed once per discovered method, reused across targets. */
@@ -102,7 +107,8 @@ export class ControllerDiscovery {
     const operation = reflectOperation(d.method)
     const docFields = lookup ? openApiFields(lookup, route.method, route.openapiPath) : {}
 
-    const { shape, bindings } = buildInput(proto, d.methodName, route.pathParams, slots, operation.params, docFields)
+    const { shape, bindings, warnings } = buildInput(proto, d.methodName, route.pathParams, slots, operation.params, docFields)
+    for (const w of warnings) { logger.warn(`${d.classRef.name}.${d.methodName}: ${w}`) }
 
     return {
       route,
@@ -138,7 +144,7 @@ export class ControllerDiscovery {
   /** Synthesize the MCP-targeted action (unchanged behavior from v2.4). */
   private mcpAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[], defaultResult?: 'json' | 'smart'): Action {
     const meta = d.mcp!
-    const shape = { ...shared.baseShape, ...(meta.input ?? {}) }
+    const shape = { ...shared.baseShape, ...inputShape(meta.input) }
     const name = meta.name ?? `${shared.base}.${d.methodName}`
     const description = meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
     const applyParamPipes = meta.pipes !== 'skip'
@@ -158,7 +164,8 @@ export class ControllerDiscovery {
           run: async (input: object, context: SilkweaveContext): Promise<object> => {
             await applyGuards(context, input)
             const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
-            const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes)
+            const response = context.getOptional<unknown>('response')
+            const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
             return result ?? {}
           }
         })
@@ -168,7 +175,7 @@ export class ControllerDiscovery {
   /** Synthesize the tRPC-targeted action (kind/output/subscription + httpStatus errors). */
   private trpcAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[]): Action {
     const meta = d.trpc!
-    const shape = { ...shared.baseShape, ...(meta.input ?? {}) }
+    const shape = { ...shared.baseShape, ...inputShape(meta.input) }
     const name = meta.name ?? `${shared.base}.${d.methodName}`
     const description = meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
     const applyParamPipes = meta.pipes !== 'skip'
@@ -198,6 +205,16 @@ export class ControllerDiscovery {
       : (shared.route.method === 'GET' ? 'query' : 'mutation')
     const output = resolveOutput(meta, method)
 
+    // Reflection is one level deep, so a nested DTO or `Dto[]` output property
+    // degrades to `unknown`/`unknown[]`. Surface it - the fix is `@Trpc({ output })`.
+    const degraded = outputDegradedFields(meta, method)
+    if (output && degraded.length > 0) {
+      logger.warn(
+        `${d.classRef.name}.${d.methodName}: tRPC output field(s) ${degraded.join(', ')} reflected to 'unknown' ` +
+        '(nested DTO or Dto[] - reflection is one level deep). Supply @Trpc({ output }) with a Zod schema for precise types.'
+      )
+    }
+
     return {
       name,
       description,
@@ -209,7 +226,8 @@ export class ControllerDiscovery {
         try {
           await applyGuards(context, input)
           const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
-          const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes)
+          const response = context.getOptional<unknown>('response')
+          const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
           return result ?? {}
         } catch (error) {
           throw toSilkweaveError(error)
@@ -232,7 +250,8 @@ function streamingRun(
     try {
       await applyGuards(context, input)
       const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
-      const gen = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, applyParamPipes) as AsyncIterable<unknown>
+      const response = context.getOptional<unknown>('response')
+      const gen = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes) as AsyncIterable<unknown>
       for await (const chunk of gen) { yield chunk }
     } catch (error) {
       throw mapErrors ? toSilkweaveError(error) : error
@@ -243,6 +262,33 @@ function streamingRun(
 /** Resolve a `@Trpc` action's output schema: explicit override wins over `@ApiOkResponse` reflection. */
 function resolveOutput(meta: TrpcMetadata, method: (...args: unknown[]) => unknown): z.ZodType | undefined {
   return resolveSchema(meta.output) ?? reflectResponseSchema(method)
+}
+
+/**
+ * Output field names that reflected to `unknown` (nested DTO / `Dto[]`). Only the
+ * reflected paths are inspected - an explicit Zod or raw-shape `@Trpc({ output })`
+ * is the caller's own typing and is never flagged.
+ */
+function outputDegradedFields(meta: TrpcMetadata, method: (...args: unknown[]) => unknown): string[] {
+  if (meta.output != null && isZodSchema(meta.output)) { return [] }
+  const fields = typeof meta.output === 'function'
+    ? reflectDtoFields(meta.output)
+    : meta.output != null ? undefined : reflectResponseFields(method)
+  return fields ? unreflectedFields(fields) : []
+}
+
+/**
+ * Normalise an `@Mcp`/`@Trpc({ input })` override to a raw Zod shape. Accepts a
+ * plain `Record<string, ZodType>` or a whole `z.object({ ... })` (duck-typed by
+ * `safeParse` + `shape`, so a different zod copy's object still unwraps).
+ */
+function inputShape(input: McpMetadata['input']): Record<string, z.ZodType> {
+  if (!input) { return {} }
+  const maybe = input as { safeParse?: unknown; shape?: unknown }
+  if (typeof maybe.safeParse === 'function' && maybe.shape != null && typeof maybe.shape === 'object') {
+    return maybe.shape as Record<string, z.ZodType>
+  }
+  return input as Record<string, z.ZodType>
 }
 
 /**
@@ -294,6 +340,7 @@ function buildInput(
 ): BuiltInput {
   const designTypes = (Reflect.getMetadata('design:paramtypes', proto, methodName) as unknown[] | undefined) ?? []
   const fields: Record<string, FieldDesc> = {}
+  const warnings: string[] = []
   const maxIndex = slots.reduce((m, s) => Math.max(m, s.index), -1)
   const bindings: Binding[] = Array.from({ length: maxIndex + 1 }, () => ({ kind: 'missing' as const }))
 
@@ -305,6 +352,18 @@ function buildInput(
     const { binding, fields: contributed } = contributeSlot(slot, pathParams, designTypes)
     bindings[slot.index] = binding
     for (const [name, desc] of Object.entries(contributed)) { addField(name, desc) }
+    // A whole-DTO `@Body()`/`@Query()` that reflected to zero fields: the type
+    // was unreflectable (an interface, or an intersection/union TypeScript
+    // erases to `Object`/`Array` under `design:type`). Its fields are silently
+    // absent unless declared via `@Mcp`/`@Trpc({ input })`.
+    if (binding.kind === 'object' && binding.fields.length === 0) {
+      const typeName = (designTypes[slot.index] as { name?: string } | undefined)?.name ?? 'unknown'
+      warnings.push(
+        `whole-${binding.source} parameter #${slot.index} (type '${typeName}') reflected no input fields. ` +
+        `If it is an intersection/union (e.g. 'A & B'), TypeScript erases it to '${typeName}' so the DTO is lost - ` +
+        'use a single DTO class or declare the fields via @Mcp/@Trpc({ input }).'
+      )
+    }
   }
 
   // Layer operation-level (`@ApiParam`/`@ApiQuery`) then OpenAPI-document
@@ -319,7 +378,7 @@ function buildInput(
   const shape: Record<string, z.ZodType> = {}
   for (const [name, desc] of Object.entries(fields)) { shape[name] = fieldToZod(desc) }
 
-  return { shape, bindings }
+  return { shape, bindings, warnings }
 }
 
 /** Input field names that originate from the URL path (`@Param`), per the re-bind plan. */

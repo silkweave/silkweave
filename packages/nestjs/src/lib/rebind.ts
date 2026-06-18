@@ -52,6 +52,7 @@ async function resolveArg(
   b: Binding,
   input: Record<string, unknown>,
   request: RequestLike | undefined,
+  response: unknown,
   applyParamPipes: boolean
 ): Promise<unknown> {
   switch (b.kind) {
@@ -70,6 +71,10 @@ async function resolveArg(
       return b.data ? request?.headers?.[b.data.toLowerCase()] : (request?.headers ?? {})
     case 'request':
       return request ?? { headers: {} }
+    case 'response':
+      // The real Express response over tRPC (so `@Res({ passthrough: true })`
+      // can set cookies/headers); `undefined` over MCP (no HTTP response).
+      return response
     case 'ip':
       return request?.ip
     case 'host':
@@ -90,11 +95,12 @@ export async function invokeRebound(
   input: Record<string, unknown>,
   bindings: Binding[],
   request: RequestLike | undefined,
+  response: unknown,
   applyParamPipes: boolean
 ): Promise<unknown> {
   const args: unknown[] = []
   for (let i = 0; i < bindings.length; i += 1) {
-    args[i] = await resolveArg(bindings[i], input, request, applyParamPipes)
+    args[i] = await resolveArg(bindings[i], input, request, response, applyParamPipes)
   }
   return await method.apply(instance, args)
 }

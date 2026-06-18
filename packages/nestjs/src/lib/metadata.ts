@@ -27,11 +27,16 @@ export interface McpMetadata {
    */
   description?: string
   /**
-   * Zod raw-shape override merged over the reflected input fields (override
-   * wins per field). The escape hatch for shapes reflection can't express
-   * losslessly - discriminated unions, custom validators, `@Transform`, etc.
+   * Zod override merged over the reflected input fields (override wins per
+   * field). Accepts either a raw shape (`{ field: z.string() }`) or a whole
+   * `z.object({ ... })` - the object's `.shape` is unwrapped. The escape hatch
+   * for shapes reflection can't express losslessly - discriminated unions,
+   * custom validators, `@Transform`, etc. Note it *adds to* the reflected
+   * fields; it does not replace them, so a field reflection silently dropped
+   * (see the unreflectable-param warning) is not recovered by listing the
+   * others here.
    */
-  input?: Record<string, z.ZodType>
+  input?: Record<string, z.ZodType> | z.ZodObject
   /**
    * Whether to apply the controller method's parameter-bound pipes
    * (`@Param('id', ParseIntPipe)`) when re-binding the call. Default `'apply'`.
@@ -75,10 +80,12 @@ export interface TrpcMetadata {
    */
   description?: string
   /**
-   * Zod raw-shape override merged over the reflected input fields (override wins
-   * per field). Same escape hatch as `@Mcp({ input })`.
+   * Zod override merged over the reflected input fields (override wins per
+   * field). Accepts a raw shape (`{ field: z.string() }`) or a whole
+   * `z.object({ ... })` (its `.shape` is unwrapped). Same escape hatch as
+   * `@Mcp({ input })`.
    */
-  input?: Record<string, z.ZodType>
+  input?: Record<string, z.ZodType> | z.ZodObject
   /**
    * Explicit output schema driving the generated procedure's output type - a Zod
    * type, a DTO class (reflected like `@ApiOkResponse`), or a raw shape (wrapped

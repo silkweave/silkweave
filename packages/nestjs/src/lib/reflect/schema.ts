@@ -16,6 +16,8 @@ const API_MODEL_PROPERTIES_ARRAY = 'swagger/apiModelPropertiesArray'
 export interface FieldDesc {
   type?: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'unknown'
   required?: boolean
+  /** Field accepts `null` (`@ApiProperty({ nullable: true })` / OpenAPI `nullable`). */
+  nullable?: boolean
   description?: string
   enum?: (string | number)[]
   items?: FieldDesc
@@ -83,6 +85,7 @@ function baseToZod(d: FieldDesc): z.ZodType {
 export function fieldToZod(d: FieldDesc): z.ZodType {
   let schema = (d.enum?.length) ? enumToZod(d.enum) : baseToZod(d)
   if (d.description) { schema = schema.describe(d.description) }
+  if (d.nullable) { schema = schema.nullable() }
   if (d.default !== undefined) {
     schema = (schema as any).default(d.default)
   } else if (d.required === false) {
@@ -164,6 +167,7 @@ export function apiPropertyToField(o: Record<string, any>): FieldDesc {
   if (o['minLength'] != null) { f.minLength = o['minLength'] }
   if (o['maxLength'] != null) { f.maxLength = o['maxLength'] }
   if (o['format']) { f.format = o['format'] }
+  if (o['nullable'] === true) { f.nullable = true }
   if (o['default'] !== undefined) { f.default = o['default'] }
   return f
 }
@@ -228,6 +232,7 @@ export function openapiSchemaToField(schema: Record<string, any>): FieldDesc {
   if (schema['minLength'] != null) { f.minLength = schema['minLength'] }
   if (schema['maxLength'] != null) { f.maxLength = schema['maxLength'] }
   if (schema['format']) { f.format = schema['format'] }
+  if (schema['nullable'] === true) { f.nullable = true }
   if (schema['default'] !== undefined) { f.default = schema['default'] }
   if (schema['items'] && typeof schema['items'] === 'object') {
     f.items = openapiSchemaToField(schema['items'])
@@ -265,6 +270,22 @@ export function reflectDtoFields(dtoType: any): Record<string, FieldDesc> {
     }
     if (f.required === undefined) { f.required = true }
     out[name] = f
+  }
+  return out
+}
+
+/**
+ * Names of fields that could not be reflected into a concrete type - they will
+ * become `z.unknown()` (or `z.array(z.unknown())`). This is how a nested DTO or a
+ * `Dto[]` property silently degrades (reflection is one level deep), so the
+ * adapters surface these as a build-time warning pointing at `@Trpc({ output })`
+ * / `@Mcp({ input })`. Enum and `object` (record) fields are not degraded.
+ */
+export function unreflectedFields(fields: Record<string, FieldDesc>): string[] {
+  const out: string[] = []
+  for (const [name, f] of Object.entries(fields)) {
+    if (f.enum?.length) { continue }
+    if (!f.type || f.type === 'unknown') { out.push(name) } else if (f.type === 'array' && (!f.items?.type || f.items.type === 'unknown')) { out.push(name) }
   }
   return out
 }

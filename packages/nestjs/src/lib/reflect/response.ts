@@ -1,12 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from 'zod/v4'
-import { fieldToZod, reflectDtoFields } from './schema.js'
+import { type FieldDesc, fieldToZod, reflectDtoFields } from './schema.js'
 
 /** `@nestjs/swagger` response metadata key (read directly - swagger is an optional peer). */
 const API_RESPONSE = 'swagger/apiResponse'
 
 /** Status keys we treat as the "success" response, in preference order. */
 const SUCCESS_KEYS = ['200', '201', '202', '204', '2XX', 'default']
+
+/** The 2xx (or first) `@ApiResponse` entry for a method, if any. */
+function successEntry(method: (...args: any[]) => any): { type?: unknown; isArray?: boolean } | undefined {
+  const responses = Reflect.getMetadata(API_RESPONSE, method) as Record<string, { type?: unknown; isArray?: boolean }> | undefined
+  if (!responses) { return undefined }
+  const key = SUCCESS_KEYS.find((k) => responses[k]) ?? Object.keys(responses)[0]
+  return key ? responses[key] : undefined
+}
 
 /**
  * Reflect a `@Trpc` procedure's output schema from the method's
@@ -19,17 +27,25 @@ const SUCCESS_KEYS = ['200', '201', '202', '204', '2XX', 'default']
  * explicit `@Trpc({ output })` or an `unknown` output type.
  */
 export function reflectResponseSchema(method: (...args: any[]) => any): z.ZodType | undefined {
-  const responses = Reflect.getMetadata(API_RESPONSE, method) as Record<string, { type?: unknown; isArray?: boolean }> | undefined
-  if (!responses) { return undefined }
-
-  const key = SUCCESS_KEYS.find((k) => responses[k]) ?? Object.keys(responses)[0]
-  const entry = key ? responses[key] : undefined
+  const entry = successEntry(method)
   const dtoType = entry?.type
   if (typeof dtoType !== 'function') { return undefined }
 
   const schema = reflectDtoSchema(dtoType)
   if (!schema) { return undefined }
   return entry?.isArray ? z.array(schema) : schema
+}
+
+/**
+ * The reflected `FieldDesc` map for a method's response DTO (the same fields
+ * {@link reflectResponseSchema} builds its schema from), or `undefined` when
+ * there is no DTO to reflect. Used to detect fields that degraded to `unknown`
+ * (nested DTO / `Dto[]`) so the caller can warn.
+ */
+export function reflectResponseFields(method: (...args: any[]) => any): Record<string, FieldDesc> | undefined {
+  const dtoType = successEntry(method)?.type
+  if (typeof dtoType !== 'function') { return undefined }
+  return reflectDtoFields(dtoType)
 }
 
 /**
