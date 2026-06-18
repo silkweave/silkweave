@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-ai",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Silkweave + Vercel AI SDK + tRPC subscriptions chat example",
   "private": true,
   "type": "module",

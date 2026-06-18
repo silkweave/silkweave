@@ -39,6 +39,38 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '2.6.0',
+    date: '2026-06-18',
+    summary: 'NestJS reflection gets louder and more precise - and @Res() works over tRPC.',
+    changes: [
+      {
+        type: 'feature',
+        text: 'Boot-time warning when a @Mcp/@Trpc whole-DTO @Body()/@Query() param reflects no fields. The usual cause is an intersection/union type (e.g. CreateDto & Extra), which TypeScript erases to Object so every DTO field is silently dropped - a ({ input }) override adds fields but does not recover them. The warning names the controller method and param so the footgun is caught at startup instead of as client-side drift.',
+        commit: '4f448e5'
+      },
+      {
+        type: 'feature',
+        text: 'Boot-time warning when a reflected @Trpc output field degrades to unknown/unknown[] (a nested DTO or Dto[] - reflection is one level deep). Explicit @Trpc({ output }) schemas are your own typing and are never flagged. Supply @Trpc({ output }) with a Zod schema for a precise nested shape.',
+        commit: '4f448e5'
+      },
+      {
+        type: 'feature',
+        text: '@Res() now works over the tRPC transport - @Res({ passthrough: true }) resolves to the real Express response, so a handler can set session cookies/headers. Previously it was undefined on both transports. Over MCP it stays undefined (no HTTP response).',
+        commit: '4f448e5'
+      },
+      {
+        type: 'improvement',
+        text: '@Mcp/@Trpc({ input }) now accept a whole z.object({ ... }) (its .shape is unwrapped) in addition to a raw { field: z.type() } shape, and accept a schema from Zod v3 or v4 - a relief for apps already migrated to zod/v4. Override detection is duck-typed, so it does not depend on a shared Zod instance.',
+        commit: '4f448e5'
+      },
+      {
+        type: 'improvement',
+        text: 'Reflect nullable fields - @ApiProperty({ nullable: true }) (and OpenAPI nullable) map to a .nullable() Zod field (string | null). class-validator has no null signal, so @IsOptional() stays optional-not-nullable.',
+        commit: '4f448e5'
+      }
+    ]
+  },
+  {
     version: '2.5.0',
     date: '2026-06-18',
     summary: 'NestJS controllers gain end-to-end-typed tRPC, plus a much lighter install.',
