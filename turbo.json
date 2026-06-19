@@ -17,6 +17,10 @@
       "dependsOn": [],
       "outputs": []
     },
+    "test": {
+      "dependsOn": [],
+      "outputs": []
+    },
     "clean": {
       "cache": false
     },
