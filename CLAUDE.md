@@ -263,7 +263,7 @@ Each publishable package (`packages/*`, except the `silkweave` umbrella) resolve
 ## Wrapup Config
 
 - check: `pnpm check` - always run from the **repo root** (not from a sub-package), so turbo runs lint + typecheck across every workspace package
-- test: skip
+- test: `pnpm test` - runs `turbo test` (Vitest) across every package that defines a `test` script. New `*.test.ts` files co-locate in a package's `src/` (never shipped - tsdown builds only its explicit entries) and resolve cross-package `@silkweave/*` imports to TS source via the shared `vitest.shared.ts` (the `@silkweave/source` condition). To add Vitest to a package without it: `pnpm -F <pkg> add -D vitest`, add a one-line `vitest.config.ts` re-exporting `sharedConfig`, a `"test": "vitest run"` script, and `vitest.config.ts` to the eslint `ignores`.
 - push: yes
 - version_bump: yes (aligned across all packages)
   + `pnpm -r exec npm version 1.9.0 --no-git-tag-version --force`
@@ -294,8 +294,8 @@ The website `/changelog` page (`website/src/pages/changelog.astro`) and the GitH
 
 Two GitHub Actions workflows live in `.github/workflows/`:
 
-- **`ci.yml`** - runs on every push to `master` and every pull request. Installs (`--frozen-lockfile`), builds, then runs `pnpm exec turbo lint check` (lint + typecheck across all workspace packages). It deliberately does **not** run the root `pnpm check`'s trailing `pnpm roam` step, since the roam CLI isn't available on CI runners.
-- **`publish.yml`** - runs when a `vX.Y.Z` tag is pushed. Builds, lints, then runs `pnpm publish -r --access public --no-git-checks`. Publishing uses **npm trusted publishing (OIDC)** - there is **no `NPM_TOKEN`**; auth comes from the `id-token: write` permission, and npm auto-generates provenance attestations.
+- **`ci.yml`** - runs on every push to `master` and every pull request. Installs (`--frozen-lockfile`), builds, then runs `pnpm exec turbo lint check` (lint + typecheck across all workspace packages) followed by `pnpm exec turbo test` (the Vitest suites). It deliberately does **not** run the root `pnpm check`'s trailing `pnpm roam` step, since the roam CLI isn't available on CI runners.
+- **`publish.yml`** - runs when a `vX.Y.Z` tag is pushed. Builds, lints, tests, then runs `pnpm publish -r --access public --no-git-checks`. Publishing uses **npm trusted publishing (OIDC)** - there is **no `NPM_TOKEN`**; auth comes from the `id-token: write` permission, and npm auto-generates provenance attestations.
 
 Key facts for maintaining the publish flow:
 

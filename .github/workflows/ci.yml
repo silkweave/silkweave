@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint + typecheck
+    name: Lint, typecheck + test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,3 +33,6 @@ jobs:
 
       - name: Lint + typecheck
         run: pnpm exec turbo lint check
+
+      - name: Test
+        run: pnpm exec turbo test

@@ -48,6 +48,9 @@ jobs:
       - name: Lint + typecheck
         run: pnpm exec turbo lint check
 
+      - name: Test
+        run: pnpm exec turbo test
+
       # pnpm publish -r walks every public workspace package, runs its prepack
       # (clean + build), and skips versions already on the registry, so re-running a
       # tag is safe. --no-git-checks is required on a detached tag checkout.
