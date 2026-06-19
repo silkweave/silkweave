@@ -32,7 +32,8 @@
     "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "check": "pnpm lint && pnpm typecheck"
+    "check": "pnpm lint && pnpm typecheck",
+    "test": "vitest run"
   },
   "dependencies": {
     "zod": "^3.25.0"
@@ -55,6 +56,7 @@
     "tsdown": "^0.21.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.1.9"
   }
 }
