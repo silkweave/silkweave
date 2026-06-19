@@ -40,7 +40,7 @@ interface Reflected {
   baseShape: Record<string, z.ZodType>
   bindings: Binding[]
   guards: ReturnType<typeof collectGuards>
-  pathFields: string[]
+  requestSlots: RequestSlots
   streaming: boolean
 }
 
@@ -117,7 +117,7 @@ export class ControllerDiscovery {
       baseShape: shape,
       bindings,
       guards: collectGuards(this.reflector, d.classRef, d.method),
-      pathFields: pathParamFields(bindings),
+      requestSlots: requestSlotFields(bindings),
       streaming: isAsyncGeneratorFn(d.method)
     }
   }
@@ -125,7 +125,7 @@ export class ControllerDiscovery {
   /** Build a guard-application closure shared by both run shapes. */
   private guardRunner(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[]) {
     const { moduleRef, reflector, appConfig } = this
-    const { guards, pathFields } = shared
+    const { guards, requestSlots } = shared
     const { classRef, method } = d
     return async (context: SilkweaveContext, input: object): Promise<void> => {
       // Resolved at call time - `APP_GUARD` instances aren't populated until
@@ -136,7 +136,7 @@ export class ControllerDiscovery {
       const response = context.getOptional<unknown>('response') ?? null
       const hasRequest = request != null
       const guardRequest = hasRequest ? request : { headers: {}, params: {}, query: {} }
-      populatePathParams(guardRequest, pathFields, input as Record<string, unknown>)
+      populateRequestSlots(guardRequest, requestSlots, input as Record<string, unknown>)
       await runGuards(all, moduleRef, reflector, classRef, method, guardRequest, response, hasRequest ? 'http' : 'rpc')
     }
   }
@@ -382,27 +382,55 @@ function buildInput(
 }
 
 /** Input field names that originate from the URL path (`@Param`), per the re-bind plan. */
-function pathParamFields(bindings: Binding[]): string[] {
-  const fields: string[] = []
-  for (const b of bindings) {
-    if (b.kind === 'params') { fields.push(...b.fields) } else if (b.kind === 'value' && b.source === 'path') { fields.push(b.field) }
-  }
-  return fields
+/** Input field names grouped by the REST request slot Express would source them from. */
+interface RequestSlots {
+  /** `@Param`/path-template fields -> `request.params` (raw strings). */
+  params: string[]
+  /** `@Query` fields -> `request.query` (raw strings). */
+  query: string[]
+  /** `@Body` fields -> `request.body` (parsed values). */
+  body: string[]
 }
 
 /**
- * Fill `request.params` with the reflected path fields from the validated input,
- * matching what Express would populate over REST (raw string values). Only adds
- * keys that are absent, so a real REST request's params are never overwritten.
+ * Classify every input field by the REST request slot it would occupy, reading
+ * the discovery-time {@link Binding}s. A whole-DTO `@Query()`/`@Body()` (`object`
+ * binding) contributes all its fields to the matching slot; a bare `@Param()`
+ * (`params` binding) and a path-sourced `value` go to `params`.
  */
-function populatePathParams(request: unknown, pathFields: string[], input: Record<string, unknown>): void {
-  if (pathFields.length === 0 || typeof request !== 'object' || request === null) { return }
-  const params = ((request as { params?: Record<string, unknown> }).params ??= {})
-  for (const field of pathFields) {
-    if (!(field in params) && input[field] !== undefined) {
-      params[field] = String(input[field])
+function requestSlotFields(bindings: Binding[]): RequestSlots {
+  const slots: RequestSlots = { params: [], query: [], body: [] }
+  for (const b of bindings) {
+    if (b.kind === 'params') { slots.params.push(...b.fields) } else if (b.kind === 'object') { slots[b.source].push(...b.fields) } else if (b.kind === 'value') { slots[b.source === 'path' ? 'params' : b.source].push(b.field) }
+  }
+  return slots
+}
+
+/** Fill one request slot from the validated input, only adding absent keys. */
+function fillSlot(bag: Record<string, unknown>, fields: string[], input: Record<string, unknown>, stringify: boolean): void {
+  for (const field of fields) {
+    if (!(field in bag) && input[field] !== undefined) {
+      bag[field] = stringify ? String(input[field]) : input[field]
     }
   }
+}
+
+/**
+ * Fill `request.params`/`query`/`body` from the validated input, mirroring the
+ * slots Express would populate over REST (path -> `params`, `@Query` -> `query`,
+ * `@Body` -> `body`). Path/query values are stringified to match how Express
+ * delivers them (a guard reading `req.query.limit` sees `'10'`, not `10`); body
+ * keeps the parsed values. Only absent keys are added, so a real REST/tRPC
+ * request's own params/query/body are never overwritten. This is what lets a
+ * scope-enforcing guard (`req.params.sessionId`, `req.body.sessionId`, ...)
+ * decide identically over MCP and REST.
+ */
+function populateRequestSlots(request: unknown, slots: RequestSlots, input: Record<string, unknown>): void {
+  if (typeof request !== 'object' || request === null) { return }
+  const req = request as { params?: Record<string, unknown>; query?: Record<string, unknown>; body?: Record<string, unknown> }
+  if (slots.params.length > 0) { fillSlot((req.params ??= {}), slots.params, input, true) }
+  if (slots.query.length > 0) { fillSlot((req.query ??= {}), slots.query, input, true) }
+  if (slots.body.length > 0) { fillSlot((req.body ??= {}), slots.body, input, false) }
 }
 
 function designTypeAt(designTypes: unknown[], index: number): FieldDesc {

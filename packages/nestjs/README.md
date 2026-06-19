@@ -333,9 +333,9 @@ A `@Get`/`@Post` is inherently a public REST route. To expose a method over **tR
 
 Native NestJS `@UseGuards()` on `@Mcp`/`@Trpc` methods run before the handler is invoked. Guards receive an `ExecutionContext` with the request in `switchToHttp().getRequest()`, and the `Reflector` is wired up so guards can read custom metadata.
 
-**Headers over MCP.** The inbound tool-call request is surfaced as a stand-in `{ headers, url, params, query }` object built from the MCP SDK's `extra.requestInfo`, so a header-based guard - e.g. one reading `getRequest().headers['x-api-key']` - works unchanged. `ExecutionContext.getType()` is `'http'` whenever a request is available (and `'rpc'` for transports with none, e.g. MCP stdio). Caveats:
+**Headers over MCP.** The inbound tool-call request is surfaced as a stand-in `{ headers, url, params, query, body }` object built from the MCP SDK's `extra.requestInfo`, so a header-based guard - e.g. one reading `getRequest().headers['x-api-key']` - works unchanged. `ExecutionContext.getType()` is `'http'` whenever a request is available (and `'rpc'` for transports with none, e.g. MCP stdio). Caveats:
 
-- **Headers**, the request `url`, and **URL path params** cross the MCP boundary. `getRequest().params` is populated from the route's reflected `@Param` fields (as raw strings, like Express), so a path-scoped guard - e.g. one reading `getRequest().params['id']` to fence a key to one resource - works the same over MCP as over REST. `getRequest().query` is still empty (no query string over MCP).
+- **Headers**, the request `url`, and the **validated tool input** cross the MCP boundary. Before guards run, the input is reconstructed into `getRequest().params`/`query`/`body` per each field's reflected source (path/`@Param` -> `params`, `@Query` -> `query`, `@Body` -> `body`; path and query stringified like Express delivers them, body kept as parsed values; only absent keys are filled). So a scope-enforcing guard reading `getRequest().params['id']`, `req.query['…']`, or `req.body['sessionId']` - e.g. one fencing a key to one resource/session - decides the same over MCP as over REST. The **request-fidelity contract**: whichever request slot a guard reads, it sees the value it would over HTTP.
 - A guard that denies (returns `false` or throws) produces a clean MCP tool error (`ForbiddenException`), not an HTTP 500.
 - For OAuth 2.1 / bearer-token MCP auth, prefer `mcp({ auth })` and read the resolved identity from the silkweave context (`ctx.get('auth')`); the header stand-in is for custom request-reading guards.
 
@@ -349,7 +349,7 @@ SilkweaveModule.forRoot({
 })
 ```
 
-The allow-list is explicit-by-class on purpose - a blanket "run every global" would also fire unrelated globals (e.g. a `ThrottlerGuard`, which assumes a writable response MCP doesn't provide). Listed guards run **before** the method/class `@UseGuards`, mirroring Nest's request pipeline. They see the same request stand-in as method guards: headers, `url`, and path `params` (populated from reflected `@Param` fields); only `query`/IP-derived logic won't apply over MCP.
+The allow-list is explicit-by-class on purpose - a blanket "run every global" would also fire unrelated globals (e.g. a `ThrottlerGuard`, which assumes a writable response MCP doesn't provide). Listed guards run **before** the method/class `@UseGuards`, mirroring Nest's request pipeline. They see the same request stand-in as method guards: headers, `url`, and `params`/`query`/`body` reconstructed from the validated input; only IP-derived logic won't apply over MCP.
 
 Controllers are normal Nest providers - inject services via the constructor as usual.
 

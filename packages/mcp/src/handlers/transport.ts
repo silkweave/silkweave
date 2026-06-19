@@ -14,13 +14,16 @@ import { authStorage } from './auth.js'
  * Build the generic `request` context value (the same key REST/tRPC populate)
  * from the MCP SDK's `extra.requestInfo`, so transport-agnostic consumers - e.g.
  * `@silkweave/nestjs` `@UseGuards` guards reading
- * `switchToHttp().getRequest().headers` - work over MCP. There is no path
- * `params`/`query` on an MCP call, so those are empty stand-ins for graceful
- * degradation. Returns `undefined` when no HTTP request info is available.
+ * `switchToHttp().getRequest().headers` - work over MCP. There are no path
+ * `params`/`query`/`body` on the raw MCP call, so those start as empty
+ * stand-ins; `@silkweave/nestjs` later fills them from the validated tool input
+ * per the reflected param sources (path -> `params`, `@Query` -> `query`,
+ * `@Body` -> `body`) so guards reading any of them decide as they would over
+ * REST. Returns `undefined` when no HTTP request info is available.
  */
 function requestFromExtra(requestInfo: { headers?: unknown; url?: { toString(): string } } | undefined) {
   if (!requestInfo) { return undefined }
-  return { headers: requestInfo.headers ?? {}, url: requestInfo.url?.toString(), params: {}, query: {} }
+  return { headers: requestInfo.headers ?? {}, url: requestInfo.url?.toString(), params: {}, query: {}, body: {} }
 }
 
 function registerTools(server: McpServer, actions: Action[], context: SilkweaveContext) {
