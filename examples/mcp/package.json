@@ -22,6 +22,8 @@
     "@silkweave/logger": "workspace:*",
     "@silkweave/mcp": "workspace:*",
     "commander": "^13.1.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "zod": "^3.25.0"
   },
   "devDependencies": {

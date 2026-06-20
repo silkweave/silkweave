@@ -24,6 +24,11 @@
       "types": "./build/index.d.mts",
       "default": "./build/index.mjs"
     },
+    "./tools": {
+      "@silkweave/source": "./src/tools.ts",
+      "types": "./build/tools.d.mts",
+      "default": "./build/tools.mjs"
+    },
     "./cli-proxy": {
       "@silkweave/source": "./src/cliProxy.ts",
       "types": "./build/cliProxy.d.mts",
@@ -46,19 +51,25 @@
     "@silkweave/core": "workspace:*",
     "@silkweave/logger": "workspace:*",
     "change-case": "^5.4.4",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
     "zod": "^3.25.0"
   },
   "peerDependencies": {
     "@clack/prompts": "^1.0.1",
-    "commander": "^13.1.0"
+    "commander": "^13.1.0",
+    "cors": "^2.8.5",
+    "express": "^5.0.0"
   },
   "peerDependenciesMeta": {
     "@clack/prompts": {
       "optional": true
     },
     "commander": {
+      "optional": true
+    },
+    "cors": {
+      "optional": true
+    },
+    "express": {
       "optional": true
     }
   },
@@ -71,7 +82,9 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "commander": "^13.1.0",
+    "cors": "^2.8.6",
     "eslint": "^10.4.0",
+    "express": "^5.2.1",
     "rimraf": "^6.1.3",
     "tsdown": "^0.21.8",
     "tsx": "^4.21.0",

@@ -3,5 +3,5 @@ import { defineConfig } from 'tsdown'
 export default defineConfig({
   outDir: 'build',
   dts: true,
-  entry: ['src/index.ts', 'src/cliProxy.ts']
+  entry: ['src/index.ts', 'src/tools.ts', 'src/cliProxy.ts']
 })

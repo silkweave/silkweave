@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
 import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
-import { registerTools } from '@silkweave/mcp'
+import { registerTools } from '@silkweave/mcp/tools'
 
 export interface VercelAdapterOptions {
   enableJsonResponse?: boolean
