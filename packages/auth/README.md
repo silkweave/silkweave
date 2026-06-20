@@ -1,6 +1,9 @@
 # @silkweave/auth
 
-OAuth 2.1 authentication for [Silkweave](https://github.com/silkweave/silkweave) MCP servers. Acts as an OAuth proxy between MCP clients and upstream identity providers (Google, etc.), handling PKCE, refresh tokens, dynamic client registration (CIMD), and protected resource metadata (RFC 9728).
+Auth for [Silkweave](https://github.com/silkweave/silkweave) MCP servers, in two layers:
+
+- **Resource-server core** (the package root, `@silkweave/auth`) - the spec-required surface for an MCP server: bearer-token validation + protected resource metadata (RFC 9728). `jose`-only. Most servers need only this and delegate token issuance to an external IdP (Auth0/WorkOS/Stytch/Keycloak/Google).
+- **OAuth authorization server** (the opt-in subpath, `@silkweave/auth/oauth`) - a full OAuth 2.1 proxy between MCP clients and an upstream IdP: PKCE, refresh tokens, dynamic client registration (CIMD), and persistence stores. Import this only when you want Silkweave itself to *be* the authorization server, so a pure resource server never pulls the issuer machinery into its dependency graph.
 
 ## Install
 
@@ -8,12 +11,14 @@ OAuth 2.1 authentication for [Silkweave](https://github.com/silkweave/silkweave)
 pnpm add @silkweave/auth
 ```
 
+> The OAuth-proxy helpers (`google`, `createOAuthProxy`, `createJsonStore`/`createRedisStore`/`createMemoryStore`, `OAuthStore`) are imported from `@silkweave/auth/oauth`. Bearer validation (`validateToken`) and `generateProtectedResourceMetadata` - plus the `AuthConfig`/`AuthInfo`/`OAuthRequest`/`OAuthResponse`/`OAuthProvider` types - live at the package root.
+
 ## Quick Start with Google OAuth
 
 The `google()` helper returns a complete `AuthConfig` ready to pass to the `http()` adapter:
 
 ```typescript
-import { google, createJsonStore } from '@silkweave/auth'
+import { google, createJsonStore } from '@silkweave/auth/oauth'
 import { silkweave } from '@silkweave/core'
 import { http } from '@silkweave/mcp'
 
@@ -52,7 +57,7 @@ await silkweave({ name: 'my-server', description: 'My MCP Server', version: '1.0
 For providers other than Google, use `createOAuthProxy()` directly. It returns an `OAuthProvider` that implements the full OAuth 2.1 proxy flow:
 
 ```typescript
-import { createOAuthProxy } from '@silkweave/auth'
+import { createOAuthProxy } from '@silkweave/auth/oauth'
 
 const provider = createOAuthProxy({
   authorizeUrl: 'https://provider.example.com/authorize',
@@ -166,7 +171,7 @@ The OAuth proxy needs persistent storage for auth codes, client registrations, P
 In-memory storage -- data is lost on restart. Good for development:
 
 ```typescript
-import { createMemoryStore } from '@silkweave/auth'
+import { createMemoryStore } from '@silkweave/auth/oauth'
 
 const store = createMemoryStore()
 ```
@@ -176,7 +181,7 @@ const store = createMemoryStore()
 Persists to a JSON file on disk. Suitable for single-process deployments:
 
 ```typescript
-import { createJsonStore } from '@silkweave/auth'
+import { createJsonStore } from '@silkweave/auth/oauth'
 
 const store = createJsonStore('oauth-store.json')
 ```
@@ -186,7 +191,7 @@ const store = createJsonStore('oauth-store.json')
 For production multi-process deployments. Accepts any Redis client with `get`/`set`/`del` methods (compatible with `ioredis` and `redis`):
 
 ```typescript
-import { createRedisStore } from '@silkweave/auth'
+import { createRedisStore } from '@silkweave/auth/oauth'
 import Redis from 'ioredis'
 
 const store = createRedisStore({
@@ -200,7 +205,7 @@ const store = createRedisStore({
 Implement the `OAuthStore` interface for your own backend:
 
 ```typescript
-import type { OAuthStore } from '@silkweave/auth'
+import type { OAuthStore } from '@silkweave/auth/oauth'
 
 const store: OAuthStore = {
   saveAuthCode(code, data) { /* ... */ },

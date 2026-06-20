@@ -23,6 +23,11 @@
       "@silkweave/source": "./src/index.ts",
       "types": "./build/index.d.mts",
       "default": "./build/index.mjs"
+    },
+    "./oauth": {
+      "@silkweave/source": "./src/oauth.ts",
+      "types": "./build/oauth.d.mts",
+      "default": "./build/oauth.mjs"
     }
   },
   "scripts": {

@@ -71,9 +71,6 @@ export function buildMcpExpressApp(
 
   const transport = mcpTransport(silkweaveOptions, context, actions)
   app.post('/mcp', express.json(), transport.post)
-  app.get('/mcp', transport.stream)
-  app.delete('/mcp', transport.stream)
-  app.get('/mcp/resource/:id', transport.stream)
 
   return app
 }

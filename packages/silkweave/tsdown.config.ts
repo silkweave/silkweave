@@ -5,6 +5,7 @@ export default defineConfig({
   dts: true,
   entry: [
     'src/auth.ts',
+    'src/auth-oauth.ts',
     'src/cli.ts',
     'src/core.ts',
     'src/fastify.ts',

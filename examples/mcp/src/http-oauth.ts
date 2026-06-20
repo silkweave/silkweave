@@ -1,4 +1,5 @@
-import { AuthInfo, createJsonStore, google } from '@silkweave/auth'
+import { AuthInfo } from '@silkweave/auth'
+import { createJsonStore, google } from '@silkweave/auth/oauth'
 import { createAction, silkweave } from '@silkweave/core'
 import { http } from '@silkweave/mcp'
 import z from 'zod/v4'

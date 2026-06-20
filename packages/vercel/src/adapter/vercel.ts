@@ -1,10 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, ActionRun, AdapterGenerator, isStreamingAction, runStreamingAction, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
-import { createLogger } from '@silkweave/logger'
-import { handleToolError, smartToolResult } from '@silkweave/mcp'
-import { capitalCase, pascalCase } from 'change-case'
+import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
+import { registerTools } from '@silkweave/mcp'
 
 export interface VercelAdapterOptions {
   enableJsonResponse?: boolean
@@ -25,55 +23,6 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': '*',
   'Access-Control-Max-Age': '86400'
-}
-
-function registerTools(server: McpServer, actions: Action[], requestContext: SilkweaveContext) {
-  for (const action of actions) {
-    server.registerTool(pascalCase(action.name), {
-      title: capitalCase(action.name),
-      description: action.description,
-      inputSchema: action.input
-    }, async (input, extra) => {
-      const logger = createLogger({
-        stream: process.stderr,
-        onLog: (level, data) => {
-          extra.sendNotification({ method: 'notifications/message', params: { level, data } })
-        },
-        onProgress: ({ progress, total, message }) => {
-          if (!extra._meta?.progressToken) { return }
-          extra.sendNotification({
-            method: 'notifications/progress',
-            params: {
-              progress,
-              total,
-              message,
-              progressToken: extra._meta.progressToken
-            }
-          })
-        }
-      })
-      const actionContext = requestContext.fork({ logger, extra })
-      const progressToken = extra._meta?.progressToken
-      try {
-        let result: object | object[]
-        if (isStreamingAction(action)) {
-          result = await runStreamingAction(action, input, actionContext, progressToken
-            ? async (chunk, index) => {
-              await extra.sendNotification({
-                method: 'notifications/progress',
-                params: { progressToken, progress: index + 1, message: JSON.stringify(chunk) }
-              })
-            }
-            : undefined)
-        } else {
-          result = await (action.run as ActionRun<object, object>)(input, actionContext)
-        }
-        return action.toolResult?.(result, actionContext) ?? smartToolResult(result)
-      } catch (error) {
-        return handleToolError(error)
-      }
-    })
-  }
 }
 
 async function parseOAuthRequest(url: URL, request: Request): Promise<OAuthRequest> {

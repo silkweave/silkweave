@@ -3,5 +3,5 @@ import { defineConfig } from 'tsdown'
 export default defineConfig({
   outDir: 'build',
   dts: true,
-  entry: ['./src/index.ts'],
+  entry: ['./src/index.ts', './src/oauth.ts'],
 })

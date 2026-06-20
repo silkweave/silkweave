@@ -21,6 +21,10 @@
       "types": "./build/auth.d.mts",
       "default": "./build/auth.mjs"
     },
+    "./auth/oauth": {
+      "types": "./build/auth-oauth.d.mts",
+      "default": "./build/auth-oauth.mjs"
+    },
     "./cli": {
       "types": "./build/cli.d.mts",
       "default": "./build/cli.mjs"

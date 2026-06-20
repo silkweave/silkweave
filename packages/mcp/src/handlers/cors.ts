@@ -2,12 +2,12 @@ import cors, { CorsOptions } from 'cors'
 import { type RequestHandler } from 'express'
 
 /** Headers required by the MCP protocol that must always be exposed when CORS is in use. */
-export const MCP_REQUIRED_HEADERS = ['WWW-Authenticate', 'Mcp-Session-Id', 'Last-Event-Id', 'Mcp-Protocol-Version']
+export const MCP_REQUIRED_HEADERS = ['WWW-Authenticate', 'Last-Event-Id', 'Mcp-Protocol-Version']
 
 /**
  * CORS middleware preconfigured to expose the headers MCP clients need
- * (`Mcp-Session-Id`, `Last-Event-Id`, `Mcp-Protocol-Version`, `WWW-Authenticate`)
- * on top of any user-supplied options.
+ * (`Last-Event-Id`, `Mcp-Protocol-Version`, `WWW-Authenticate`) on top of any
+ * user-supplied options. (Stateless transport - no `Mcp-Session-Id`.)
  *
  * Pass `false` to disable, omit / pass `true` for permissive defaults, or pass
  * a `CorsOptions` object to override.

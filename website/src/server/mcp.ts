@@ -1,4 +1,4 @@
-import { createRedisStore, google } from '@silkweave/auth'
+import { createRedisStore, google } from '@silkweave/auth/oauth'
 import { silkweave } from '@silkweave/core'
 import { vercel } from '@silkweave/vercel'
 import { Redis } from '@upstash/redis'

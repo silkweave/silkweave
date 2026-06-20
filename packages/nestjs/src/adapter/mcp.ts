@@ -95,8 +95,6 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
 
       const transport = mcpTransport(silkweaveOptions, baseContext, actions)
       adapter.post(basePath, ...prefix(corsHandler, express.json(), protect(transport.post)))
-      adapter.get(basePath, ...prefix(corsHandler, protect(transport.stream)))
-      adapter.delete(basePath, ...prefix(corsHandler, protect(transport.stream)))
     }
   }
 }

@@ -39,7 +39,7 @@ Configure in Claude Desktop or Claude Code:
 
 ### http
 
-Session-based MCP transport over HTTP with SSE streaming and resumability.
+**Stateless** MCP transport over HTTP with per-call SSE streaming (no sessions, so any request can hit any instance behind a plain load balancer).
 
 ```typescript
 import { silkweave } from '@silkweave/core'
@@ -51,7 +51,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .start()
 ```
 
-Exposes `POST /mcp` (invoke tools), `GET /mcp` (SSE stream), and `DELETE /mcp` (terminate session). Built on Express with `StreamableHTTPServerTransport` from the MCP SDK.
+Exposes a single stateless `POST /mcp` (each call mints a fresh transport with `sessionIdGenerator: undefined`; progress streams over SSE per call). No `Mcp-Session-Id`, no `GET`/`DELETE` reconnect. Built on Express with `StreamableHTTPServerTransport` from the MCP SDK.
 
 | Option | Type | Description |
 |--------|------|-------------|
