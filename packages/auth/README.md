@@ -144,6 +144,36 @@ if (result.error) {
 console.log(result.auth?.clientId)
 ```
 
+### Recommended: front with an external IdP (resource-server only)
+
+The MCP 2026 spec direction is for servers to be **pure OAuth resource servers**
+that delegate token issuance to a dedicated authorization server. For most
+deployments, point `authorizationServers` at an external IdP (Auth0, WorkOS,
+Stytch, Keycloak, Google, ...), have `verifyToken` validate that IdP's JWTs (e.g.
+with `jose`'s `jwtVerify` against the IdP JWKS), and skip the `@silkweave/auth/oauth`
+proxy entirely:
+
+```typescript
+import { validateToken } from '@silkweave/auth'
+
+const auth = {
+  resourceUrl: 'https://mcp.example.com',
+  authorizationServers: ['https://idp.example.com'],
+  issuer: 'https://idp.example.com',     // RFC 9207 - bind the token to this issuer
+  audience: 'https://mcp.example.com',   // RFC 8707 - reject tokens minted for another resource
+  requiredScopes: ['mcp:tools'],         // advertised in the 403 step-up challenge (SEP-2350)
+  verifyToken: async (token) => {
+    const { payload } = await jwtVerify(token, JWKS, { issuer: 'https://idp.example.com', audience: 'https://mcp.example.com' })
+    return { token, clientId: payload.sub, scopes: String(payload.scope ?? '').split(' '), iss: payload.iss, aud: payload.aud, expiresAt: payload.exp }
+  }
+}
+```
+
+`validateToken` then enforces, in order: expiry, **issuer** binding (`issuer`),
+**audience** binding (`audience`, defaults to `resourceUrl`; set `false` to skip),
+and **required scopes** - emitting a `WWW-Authenticate` challenge with `scope="..."`
+on insufficient scope so the client knows what to step up to.
+
 ## Protected Resource Metadata (RFC 9728)
 
 Generate the `/.well-known/oauth-protected-resource` document for your server:
@@ -153,11 +183,13 @@ import { generateProtectedResourceMetadata } from '@silkweave/auth'
 
 const metadata = generateProtectedResourceMetadata(
   'https://my-server.example.com',
-  ['https://my-server.example.com']
+  ['https://idp.example.com'],
+  ['mcp:tools'] // optional scopes_supported - the adapters pass auth.requiredScopes here
 )
 // {
 //   resource: 'https://my-server.example.com',
-//   authorization_servers: ['https://my-server.example.com'],
+//   authorization_servers: ['https://idp.example.com'],
+//   scopes_supported: ['mcp:tools'],
 //   bearer_methods_supported: ['header']
 // }
 ```

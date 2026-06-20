@@ -7,7 +7,8 @@ export function extractBearerToken(header: string | null | undefined): string | 
 export function buildWWWAuthenticate(
   error?: string,
   description?: string,
-  resourceMetadataUrl?: string
+  resourceMetadataUrl?: string,
+  scope?: string
 ): string {
   const parts: string[] = []
   if (error) {
@@ -18,6 +19,10 @@ export function buildWWWAuthenticate(
   }
   if (resourceMetadataUrl) {
     parts.push(`resource_metadata="${resourceMetadataUrl}"`)
+  }
+  // The scopes the client must obtain to step up (RFC 9470 / SEP-2350).
+  if (scope) {
+    parts.push(`scope="${scope}"`)
   }
   return parts.length > 0 ? `Bearer ${parts.join(', ')}` : 'Bearer'
 }

@@ -47,16 +47,41 @@ export async function validateToken(
     return buildErrorResult(err, resourceMetadataUrl)
   }
 
+  // Issuer binding (RFC 9207 / SEP-2468): reject a token minted by an
+  // authorization server other than the expected one.
+  if (config.issuer && typeof authInfo.iss === 'string' && authInfo.iss !== config.issuer) {
+    return buildErrorResult(invalidToken('Token issuer mismatch'), resourceMetadataUrl)
+  }
+
+  // Audience binding (RFC 8707 / SEP-2352): reject a token whose `aud` does not
+  // include this resource - the resource-server confused-deputy defence.
+  const expectedAudience = config.audience === false ? undefined : (config.audience ?? config.resourceUrl)
+  if (expectedAudience !== undefined && !audienceMatches(authInfo.aud, expectedAudience)) {
+    return buildErrorResult(invalidToken('Token audience mismatch'), resourceMetadataUrl)
+  }
+
   if (config.requiredScopes?.length) {
     const scopes = authInfo.scopes ?? []
     const hasAll = config.requiredScopes.every((s) => scopes.includes(s))
     if (!hasAll) {
-      const err = insufficientScope()
-      return buildErrorResult(err, resourceMetadataUrl)
+      // Advertise the scopes to step up to (SEP-2350).
+      return buildErrorResult(insufficientScope(), resourceMetadataUrl, config.requiredScopes.join(' '))
     }
   }
 
   return { auth: authInfo }
+}
+
+/**
+ * True when the token's `aud` claim includes one of the expected values. A token
+ * with no `aud` is allowed (the verifier may have bound the audience already);
+ * a present-but-mismatched `aud` is rejected.
+ */
+function audienceMatches(tokenAud: unknown, expected: string | string[]): boolean {
+  if (tokenAud === undefined || tokenAud === null) { return true }
+  const have = Array.isArray(tokenAud) ? tokenAud : [tokenAud]
+  const want = Array.isArray(expected) ? expected : [expected]
+  return have.some((a) => want.includes(a as string))
 }
 
 function buildChallengeResult(resourceMetadataUrl?: string): ValidateResult {
@@ -74,13 +99,14 @@ function buildChallengeResult(resourceMetadataUrl?: string): ValidateResult {
 
 function buildErrorResult(
   err: AuthError,
-  resourceMetadataUrl?: string
+  resourceMetadataUrl?: string,
+  scope?: string
 ): ValidateResult {
   return {
     error: {
       statusCode: err.statusCode,
       headers: {
-        'WWW-Authenticate': buildWWWAuthenticate(err.code, err.message, resourceMetadataUrl),
+        'WWW-Authenticate': buildWWWAuthenticate(err.code, err.message, resourceMetadataUrl, scope),
         'Content-Type': 'application/json'
       },
       body: { error: err.code, error_description: err.message }

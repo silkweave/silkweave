@@ -10,6 +10,6 @@ export function protectedResourceMetadata(auth: AuthConfig): RequestHandler {
   if (!auth.resourceUrl || !auth.authorizationServers?.length) {
     throw new Error('@silkweave/mcp protectedResourceMetadata(): auth.resourceUrl and auth.authorizationServers are required')
   }
-  const metadata = generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers)
+  const metadata = generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers, auth.requiredScopes)
   return (_req, res) => { res.json(metadata) }
 }

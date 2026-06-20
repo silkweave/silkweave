@@ -221,7 +221,7 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
 
         if (auth?.authorizationServers?.length && auth.resourceUrl) {
           instance.get('/.well-known/oauth-protected-resource', () => {
-            return generateProtectedResourceMetadata(auth.resourceUrl!, auth.authorizationServers!)
+            return generateProtectedResourceMetadata(auth.resourceUrl!, auth.authorizationServers!, auth.requiredScopes)
           })
         }
 

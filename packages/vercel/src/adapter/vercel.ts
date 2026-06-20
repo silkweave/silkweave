@@ -124,7 +124,7 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
 
     // Protected resource metadata (RFC 9728)
     if (url.pathname === '/.well-known/oauth-protected-resource') {
-      const metadata = generateProtectedResourceMetadata(options.auth!.resourceUrl!, options.auth!.authorizationServers!)
+      const metadata = generateProtectedResourceMetadata(options.auth!.resourceUrl!, options.auth!.authorizationServers!, options.auth!.requiredScopes)
       return new Response(JSON.stringify(metadata), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' }
       })
