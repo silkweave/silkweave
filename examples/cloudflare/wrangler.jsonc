@@ -1,0 +1,29 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "mcp",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-06-01",
+	// jose (auth) + the MCP SDK transport use Web Crypto / occasional node built-ins.
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// Create with: wrangler kv namespace create OAUTH_KV
+	// then paste the returned id below (and a separate preview_id for `wrangler dev`).
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "e4c2bd2591ce4b89a7e2d2391c1715cf",
+			"remote": true
+		}
+	],
+	// Public, non-secret config. RESOURCE_URL MUST be the deployed origin (the value
+	// advertised in protected-resource metadata + used to mint redirect URIs).
+	"vars": {
+		"RESOURCE_URL": "https://mcp.silkweave.workers.dev"
+	}
+	// Secrets are NOT set here. Use:
+	//   wrangler secret put GOOGLE_CLIENT_ID
+	//   wrangler secret put GOOGLE_CLIENT_SECRET
+	//   wrangler secret put SIGNING_KEY
+	// For local `wrangler dev`, put them in .dev.vars (see .dev.vars.example).
+}

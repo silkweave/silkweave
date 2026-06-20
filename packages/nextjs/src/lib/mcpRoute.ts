@@ -1,12 +1,12 @@
 import { Action, silkweave, SilkweaveOptions } from '@silkweave/core'
-import { vercel } from '@silkweave/vercel'
+import { edge } from '@silkweave/edge'
 import { McpRouteHandlers, McpRouteOptions } from '../types.js'
 import { normalizeBasePath, rewriteRequestPath } from './stripPrefix.js'
 
 /**
  * Build the MCP route handlers for a single catch-all Next.js route file.
  *
- * Wires the actions through `@silkweave/vercel` (stateless MCP over Web Standard
+ * Wires the actions through `@silkweave/edge` (stateless MCP over Web Standard
  * Streamable HTTP) and wraps its handler with a prefix-stripping rewrite so the
  * transport, OAuth routes and protected-resource metadata all resolve from one
  * `app/<basePath>/[[...slug]]/route.ts` file.
@@ -17,7 +17,7 @@ export function buildMcpRoute(
   options: McpRouteOptions
 ): McpRouteHandlers {
   const basePath = normalizeBasePath(options.basePath)
-  const { adapter, handler } = vercel({
+  const { adapter, handler } = edge({
     auth: options.auth,
     enableJsonResponse: options.enableJsonResponse
   })

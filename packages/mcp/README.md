@@ -194,4 +194,4 @@ All result utilities are exported from `@silkweave/mcp`:
 
 - [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation
 - [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core) - Core library
-- [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) - Stateless MCP for Vercel
+- [`@silkweave/edge`](https://www.npmjs.com/package/@silkweave/edge) - Stateless MCP on Web-Standard edge/serverless runtimes (Cloudflare Workers, Vercel, Bun, Deno)

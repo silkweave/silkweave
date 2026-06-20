@@ -8,11 +8,11 @@ export default defineConfig({
     'src/auth-oauth.ts',
     'src/cli.ts',
     'src/core.ts',
+    'src/edge.ts',
     'src/fastify.ts',
     'src/logger.ts',
     'src/mcp.ts',
     'src/mcp-cli-proxy.ts',
-    'src/typegen.ts',
-    'src/vercel.ts'
+    'src/typegen.ts'
   ]
 })

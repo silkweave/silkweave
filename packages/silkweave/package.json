@@ -53,9 +53,9 @@
       "types": "./build/typegen.d.mts",
       "default": "./build/typegen.mjs"
     },
-    "./vercel": {
-      "types": "./build/vercel.d.mts",
-      "default": "./build/vercel.mjs"
+    "./edge": {
+      "types": "./build/edge.d.mts",
+      "default": "./build/edge.mjs"
     }
   },
   "scripts": {
@@ -74,8 +74,8 @@
     "@silkweave/fastify": "workspace:*",
     "@silkweave/logger": "workspace:*",
     "@silkweave/mcp": "workspace:*",
-    "@silkweave/typegen": "workspace:*",
-    "@silkweave/vercel": "workspace:*"
+    "@silkweave/edge": "workspace:*",
+    "@silkweave/typegen": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

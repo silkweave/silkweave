@@ -14,7 +14,7 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
          ┌──────────────┬───────┼───────┬──────────────┐
          │              │       │       │              │
   ┌──────▼──────┐ ┌─────▼─────┐ │ ┌─────▼──────┐ ┌────▼─────┐
-  │ MCP (stdio) │ │   Fastify │ │ │    CLI     │ │  Vercel  │
+  │ MCP (stdio) │ │   Fastify │ │ │    CLI     │ │   Edge   │
   │ MCP (http)  │ │  REST API │ │ │ commander  │ │serverless│
   │             │ │ + Swagger │ │ │  + clack   │ │  MCP     │
   └─────────────┘ └───────────┘ │ └────────────┘ └──────────┘
@@ -37,7 +37,7 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
   - [MCP Streamable HTTP](#mcp-streamable-http)
   - [Fastify REST API](#fastify-rest-api)
   - [CLI](#cli)
-  - [Vercel Serverless](#vercel-serverless)
+  - [Edge Adapter](#edge-adapter)
 - [Logging and Progress](#logging-and-progress)
 - [Streaming Actions](#streaming-actions)
 - [Plug into Vercel AI SDK](#plug-into-vercel-ai-sdk)
@@ -76,7 +76,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
 | `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + clack terminal UI |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
-| `@silkweave/vercel` | [![npm](https://img.shields.io/npm/v/@silkweave/vercel)](https://www.npmjs.com/package/@silkweave/vercel) | Vercel serverless adapter - stateless MCP over Streamable HTTP |
+| `@silkweave/edge` | [![npm](https://img.shields.io/npm/v/@silkweave/edge)](https://www.npmjs.com/package/@silkweave/edge) | Edge / serverless adapter - stateless MCP over Web Standard Streamable HTTP |
 | `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - `createChatAction()` + `silkweaveTransport()` for `useChat` over tRPC subscriptions |
 | `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - pino, clack, and MCP notification support |
 
@@ -93,13 +93,13 @@ pnpm add @silkweave/core @silkweave/fastify
 pnpm add @silkweave/core @silkweave/cli
 
 # Vercel serverless MCP
-pnpm add @silkweave/core @silkweave/vercel
+pnpm add @silkweave/core @silkweave/edge
 
 # Vercel AI SDK chat (useChat over tRPC subscriptions)
 pnpm add @silkweave/core @silkweave/trpc @silkweave/ai ai @ai-sdk/anthropic
 
 # All of the above
-pnpm add @silkweave/core @silkweave/mcp @silkweave/cli @silkweave/fastify @silkweave/vercel @silkweave/ai
+pnpm add @silkweave/core @silkweave/mcp @silkweave/cli @silkweave/fastify @silkweave/edge @silkweave/ai
 ```
 
 ---
@@ -407,17 +407,17 @@ $ mytool greet --name "World" --enthusiastic
 ℹ HELLO, WORLD!!!
 ```
 
-### Vercel Serverless
+### Edge Adapter
 
 Deploy your actions as a stateless MCP server on Vercel. Each request creates a fresh server instance - no sessions, no persistent connections, fully compatible with serverless constraints.
 
 ```typescript
-// api/mcp.ts (Vercel function)
+// api/mcp.ts (edge / serverless function)
 import { silkweave } from '@silkweave/core'
-import { vercel } from '@silkweave/vercel'
+import { edge } from '@silkweave/edge'
 import { SearchAction } from '../actions/search.js'
 
-const { adapter, handler } = vercel()
+const { adapter, handler } = edge()
 
 await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .adapter(adapter)
@@ -427,12 +427,12 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 export default { fetch: handler }
 ```
 
-The `vercel()` function returns a compound object - `adapter` wires into the Silkweave builder, while `handler`/`GET`/`POST`/`DELETE` are the request handler for your Vercel route.
+The `edge()` function returns a compound object - `adapter` wires into the Silkweave builder, while `handler`/`GET`/`POST`/`DELETE` are the request handler for your Vercel route.
 
 **For Next.js App Router** (`app/api/mcp/route.ts`):
 
 ```typescript
-const { adapter, GET, POST, DELETE } = vercel()
+const { adapter, GET, POST, DELETE } = edge()
 
 await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .adapter(adapter)
@@ -449,7 +449,7 @@ export { GET, POST, DELETE }
 - Logging goes to `process.stderr` (Vercel log drain) and MCP client notifications
 - No CORS handling - use Next.js middleware or `vercel.json` headers
 
-**`VercelAdapterOptions`:**
+**`EdgeAdapterOptions`:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -534,7 +534,7 @@ Adapters detect streaming actions via `isStreamingAction()` at registration time
 |---------|-------------|---------------------|-------------------|
 | **MCP stdio** (`@silkweave/mcp`) | `notifications/progress` - one notification per chunk, with the JSON-stringified chunk in the `message` field and a 1-based `progress` counter | Client sends `_meta.progressToken` in the tool call (MCP SDK does this automatically when the host subscribes) | Action runs to completion; chunks are buffered and returned as the final `CallToolResult` |
 | **MCP HTTP** (`@silkweave/mcp`) | Same - `notifications/progress` carried on the session's SSE stream | Same - `_meta.progressToken` | Same |
-| **MCP Vercel** (`@silkweave/vercel`) | Same - `notifications/progress` over Streamable HTTP | Same | Same |
+| **MCP Edge** (`@silkweave/edge`) | Same - `notifications/progress` over Streamable HTTP | Same | Same |
 | **Fastify REST** (`@silkweave/fastify`) | `text/event-stream` (SSE: `data: <json>\n\n`, terminated by `event: done`) **or** `application/x-ndjson` (one JSON chunk per line) | `Accept: text/event-stream` or `Accept: application/x-ndjson` | `200 OK` with the buffered chunk array as JSON |
 | **tRPC** (`@silkweave/trpc`) | Action is registered as a tRPC **`.subscription()`** whose async generator yields chunks directly | Streaming action ⇒ always a subscription, regardless of `kind` | n/a - the consumer iterates the subscription |
 | **CLI** (`@silkweave/cli`) | NDJSON on stdout (one JSON chunk per line, backpressure-aware via `stdout.write` + `drain`) | Streaming action ⇒ always streamed | n/a |
@@ -624,7 +624,7 @@ See [`examples/ai/`](../../examples/ai) in the repo for a complete Vite + React 
 
 ## Smart Tool Results
 
-MCP adapters (stdio, HTTP, and Vercel) use `smartToolResult()` by default to format action return values. This is a server-side best practice for managing LLM context bloat:
+MCP adapters (stdio, HTTP, and Edge) use `smartToolResult()` by default to format action return values. This is a server-side best practice for managing LLM context bloat:
 
 - **Small responses** (≤ 4096 chars): returned as inline `TextContent` JSON
 - **Large responses** (> 4096 chars): split into a short text summary + a base64 **embedded resource**, keeping the LLM's context window lean while preserving full data access
@@ -927,13 +927,13 @@ interface FastifyAdapterOptions {
 import { cli } from '@silkweave/cli'
 function cli(): AdapterFactory
 
-// Vercel serverless - from @silkweave/vercel
-import { vercel } from '@silkweave/vercel'
-function vercel(options?: VercelAdapterOptions): VercelAdapter
-interface VercelAdapterOptions {
+// Edge / serverless - from @silkweave/edge
+import { edge } from '@silkweave/edge'
+function edge(options?: EdgeAdapterOptions): EdgeAdapter
+interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
 }
-interface VercelAdapter {
+interface EdgeAdapter {
   adapter: AdapterGenerator          // Pass to silkweave().adapter()
   handler: (req: Request) => Promise<Response>
   GET: (req: Request) => Promise<Response>

@@ -37,8 +37,8 @@
   "dependencies": {
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
+    "@silkweave/edge": "workspace:*",
     "@silkweave/trpc": "workspace:*",
-    "@silkweave/vercel": "workspace:*",
     "@trpc/server": "^11.7.1",
     "zod": "^3.25.0"
   },

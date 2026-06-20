@@ -1,11 +1,11 @@
 import { createRedisStore, google } from '@silkweave/auth/oauth'
 import { silkweave } from '@silkweave/core'
-import { vercel } from '@silkweave/vercel'
+import { edge } from '@silkweave/edge'
 import { Redis } from '@upstash/redis'
 import { CalculateAction } from '../../actions/calculate.js'
 import { GreetAction } from '../../actions/greet.js'
 
-const { adapter, handler } = vercel({
+const { adapter, handler } = edge({
   auth: google({
     clientId: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,

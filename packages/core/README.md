@@ -121,5 +121,5 @@ type AdapterFactory<T = void> = (options: T) => AdapterGenerator
 - [`@silkweave/mcp`](https://www.npmjs.com/package/@silkweave/mcp) - MCP stdio and HTTP adapters
 - [`@silkweave/fastify`](https://www.npmjs.com/package/@silkweave/fastify) - Fastify REST adapter
 - [`@silkweave/cli`](https://www.npmjs.com/package/@silkweave/cli) - CLI adapter
-- [`@silkweave/vercel`](https://www.npmjs.com/package/@silkweave/vercel) - Vercel serverless adapter
+- [`@silkweave/edge`](https://www.npmjs.com/package/@silkweave/edge) - Web-Standard edge/serverless adapter (Cloudflare Workers, Vercel, Bun, Deno)
 - [`@silkweave/typegen`](https://www.npmjs.com/package/@silkweave/typegen) - Build-time type generation

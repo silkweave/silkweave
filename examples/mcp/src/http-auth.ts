@@ -1,7 +1,6 @@
 import { AuthConfig } from '@silkweave/auth'
 import { createAction, silkweave } from '@silkweave/core'
 import { http } from '@silkweave/mcp'
-import { randomUUID } from 'crypto'
 import z from 'zod/v4'
 
 const API_TOKEN = process.env.API_TOKEN ?? 'test-token'
@@ -28,7 +27,6 @@ const HelloAction = createAction({
 async function main() {
   console.log(`Starting MCP HTTP server with auth (token: ${API_TOKEN})`)
   await silkweave({ name: 'silkweave-auth', description: 'Silkweave with Auth', version: '1.0.0' })
-    .set('sessionId', randomUUID)
     .adapter(http({ host: 'localhost', port: 8080, allowedHosts: ['localhost'], auth }))
     .action(HelloAction)
     .start()

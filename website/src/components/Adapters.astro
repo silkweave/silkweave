@@ -112,14 +112,14 @@ await silkweave({ name: 'my-tool', version: '1.0.0' })
   .<span class="token-function">start</span>()`
   },
   {
-    id: 'vercel',
-    label: 'Vercel',
-    pkg: '@silkweave/vercel',
+    id: 'edge',
+    label: 'Edge / Serverless',
+    pkg: '@silkweave/edge',
     raw: `import { silkweave } from '@silkweave/core'
-import { vercel } from '@silkweave/vercel'
+import { edge } from '@silkweave/edge'
 import { GreetAction } from './actions/greet.js'
 
-const { adapter, handler } = vercel()
+const { adapter, handler } = edge()
 await silkweave({ name: 'my-server', version: '1.0.0' })
   .adapter(adapter)
   .action(GreetAction)
@@ -127,10 +127,10 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 
 export default { fetch: handler }`,
     code: `<span class="token-keyword">import</span> { silkweave } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/core'</span>
-<span class="token-keyword">import</span> { vercel } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/vercel'</span>
+<span class="token-keyword">import</span> { edge } <span class="token-keyword">from</span> <span class="token-string">'@silkweave/edge'</span>
 <span class="token-keyword">import</span> { <span class="token-function">GreetAction</span> } <span class="token-keyword">from</span> <span class="token-string">'./actions/greet.js'</span>
 
-<span class="token-keyword">const</span> { adapter, handler } = <span class="token-function">vercel</span>()
+<span class="token-keyword">const</span> { adapter, handler } = <span class="token-function">edge</span>()
 <span class="token-keyword">await</span> <span class="token-function">silkweave</span>({ <span class="token-property">name</span>: <span class="token-string">'my-server'</span>, <span class="token-property">version</span>: <span class="token-string">'1.0.0'</span> })
   .<span class="token-function">adapter</span>(adapter)
   .<span class="token-function">action</span>(<span class="token-function">GreetAction</span>)

@@ -12,4 +12,7 @@ resources/
 .astro
 .DS_Store
 .env
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 store.json

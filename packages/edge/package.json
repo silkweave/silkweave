@@ -1,7 +1,7 @@
 {
-  "name": "@silkweave/vercel",
+  "name": "@silkweave/edge",
   "version": "2.6.1",
-  "description": "Silkweave Vercel Serverless Adapter",
+  "description": "Silkweave Web-Standard edge/serverless adapter (Cloudflare Workers, Vercel, Bun, Deno, Hono)",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
   "bugs": {
@@ -10,7 +10,7 @@
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/silkweave/silkweave.git",
-    "directory": "packages/vercel"
+    "directory": "packages/edge"
   },
   "type": "module",
   "main": "./build/index.mjs",

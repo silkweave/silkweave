@@ -1,17 +1,20 @@
 {
-  "name": "@silkweave/example-vercel",
+  "name": "@silkweave/example-cloudflare",
   "version": "2.6.1",
-  "description": "Silkweave Vercel/Next.js route handler example",
+  "description": "Silkweave MCP on Cloudflare Workers - stateless Streamable HTTP + Google Workspace OAuth, KV-backed store",
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"
   },
   "dependencies": {
+    "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "@silkweave/vercel": "workspace:*",
+    "@silkweave/edge": "workspace:*",
     "zod": "^3.25.0"
   },
   "devDependencies": {
@@ -21,6 +24,7 @@
     "eslint": "^10.4.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "wrangler": "^4.0.0"
   }
 }

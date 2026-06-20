@@ -6,11 +6,11 @@ import type { NextConfig } from 'next'
 const SILKWEAVE_PACKAGES = [
   '@silkweave/auth',
   '@silkweave/core',
+  '@silkweave/edge',
   '@silkweave/logger',
   '@silkweave/mcp',
   '@silkweave/nextjs',
-  '@silkweave/trpc',
-  '@silkweave/vercel'
+  '@silkweave/trpc'
 ]
 
 const nextConfig: NextConfig = {

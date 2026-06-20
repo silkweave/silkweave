@@ -4,13 +4,13 @@ import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthRespo
 import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 import { registerTools } from '@silkweave/mcp/tools'
 
-export interface VercelAdapterOptions {
+export interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
   auth?: AuthConfig
   path?: string
 }
 
-export interface VercelAdapter {
+export interface EdgeAdapter {
   adapter: AdapterGenerator
   handler: (request: Request) => Promise<Response>
   GET: (request: Request) => Promise<Response>
@@ -73,7 +73,7 @@ async function routeOAuth(
   return oauthResponseToResponse(oauthRes)
 }
 
-export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
+export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   const mcpPath = options.path ?? '/mcp'
   const callbackPath = options.auth?.callbackPath ?? '/auth/callback'
 
@@ -141,7 +141,19 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
       }
     }
 
-    // MCP transport - wait for silkweave().start() to complete
+    // MCP transport (stateless): only POST carries JSON-RPC. A standing-stream
+    // GET or a session-teardown DELETE has no session to act on - and the SDK's
+    // GET handler would open an SSE stream that never closes, hanging the request
+    // on serverless runtimes (e.g. Cloudflare Workers). Answer them with 405, which
+    // the Streamable HTTP spec explicitly permits for servers without a GET stream.
+    if (request.method !== 'POST') {
+      return new Response('Method Not Allowed', {
+        status: 405,
+        headers: { ...CORS_HEADERS, Allow: 'POST' }
+      })
+    }
+
+    // wait for silkweave().start() to complete
     await _ready
 
     let requestContext = _context!
@@ -179,7 +191,7 @@ export function vercel(options: VercelAdapterOptions = {}): VercelAdapter {
 
   const adapter: AdapterGenerator = (silkweaveOptions: SilkweaveOptions, baseContext: SilkweaveContext) => {
     _options = silkweaveOptions
-    _context = baseContext.fork({ adapter: 'vercel' })
+    _context = baseContext.fork({ adapter: 'edge' })
     return {
       context: _context,
       start: async (actions) => {

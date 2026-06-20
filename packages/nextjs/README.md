@@ -6,7 +6,7 @@ project them onto Next.js route handlers - **MCP tools** for agents and a
 
 This package is action-first and additive: it adds route files to an existing
 Next.js app, it doesn't restructure anything. Under the hood it wraps
-[`@silkweave/vercel`](../vercel) (MCP over Web-Standard Streamable HTTP) and
+[`@silkweave/edge`](../edge) (MCP over Web-Standard Streamable HTTP) and
 [`@silkweave/trpc`](../trpc) (fetch handler), adding the Next.js glue -
 catch-all path normalization, ergonomic route factories, and end-to-end tRPC
 types.

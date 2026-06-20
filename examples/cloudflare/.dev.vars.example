@@ -1,0 +1,13 @@
+# Copy to `.dev.vars` for local `wrangler dev` (gitignored; do NOT commit real secrets).
+# In production set these with `wrangler secret put <NAME>` instead.
+
+GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+
+# Any high-entropy string; signs the issued bearer tokens. Generate one with:
+#   node -e "console.log(crypto.randomUUID())"
+SIGNING_KEY=replace-with-a-random-secret
+
+# For local dev, point the resource URL at the wrangler dev origin.
+# (In production this comes from wrangler.jsonc `vars`, not here.)
+RESOURCE_URL=http://localhost:8787

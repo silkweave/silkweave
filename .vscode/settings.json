@@ -18,7 +18,7 @@
     "packages/mcp",
     "packages/typegen",
     "packages/trpc",
-    "packages/vercel"
+    "packages/edge"
   ],
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",
   "editor.formatOnSave": true,

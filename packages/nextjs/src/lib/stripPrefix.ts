@@ -9,7 +9,7 @@ export function normalizeBasePath(basePath: string): string {
 }
 
 /**
- * Rewrite a Web `Request`'s URL so the inner `@silkweave/vercel` MCP handler -
+ * Rewrite a Web `Request`'s URL so the inner `@silkweave/edge` MCP handler -
  * which matches absolute pathnames (`/mcp`, `/authorize`, `/.well-known/...`) -
  * sees canonical paths regardless of where the Next.js route is mounted.
  *

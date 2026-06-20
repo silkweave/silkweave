@@ -1,0 +1,26 @@
+{
+  "name": "@silkweave/example-edge",
+  "version": "2.6.1",
+  "description": "Silkweave Web-Standard edge adapter route handler example (Vercel/Next.js/serverless)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "check": "pnpm lint && pnpm typecheck"
+  },
+  "dependencies": {
+    "@silkweave/core": "workspace:*",
+    "@silkweave/edge": "workspace:*",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^10.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}

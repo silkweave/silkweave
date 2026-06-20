@@ -79,7 +79,7 @@ function formatToolResult(action: Action, result: object | object[], context: Si
 
 /**
  * Register every action as an MCP tool on `server`. Shared by all MCP transports
- * (`stdio`, `http`, `vercel`). Each tool call forks `context` with a per-call
+ * (`stdio`, `http`, `edge`). Each tool call forks `context` with a per-call
  * `logger`, the SDK `extra`, a synthesized `request` (see `requestFromExtra`),
  * and - when bearer auth ran for this request - the resolved `auth`. The result
  * is formatted by the action's `toolResult` hook if present, otherwise per the

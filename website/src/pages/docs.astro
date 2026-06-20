@@ -296,7 +296,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
         <tr><td><code>@silkweave/mcp</code></td><td>MCP stdio and streamable HTTP adapters</td></tr>
         <tr><td><code>@silkweave/fastify</code></td><td>Fastify REST API with auto-generated Swagger UI</td></tr>
         <tr><td><code>@silkweave/cli</code></td><td>CLI adapter with Commander + Clack prompts</td></tr>
-        <tr><td><code>@silkweave/vercel</code></td><td>Stateless MCP over Vercel / Web Standard serverless</td></tr>
+        <tr><td><code>@silkweave/edge</code></td><td>Stateless MCP over Web Standard edge / serverless (Vercel, Cloudflare, Bun)</td></tr>
         <tr><td><code>@silkweave/typegen</code></td><td>Build-time <code>.d.ts</code> generation from action Zod schemas</td></tr>
         <tr><td><code>@silkweave/auth</code></td><td>OAuth 2.1 proxy, bearer token validation</td></tr>
       </tbody>
@@ -321,7 +321,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
       </div>
       <pre><code set:html={hl(wireRaw)} /></pre>
     </div>
-    <p>Swap <code>stdio()</code> for <code>http()</code>, <code>fastify()</code>, <code>cli()</code>, or <code>vercel()</code> - the action stays identical.</p>
+    <p>Swap <code>stdio()</code> for <code>http()</code>, <code>fastify()</code>, <code>cli()</code>, or <code>edge()</code> - the action stays identical.</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -385,7 +385,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
         <tr><td><code>http()</code></td><td><code>@silkweave/mcp</code></td><td>MCP Streamable HTTP (Express)</td></tr>
         <tr><td><code>fastify()</code></td><td><code>@silkweave/fastify</code></td><td>REST API + Swagger UI</td></tr>
         <tr><td><code>cli()</code></td><td><code>@silkweave/cli</code></td><td>CLI via Commander + Clack</td></tr>
-        <tr><td><code>vercel()</code></td><td><code>@silkweave/vercel</code></td><td>Stateless MCP (Web Standard)</td></tr>
+        <tr><td><code>edge()</code></td><td><code>@silkweave/edge</code></td><td>Stateless MCP (Web Standard)</td></tr>
         <tr><td><code>typegen()</code></td><td><code>@silkweave/typegen</code></td><td>Build-time <code>.d.ts</code> type generation</td></tr>
       </tbody>
     </table>
@@ -689,14 +689,14 @@ await silkweave({ name: 'my-tool', version: '1.0.0' })
     </ul>
   </section>
 
-  <section id="adapter-vercel">
-    <h3>Vercel Serverless</h3>
-    <p>The <code>vercel()</code> adapter creates a stateless MCP server for serverless environments. It uses Web Standard <code>Request</code> / <code>Response</code> APIs, making it compatible with <strong>Vercel, Cloudflare Workers, and Bun</strong>.</p>
+  <section id="adapter-edge">
+    <h3>Edge / Serverless</h3>
+    <p>The <code>edge()</code> adapter creates a stateless MCP server for serverless environments. It uses Web Standard <code>Request</code> / <code>Response</code> APIs, making it compatible with <strong>Vercel, Cloudflare Workers, and Bun</strong>.</p>
     <div class="code-block">
       <div class="code-block-header"><span>api/mcp/route.ts</span></div>
-      <pre><code set:html={hl(`import { vercel } from '@silkweave/vercel'
+      <pre><code set:html={hl(`import { edge } from '@silkweave/edge'
 
-const { adapter, GET, POST, DELETE } = vercel()
+const { adapter, GET, POST, DELETE } = edge()
 await silkweave({ name: 'my-server', version: '1.0.0' })
   .adapter(adapter)
   .action(GreetAction)
@@ -707,9 +707,11 @@ export { GET, POST, DELETE }`)} /></pre>
     <ul>
       <li>Each request creates a fresh MCP server instance (fully stateless)</li>
       <li>Uses <code>WebStandardStreamableHTTPServerTransport</code> from the MCP SDK</li>
+      <li>Only <code>POST</code> carries JSON-RPC; <code>GET</code> / <code>DELETE</code> return <code>405</code> (stateless mode has no SSE stream or session to tear down)</li>
       <li>Supports OAuth 2.1 and bearer token auth</li>
       <li><a href="#streaming">Streaming actions</a> deliver chunks as MCP <code>notifications/progress</code> just like the stateful HTTP adapter</li>
     </ul>
+    <p>The same handler runs unchanged on <strong>Cloudflare Workers</strong>. The <a href="https://github.com/silkweave/silkweave/tree/master/examples/cloudflare"><code>examples/cloudflare</code></a> example is a full Worker deployment - stateless MCP + Google Workspace OAuth 2.1 with OAuth state in <strong>Cloudflare KV</strong> (Workers have no filesystem, so it reuses <code>createRedisStore</code> over a tiny KV adapter) - with a from-scratch Cloudflare + Google setup guide.</p>
   </section>
 
   <section id="adapter-typegen">
@@ -815,7 +817,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
     </div>
     <ul>
       <li>Chain as many adapters as you need; the same actions are exposed on every transport (filterable per-action via <code>isEnabled</code>).</li>
-      <li>For serverless runtimes, use the fetch-handler adapters (<a href="#adapter-trpc"><code>trpcFetch</code></a>, <a href="#adapter-vercel"><code>vercel</code></a>) instead of server-binding ones.</li>
+      <li>For serverless runtimes, use the fetch-handler adapters (<a href="#adapter-trpc"><code>trpcFetch</code></a>, <a href="#adapter-edge"><code>edge</code></a>) instead of server-binding ones.</li>
       <li>Full reference: <a href="#adapter-reference">Adapter Reference</a> ↑</li>
     </ul>
   </section>
@@ -936,7 +938,7 @@ export class AppModule {}`)} /></pre>
 
   <section id="integration-nextjs">
     <h3><img src="/nextjs.svg" alt="Next.js logo" class="integration-heading-logo" width="28" height="28" /> Next.js</h3>
-    <p>The <a href="https://www.npmjs.com/package/@silkweave/nextjs"><code>@silkweave/nextjs</code></a> package projects <strong>one action set</strong> onto Next.js <strong>App Router</strong> route handlers - <strong>MCP tools</strong> for agents and a typed <strong>tRPC endpoint</strong> for your frontend - from a single source of truth. It's <strong>action-first</strong> (define a Silkweave action, then mount it) and <strong>additive</strong> (it only adds route files). Under the hood it wraps <a href="#adapter-vercel"><code>vercel()</code></a> (MCP) and <a href="#adapter-trpc"><code>trpcFetch()</code></a>, adding catch-all path normalization and end-to-end tRPC types. App Router only; the package has no <code>next</code>/<code>react</code> dependency.</p>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nextjs"><code>@silkweave/nextjs</code></a> package projects <strong>one action set</strong> onto Next.js <strong>App Router</strong> route handlers - <strong>MCP tools</strong> for agents and a typed <strong>tRPC endpoint</strong> for your frontend - from a single source of truth. It's <strong>action-first</strong> (define a Silkweave action, then mount it) and <strong>additive</strong> (it only adds route files). Under the hood it wraps <a href="#adapter-edge"><code>edge()</code></a> (MCP) and <a href="#adapter-trpc"><code>trpcFetch()</code></a>, adding catch-all path normalization and end-to-end tRPC types. App Router only; the package has no <code>next</code>/<code>react</code> dependency.</p>
     <h4>Install</h4>
     <div class="code-block">
       <pre><code set:html={hl(`pnpm add @silkweave/nextjs @silkweave/core
