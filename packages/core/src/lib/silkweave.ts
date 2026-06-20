@@ -1,6 +1,7 @@
 import { Action } from '../util/action.js'
 import { Adapter, AdapterGenerator, SilkweaveOptions } from '../util/adapter.js'
 import { createContext } from '../util/context.js'
+import { reportActionLint } from '../util/lint.js'
 
 export type { SilkweaveOptions } from '../util/adapter.js'
 
@@ -41,6 +42,7 @@ export function silkweave(options: SilkweaveOptions): Silkweave {
       return builder
     },
     start: async () => {
+      if (options.lint !== false) { reportActionLint(actions) }
       await Promise.all(adapters.map((adapter) => {
         const filtered = adapter.allActions
           ? actions

@@ -5,6 +5,13 @@ export interface SilkweaveOptions {
   name: string
   description: string
   version: string
+  /**
+   * Run the dev-time action linter on `start()` (warns about missing/short tool
+   * descriptions and undescribed input params - mistakes that degrade agent
+   * tool-use). Warnings go to stderr via `console.warn`. Default `true`; set
+   * `false` to silence in production.
+   */
+  lint?: boolean
 }
 
 export interface Adapter {

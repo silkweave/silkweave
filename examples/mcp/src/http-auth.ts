@@ -19,8 +19,8 @@ const auth: AuthConfig = {
 
 const HelloAction = createAction({
   name: 'hello',
-  description: 'Say hello',
-  input: z.object({ name: z.string() }),
+  description: 'Greet a person by name and return a friendly greeting message.',
+  input: z.object({ name: z.string().describe('The name of the person to greet.') }),
   output: z.object({ message: z.string() }),
   run: async ({ name }) => ({ message: `Hello, ${name}!` })
 })
