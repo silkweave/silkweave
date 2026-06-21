@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/nestjs",
-  "version": "2.6.1",
+  "version": "3.0.0",
   "description": "Silkweave NestJS Adapter",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",

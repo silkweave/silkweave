@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/typegen",
-  "version": "2.6.1",
+  "version": "3.0.0",
   "description": "Silkweave Type Generator",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",

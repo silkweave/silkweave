@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-nextjs",
-  "version": "2.6.1",
+  "version": "3.0.0",
   "description": "Silkweave Next.js App Router example - one action set as MCP tools + tRPC endpoint",
   "private": true,
   "type": "module",
