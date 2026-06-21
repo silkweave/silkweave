@@ -41,7 +41,6 @@ export const releases: Release[] = [
   {
     version: '3.0.0',
     date: '2026-06-21',
-    unreleased: true,
     summary: 'A stateless, web-standard, agent-first 3.0: sessionless MCP transport, a leaner auth and dependency surface, and the Vercel adapter generalised into a portable edge adapter.',
     changes: [
       {
