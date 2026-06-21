@@ -51,7 +51,8 @@ const sections = [
     { id: 'actions', label: 'Actions' },
     { id: 'adapters', label: 'Adapters' },
     { id: 'context', label: 'Context & DI' },
-    { id: 'streaming', label: 'Streaming Actions' }
+    { id: 'streaming', label: 'Streaming Actions' },
+    { id: 'action-linter', label: 'Action Linter' }
   ]},
   { id: 'adapter-reference', label: 'Adapter Reference', children: [
     { id: 'adapter-mcp-stdio', label: 'MCP (stdio)' },
@@ -61,6 +62,7 @@ const sections = [
     { id: 'adapter-trpc', label: 'tRPC' },
     { id: 'adapter-cli', label: 'CLI' },
     { id: 'adapter-edge', label: 'Edge / Serverless' },
+    { id: 'web-standard-tools', label: 'Express-optional tools' },
     { id: 'adapter-typegen', label: 'Type Generation' }
   ]},
   { id: 'integrations', label: 'Integrations', children: [
@@ -74,6 +76,7 @@ const sections = [
     { id: 'result-utilities', label: 'Result Utilities' }
   ]},
   { id: 'authentication', label: 'Authentication', children: [
+    { id: 'auth-split', label: 'Resource server vs. OAuth' },
     { id: 'bearer-token', label: 'Bearer Token' },
     { id: 'oauth', label: 'OAuth 2.1' },
     { id: 'per-action-guards', label: 'Per-Action Guards' }

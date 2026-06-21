@@ -39,6 +39,54 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '3.0.0',
+    date: '2026-06-21',
+    unreleased: true,
+    summary: 'A stateless, web-standard, agent-first 3.0: sessionless MCP transport, a leaner auth and dependency surface, and the Vercel adapter generalised into a portable edge adapter.',
+    changes: [
+      {
+        type: 'breaking',
+        text: 'Renamed @silkweave/vercel to @silkweave/edge, and its adapter vercel() to edge() (types EdgeAdapter/EdgeAdapterOptions; umbrella subpath silkweave/edge). It is platform-agnostic Web-Standard - one adapter for Cloudflare Workers, Vercel, Bun, Deno, Hono, and Next.js. Update imports; there is no back-compat alias.',
+        commit: '44f5257'
+      },
+      {
+        type: 'breaking',
+        text: 'The MCP HTTP transport is now stateless: no Mcp-Session-Id, no session map, no GET/DELETE reconnect. Each request mints a fresh transport, so servers scale horizontally with zero shared in-memory state.',
+        commit: '5c82214'
+      },
+      {
+        type: 'breaking',
+        text: '@silkweave/auth is split: the spec-required resource-server core (bearer-token validation + protected-resource metadata, jose-only) stays at the root, while the OAuth 2.1 authorization-server proxy (PKCE, refresh tokens, CIMD, dynamic client registration) plus the persistence stores move behind the opt-in @silkweave/auth/oauth subpath. A pure resource server no longer pulls the issuer machinery into its graph.',
+        commit: '5c82214'
+      },
+      {
+        type: 'breaking',
+        text: 'express and cors are now optional peerDependencies of @silkweave/mcp (needed only for the Express http() server). The transport-agnostic tool-registration and result helpers are re-exported from the express-free @silkweave/mcp/tools subpath, which the web-standard adapters import - so serverless bundles and installs never pull Express.',
+        commit: '832100f'
+      },
+      {
+        type: 'feature',
+        text: 'Resource-server hardening for the 2026 OAuth SEPs: audience binding (RFC 8707), issuer binding (RFC 9207), step-up scope challenges (SEP-2350), and scopes_supported in protected-resource metadata (RFC 9728).',
+        commit: '4c0d13d'
+      },
+      {
+        type: 'feature',
+        text: 'Action linter guardrail: silkweave().start() warns at dev time about agent-hostile action definitions (missing or throwaway descriptions, undescribed input params) - the cheap mistakes that quietly degrade an agent\'s tool use. Disable with SilkweaveOptions.lint: false.',
+        commit: 'ad52cc9'
+      },
+      {
+        type: 'feature',
+        text: 'New Cloudflare Workers example: stateless MCP + Google Workspace OAuth 2.1 with OAuth state in Cloudflare KV (reusing createRedisStore over a tiny KV adapter, since Workers have no filesystem). Ships with a from-scratch Cloudflare + Google setup guide.',
+        commit: '44f5257'
+      },
+      {
+        type: 'fix',
+        text: 'The edge adapter answers GET/DELETE on the MCP endpoint with 405 in stateless mode, instead of opening a never-closing SSE stream that hangs the request on serverless runtimes (Cloudflare cancelled it as "hung").',
+        commit: '44f5257'
+      }
+    ]
+  },
+  {
     version: '2.6.1',
     date: '2026-06-18',
     summary: 'Slimmer dependency tree - pino dropped entirely, and the CLI proxy no longer leaks into the MCP server path.',

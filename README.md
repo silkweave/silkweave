@@ -31,6 +31,7 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
 
 - [Why Silkweave](#why-silkweave)
 - [Packages](#packages)
+  - [Express-Optional MCP](#express-optional-mcp)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
   - [Actions](#actions)
@@ -47,11 +48,15 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
   - [NestJS](#nestjs)
   - [Next.js](#nextjs)
   - [Vercel AI SDK](#vercel-ai-sdk)
+- [Authentication](#authentication)
+  - [Resource-Server Core](#resource-server-core)
+  - [Opt-in OAuth 2.1](#opt-in-oauth-21)
 - [Logging and Progress](#logging-and-progress)
 - [Advanced Patterns](#advanced-patterns)
   - [Multiple Adapters Simultaneously](#multiple-adapters-simultaneously)
   - [CLI Arguments vs Options](#cli-arguments-vs-options)
   - [Complex Input Types](#complex-input-types)
+  - [Action Linter](#action-linter)
 - [MCP Client Configuration](#mcp-client-configuration)
 - [API Reference](#api-reference)
 - [Development](#development)
@@ -81,7 +86,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | Package | npm | Description |
 |---------|-----|-------------|
 | `@silkweave/core` | [![npm](https://img.shields.io/npm/v/@silkweave/core)](https://www.npmjs.com/package/@silkweave/core) | Core library - actions, adapters, builder, context, logger, utilities |
-| `@silkweave/auth` | [![npm](https://img.shields.io/npm/v/@silkweave/auth)](https://www.npmjs.com/package/@silkweave/auth) | Auth - OAuth 2.1 proxy (PKCE, refresh, dynamic client registration), bearer-token validation, protected-resource metadata (RFC 9728) |
+| `@silkweave/auth` | [![npm](https://img.shields.io/npm/v/@silkweave/auth)](https://www.npmjs.com/package/@silkweave/auth) | Auth - resource-server core (bearer-token validation + protected-resource metadata, RFC 9728); opt-in OAuth 2.1 authorization-server proxy (PKCE, refresh, CIMD, dynamic client registration) via `@silkweave/auth/oauth` |
 | `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
 | `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + clack terminal UI |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
@@ -91,7 +96,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/nextjs` | [![npm](https://img.shields.io/npm/v/@silkweave/nextjs)](https://www.npmjs.com/package/@silkweave/nextjs) | Next.js App Router adapter - `defineSilkweave({ actions })` projects one action set onto MCP + tRPC route handlers |
 | `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - wrap `streamText` as a streaming action and feed `useChat` over a tRPC subscription |
 | `@silkweave/typegen` | [![npm](https://img.shields.io/npm/v/@silkweave/typegen)](https://www.npmjs.com/package/@silkweave/typegen) | Type generator - emit `.d.ts` interfaces from action Zod schemas |
-| `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - pino, clack, and MCP notification support |
+| `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - zero-dependency structured logger (JSON lines), optional clack terminal UI, and MCP notification support |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
 
@@ -116,6 +121,21 @@ pnpm add @silkweave/core @silkweave/nestjs
 
 # Next.js App Router (MCP + tRPC)
 pnpm add @silkweave/core @silkweave/nextjs
+```
+
+### Express-Optional MCP
+
+`express` and `cors` are **optional `peerDependencies`** of `@silkweave/mcp` - they are only needed for the Express-based `http()` server. The transport-agnostic tool-registration and result helpers are re-exported from the express-free **`@silkweave/mcp/tools`** subpath, which the Web-Standard adapters (`@silkweave/edge`, `@silkweave/nextjs`) import. This means a serverless bundle or install never pulls Express into its graph.
+
+```typescript
+// Express-free: tool-registration + result helpers, no express/cors
+import { registerTools, smartToolResult } from '@silkweave/mcp/tools'
+```
+
+If you use the Express `http()` server, install the peers:
+
+```bash
+pnpm add @silkweave/core @silkweave/mcp express cors
 ```
 
 ---
@@ -566,6 +586,55 @@ export const { GET, POST, OPTIONS } = app.trpc({ endpoint: '/api/trpc' })
 
 ---
 
+## Authentication
+
+[`@silkweave/auth`](https://www.npmjs.com/package/@silkweave/auth) is split into two layers so a pure resource server never pulls the OAuth issuer machinery into its graph:
+
+- **Root (`@silkweave/auth`)** - the spec-required **resource-server core** (jose-only): validate bearer tokens, delegate issuance to an external IdP.
+- **`@silkweave/auth/oauth`** - the opt-in **authorization-server** layer: front your own OAuth 2.1 flow, with persistence stores.
+
+`AuthConfig` is accepted by the MCP `http()`, `edge()`, tRPC, and framework adapters.
+
+### Resource-Server Core
+
+The root export is the minimal, spec-required core: bearer-token validation (expiry + issuer binding per RFC 9207, audience binding per RFC 8707, step-up `scope` challenge per SEP-2350) plus protected-resource metadata (RFC 9728, including `scopes_supported`). It is **jose-only** - importing it never pulls the OAuth issuer machinery.
+
+```typescript
+import { edge } from '@silkweave/edge'
+import type { AuthConfig } from '@silkweave/auth'
+
+const auth: AuthConfig = {
+  // validate the bearer token against your external IdP
+  verifyToken: async (token) => {
+    const claims = await validateWithIdp(token)
+    return { token, clientId: claims.sub, scopes: claims.scope?.split(' ') ?? [] }
+  }
+}
+
+const { adapter, handler } = edge({ auth })
+```
+
+### Opt-in OAuth 2.1
+
+To front your own OAuth 2.1 flow, import from the **`@silkweave/auth/oauth`** subpath. This is where the authorization-server proxy lives - PKCE, refresh tokens, client ID metadata documents (CIMD), and dynamic client registration - along with the persistence stores (memory, JSON file, and Redis). Providers like `google()` and the `createRedisStore` / `createJsonStore` factories all come from this subpath.
+
+```typescript
+import { edge } from '@silkweave/edge'
+import { google, createJsonStore } from '@silkweave/auth/oauth'
+
+const auth = google({
+  clientId: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  store: createJsonStore('./oauth-state.json')
+})
+
+const { adapter, handler } = edge({ auth })
+```
+
+Importing only `@silkweave/auth` keeps the issuer/store machinery out of your bundle; reach for `@silkweave/auth/oauth` only when you run the OAuth 2.1 flow yourself.
+
+---
+
 ## Logging and Progress
 
 Every action receives a `context.logger` with eight severity levels plus a progress reporter:
@@ -685,6 +754,21 @@ export const ImportAction = createAction({
 ```
 
 In MCP, this becomes a tool with a full JSON Schema. In the CLI, `tags` becomes `--tags <json>` accepting a JSON string. In Fastify, it's a documented POST body.
+
+### Action Linter
+
+Silkweave ships a dev-time guardrail that flags **agent-hostile** action definitions - missing or throwaway `description` text and undescribed input params - the cheap mistakes that quietly degrade an agent's tool use.
+
+`silkweave().start()` runs the linter automatically, emitting warnings to stderr via `console.warn` (safe for stdio servers). Disable it with `SilkweaveOptions.lint: false`:
+
+```typescript
+await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0', lint: false })
+  .adapter(stdio())
+  .action(MyAction)
+  .start()
+```
+
+You can also run it directly via `lintActions(actions)` (returns the findings) or `reportActionLint(actions)` (prints them), both exported from `@silkweave/core`.
 
 ---
 

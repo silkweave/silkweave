@@ -70,7 +70,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
   .action(GreetAction)
   .start()`
 
-const oauthRaw = `import { google, createJsonStore } from '@silkweave/auth'
+const oauthRaw = `import { google, createJsonStore } from '@silkweave/auth/oauth'
 
 const auth = google({
   clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -298,7 +298,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
         <tr><td><code>@silkweave/cli</code></td><td>CLI adapter with Commander + Clack prompts</td></tr>
         <tr><td><code>@silkweave/edge</code></td><td>Stateless MCP over Web Standard edge / serverless (Vercel, Cloudflare, Bun)</td></tr>
         <tr><td><code>@silkweave/typegen</code></td><td>Build-time <code>.d.ts</code> generation from action Zod schemas</td></tr>
-        <tr><td><code>@silkweave/auth</code></td><td>OAuth 2.1 proxy, bearer token validation</td></tr>
+        <tr><td><code>@silkweave/auth</code></td><td>Resource-server core (bearer validation, protected-resource metadata); OAuth 2.1 proxy behind <code>/oauth</code></td></tr>
       </tbody>
     </table>
   </section>
@@ -489,6 +489,20 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
       <li><strong>tRPC subscriptions</strong> - typed async-iterable client-side; trivial to fan out chunk-by-chunk</li>
       <li><strong>CLI NDJSON</strong> - <code>your-tool generate-messages | jq</code> processes each line as it arrives</li>
     </ul>
+  </section>
+
+  <section id="action-linter">
+    <h3>Action Linter</h3>
+    <p>The action linter is a dev-time guardrail that flags agent-hostile action definitions - the cheap mistakes that quietly degrade an agent's tool use. It catches a missing or throwaway <code>description</code> and undescribed input params, exactly the metadata an LLM relies on to pick and call the right tool.</p>
+    <p><code>silkweave().start()</code> runs the linter automatically, writing warnings to stderr via <code>console.warn</code> (safe for stdio, where stdout is the protocol channel). Disable it with <code>SilkweaveOptions.lint: false</code>:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>server.ts</span></div>
+      <pre><code set:html={hl(`await silkweave({ name: 'my-server', version: '1.0.0', lint: false })
+  .adapter(stdio())
+  .action(GreetAction)
+  .start()`)} /></pre>
+    </div>
+    <p>You can also run it directly: <code>lintActions(actions)</code> returns the findings, and <code>reportActionLint(actions)</code> prints them (both from <code>@silkweave/core</code>).</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -712,6 +726,21 @@ export { GET, POST, DELETE }`)} /></pre>
       <li><a href="#streaming">Streaming actions</a> deliver chunks as MCP <code>notifications/progress</code> just like the stateful HTTP adapter</li>
     </ul>
     <p>The same handler runs unchanged on <strong>Cloudflare Workers</strong>. The <a href="https://github.com/silkweave/silkweave/tree/master/examples/cloudflare"><code>examples/cloudflare</code></a> example is a full Worker deployment - stateless MCP + Google Workspace OAuth 2.1 with OAuth state in <strong>Cloudflare KV</strong> (Workers have no filesystem, so it reuses <code>createRedisStore</code> over a tiny KV adapter) - with a from-scratch Cloudflare + Google setup guide.</p>
+  </section>
+
+  <section id="web-standard-tools">
+    <h3>Express-optional / Web Standard tools</h3>
+    <p><code>express</code> and <code>cors</code> are <strong>optional peer dependencies</strong> of <code>@silkweave/mcp</code> - they are only needed for the Express-based <code>http()</code> server. A serverless deployment never installs or bundles them.</p>
+    <p>The transport-agnostic tool-registration and result helpers are re-exported from the express-free <code>@silkweave/mcp/tools</code> subpath, which the Web Standard adapters (<code>@silkweave/edge</code> and <code>@silkweave/nextjs</code>) import - so serverless bundles and installs never pull Express in.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Express-free imports</span></div>
+      <pre><code set:html={hl(`// Express-free: tool registration + result helpers for Web Standard runtimes
+import { registerTools, smartToolResult } from '@silkweave/mcp/tools'`)} /></pre>
+    </div>
+    <ul>
+      <li>Import <code>@silkweave/mcp</code> (the <code>http()</code> server) only when you want the Express transport - install <code>express</code> + <code>cors</code> alongside it</li>
+      <li>The <code>edge()</code> and <code>@silkweave/nextjs</code> adapters use <code>@silkweave/mcp/tools</code>, keeping Express out of serverless bundles</li>
+    </ul>
   </section>
 
   <section id="adapter-typegen">
@@ -1101,6 +1130,26 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
     <p><code>@silkweave/auth</code> provides authentication for MCP and REST adapters. It supports bearer token validation and a full OAuth 2.1 proxy with PKCE, refresh tokens, and dynamic client registration.</p>
   </section>
 
+  <section id="auth-split">
+    <h3>Resource server core vs. opt-in OAuth</h3>
+    <p><code>@silkweave/auth</code> is split into two layers so a pure resource server never pulls the OAuth issuer machinery into its dependency graph.</p>
+    <p>The <strong>package root</strong> is the spec-required <strong>resource-server core</strong> (<code>jose</code>-only). It validates bearer tokens and serves protected-resource metadata:</p>
+    <ul>
+      <li><strong>Bearer token validation</strong> - expiry + issuer binding (RFC 9207), audience binding (RFC 8707), and step-up <code>scope</code> challenges (SEP-2350)</li>
+      <li><strong>Protected resource metadata</strong> - RFC 9728 discovery, including <code>scopes_supported</code></li>
+    </ul>
+    <p>The OAuth 2.1 <strong>authorization-server proxy</strong> (PKCE, refresh tokens, CIMD, dynamic client registration) and the persistence stores (memory / JSON file / Redis) live behind the opt-in <code>@silkweave/auth/oauth</code> subpath. Providers like <code>google()</code> and <code>createRedisStore</code> / <code>createJsonStore</code> are imported from there:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Imports by use case</span></div>
+      <pre><code set:html={hl(`// Resource server only - validate tokens, delegate issuance to an external IdP
+import { AuthConfig } from '@silkweave/auth'
+
+// Front your own OAuth 2.1 flow - pulls in the issuer machinery
+import { google, createRedisStore, createJsonStore } from '@silkweave/auth/oauth'`)} /></pre>
+    </div>
+    <p>Use the root when you want to <strong>validate bearer tokens and delegate issuance to an external IdP</strong>; reach for <code>@silkweave/auth/oauth</code> when you front your own OAuth flow.</p>
+  </section>
+
   <section id="bearer-token">
     <h3>Bearer Token</h3>
     <p>The simplest auth setup - provide a <code>verifyToken</code> callback that validates tokens against your own logic:</p>
@@ -1123,7 +1172,7 @@ if (auth) {
 
   <section id="oauth">
     <h3>OAuth 2.1</h3>
-    <p>For production use, Silkweave includes a full OAuth 2.1 proxy. The <code>google()</code> helper pre-configures Google as the upstream provider:</p>
+    <p>For production use, Silkweave includes a full OAuth 2.1 proxy behind the opt-in <code>@silkweave/auth/oauth</code> subpath (see <a href="#auth-split">Resource server core vs. opt-in OAuth</a>). The <code>google()</code> helper pre-configures Google as the upstream provider:</p>
     <div class="code-block">
       <div class="code-block-header">
         <span>server.ts</span>
@@ -1138,7 +1187,7 @@ if (auth) {
       <li><strong>Dynamic client registration</strong> - RFC 7591 support</li>
       <li><strong>Protected Resource Metadata</strong> - RFC 9728 discovery</li>
     </ul>
-    <p>Storage backends: <code>createMemoryStore()</code> (development), <code>createJsonStore(path)</code> (file-based), <code>createRedisStore(redis)</code> (production).</p>
+    <p>Storage backends (also from <code>@silkweave/auth/oauth</code>): <code>createMemoryStore()</code> (development), <code>createJsonStore(path)</code> (file-based), <code>createRedisStore(redis)</code> (production).</p>
   </section>
 
   <section id="per-action-guards">
