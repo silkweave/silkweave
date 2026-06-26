@@ -1,0 +1,163 @@
+---
+import PageLayout from '../layouts/PageLayout.astro'
+
+export const prerender = true
+
+const slug = 'terms'
+const title = 'Terms of Service'
+const eyebrow = 'Legal'
+const heading = 'Terms of <span class="grad">Service</span>'
+const description =
+  'The terms that govern your use of the Silkweave website, sign-in, and hosted services. The open-source packages stay under the MIT license.'
+const lastUpdated = 'June 26, 2026'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.silkweave.dev' },
+    { '@type': 'ListItem', position: 2, name: 'Terms of Service', item: 'https://www.silkweave.dev/terms' }
+  ]
+}
+---
+
+<PageLayout
+  title={title}
+  description={description}
+  slug={slug}
+  eyebrow={eyebrow}
+  heading={heading}
+  intro="These terms cover the Silkweave website and any hosted service you sign in to. They are not meant to be a wall of fine print, but they do form a binding agreement, so please read them. If you do not agree with them, that is fine, but you should not use the hosted Service."
+  jsonLd={jsonLd}
+>
+  <p><strong>Last updated:</strong> {lastUpdated}</p>
+
+  <h2 id="agreement">1. Agreement to these terms</h2>
+  <p>
+    These Terms of Service (the "Terms") are an agreement between you and
+    <strong>Atomic BI Pte. Ltd.</strong>, a company incorporated in Singapore ("Atomic", "Silkweave",
+    "we", "us"). By signing in to or using the Silkweave website at <code>silkweave.dev</code> and any
+    hosted accounts or services linked to it (the "Service"), you agree to these Terms. If you are using
+    the Service for an organisation, you confirm you have authority to accept these Terms on its behalf.
+  </p>
+
+  <h2 id="open-source">2. The open-source packages are separate</h2>
+  <p>
+    Silkweave is, first and foremost, an open-source toolkit. The Silkweave packages published on npm and
+    GitHub are licensed under the <a href="https://github.com/silkweave/silkweave/blob/master/LICENSE" target="_blank" rel="noopener">MIT
+    License</a>, and your rights to use that code come from that license, not from these Terms. These
+    Terms govern the hosted website and sign-in only. If anything here ever appears to conflict with the
+    MIT License as it applies to the code, the MIT License wins for the code.
+  </p>
+  <div class="callout">
+    <span class="callout-icon">✦</span>
+    <p>Short version: install and self-host the libraries however you like under MIT. These Terms only
+    kick in when you use our hosted website and sign-in.</p>
+  </div>
+
+  <h2 id="accounts">3. Accounts and sign-in</h2>
+  <p>
+    To use parts of the Service you sign in with a third-party identity provider such as Google or
+    GitHub. You are responsible for the account you sign in with and for keeping access to it secure. You
+    must be at least 16 years old, and you must give accurate information and keep it current. How we
+    handle the data we receive at sign-in is set out in our
+    <a href="/privacy">Privacy Policy</a>.
+  </p>
+
+  <h2 id="acceptable-use">4. Acceptable use</h2>
+  <p>When you use the Service, you agree not to:</p>
+  <ul>
+    <li>break the law or infringe anyone else's rights;</li>
+    <li>attempt to gain unauthorised access to the Service, other accounts, or our systems;</li>
+    <li>probe, scan, overload, or disrupt the Service, or get around its limits and security;</li>
+    <li>reverse engineer or misuse the hosted Service (this is separate from your MIT rights to the
+      open-source code);</li>
+    <li>use the Service to build or train a competing product by scraping or bulk-extracting it; or</li>
+    <li>upload anything malicious or unlawful.</li>
+  </ul>
+
+  <h2 id="ip">5. Intellectual property and brand</h2>
+  <p>
+    The source code is yours to use under MIT. The Silkweave name, logo, and the look and content of
+    the website are ours (or our licensors'), and nothing here gives you the right to use the Silkweave
+    name or logo to imply endorsement or affiliation without our permission. You keep ownership of any
+    content you submit, and you grant us the limited permission we need to host and operate the Service
+    for you.
+  </p>
+
+  <h2 id="third-party">6. Third-party services</h2>
+  <p>
+    The Service relies on third parties, including Google and GitHub for sign-in and various
+    infrastructure providers for hosting. Your use of those services is also subject to their terms, and
+    we are not responsible for them. If a third-party provider changes or removes something we depend on,
+    parts of the Service may change too.
+  </p>
+
+  <h2 id="availability">7. Changes and availability</h2>
+  <p>
+    Silkweave is a small, independent project, and we offer the hosted Service on a best-effort basis. We
+    may add, change, or remove features, and we may suspend or stop the hosted Service at any time. We
+    will try to give reasonable notice of major changes where we can, but we are not obliged to keep any
+    particular feature running.
+  </p>
+
+  <h2 id="disclaimer">8. Disclaimer of warranties</h2>
+  <p>
+    The Service is provided "as is" and "as available", without warranties of any kind, whether express
+    or implied, including any implied warranties of merchantability, fitness for a particular purpose,
+    and non-infringement. We do not warrant that the Service will be uninterrupted, error-free, or
+    secure. You use it at your own risk, to the fullest extent permitted by law.
+  </p>
+
+  <h2 id="liability">9. Limitation of liability</h2>
+  <p>
+    To the fullest extent permitted by law, Atomic and its directors and contributors will not be liable
+    for any indirect, incidental, special, consequential, or punitive damages, or for any loss of data,
+    profits, or goodwill, arising from your use of the Service. Our total liability for any claim
+    relating to the Service is limited to the amount you paid us for it in the twelve months before the
+    claim, or, if you paid us nothing (as is the case for the free Service), to SGD 100. Some
+    jurisdictions do not allow these limits, so they may not fully apply to you.
+  </p>
+
+  <h2 id="indemnity">10. Indemnity</h2>
+  <p>
+    You agree to indemnify and hold Atomic harmless from any claims, losses, or costs (including
+    reasonable legal fees) arising from your misuse of the Service or your breach of these Terms or of
+    any law or third-party right.
+  </p>
+
+  <h2 id="termination">11. Termination</h2>
+  <p>
+    You can stop using the Service and delete your account at any time. We may suspend or end your access
+    if you breach these Terms or misuse the Service. When access ends, the sections that by their nature
+    should survive (such as intellectual property, disclaimers, liability limits, and governing law) will
+    continue to apply.
+  </p>
+
+  <h2 id="governing-law">12. Governing law and disputes</h2>
+  <p>
+    These Terms are governed by the laws of Singapore, without regard to its conflict-of-laws rules. You
+    and we agree to submit to the exclusive jurisdiction of the courts of Singapore for any dispute
+    arising out of or relating to these Terms or the Service, except where mandatory local consumer law
+    gives you the right to bring a claim elsewhere.
+  </p>
+
+  <h2 id="changes">13. Changes to these terms</h2>
+  <p>
+    We may update these Terms from time to time. When we make material changes, we will update the "Last
+    updated" date above and, where appropriate, let you know. If you keep using the Service after a
+    change takes effect, you accept the new Terms.
+  </p>
+
+  <h2 id="contact">14. Contact us</h2>
+  <p>Questions about these Terms? Get in touch:</p>
+  <p>
+    <strong>Atomic BI Pte. Ltd.</strong><br />
+    Email: <a href="mailto:tobias.strebitzer@atomic.bi">tobias.strebitzer@atomic.bi</a>
+  </p>
+
+  <ul class="next-links">
+    <li><a href="/privacy">Privacy Policy &rarr;<span>What we collect and why</span></a></li>
+    <li><a href="/docs">Documentation &rarr;<span>Build with the toolkit</span></a></li>
+  </ul>
+</PageLayout>
