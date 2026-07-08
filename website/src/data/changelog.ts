@@ -39,6 +39,28 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '3.1.0',
+    date: '2026-07-08',
+    summary: 'A leaner dependency graph: the logger folds into core and @clack/prompts is gone entirely.',
+    changes: [
+      {
+        type: 'improvement',
+        text: 'The @silkweave/logger package is gone - its structured logger (createLogger, buildLogLevels) and the Logger/LogLevel types now live in @silkweave/core, where they belong (the logger is the shape of the context.get(\'logger\') key every action receives) and add zero dependencies. Import them from @silkweave/core; the silkweave/logger umbrella subpath still works unchanged.',
+        commit: 'efa818d'
+      },
+      {
+        type: 'improvement',
+        text: '@clack/prompts is dropped repo-wide. A new zero-dependency createConsoleLogger() in @silkweave/core (each log level mapped to console.log/info/warn/error) replaces the old clack-based createCLILogger(); the CLI adapter and MCP cliProxy now emit plain console output. clack was purely cosmetic, so nothing load-bearing changed.',
+        commit: 'efa818d'
+      },
+      {
+        type: 'fix',
+        text: 'Removed a dead zod@3 dependency the former logger package carried but never imported.',
+        commit: 'efa818d'
+      }
+    ]
+  },
+  {
     version: '3.0.0',
     date: '2026-06-21',
     summary: 'A stateless, web-standard, agent-first 3.0: sessionless MCP transport, a leaner auth and dependency surface, and the Vercel adapter generalised into a portable edge adapter.',
