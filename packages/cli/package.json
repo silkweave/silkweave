@@ -36,8 +36,6 @@
   },
   "dependencies": {
     "@silkweave/core": "workspace:*",
-    "@silkweave/logger": "workspace:*",
-    "@clack/prompts": "^1.0.1",
     "change-case": "^5.4.4",
     "commander": "^13.1.0",
     "zod": "^3.25.0"

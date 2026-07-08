@@ -16,10 +16,8 @@
     "check": "pnpm lint && pnpm typecheck"
   },
   "dependencies": {
-    "@clack/prompts": "^1.0.1",
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "@silkweave/logger": "workspace:*",
     "@silkweave/mcp": "workspace:*",
     "commander": "^13.1.0",
     "cors": "^2.8.6",

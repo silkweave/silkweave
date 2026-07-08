@@ -1,4 +1,24 @@
-import { Logger, LogFn, LogLevel, LogLevels, ProgressOptions } from './types.js'
+export interface MessageOptions {
+  message: string
+}
+
+export interface ProgressOptions {
+  progress: number
+  total?: number
+  message?: string
+}
+
+const LogLevels = ['error', 'debug', 'info', 'notice', 'warning', 'critical', 'alert', 'emergency'] as const
+
+export type LogLevel = typeof LogLevels[number]
+
+export type LogFn = (data: unknown) => void
+
+export interface Logger extends Record<LogLevel, LogFn> {
+  progress: (options: ProgressOptions) => void
+}
+
+export { LogLevels }
 
 // Severity ordering (lowest number = most verbose) used to gate writes by the
 // configured `level` threshold. Mirrors syslog-style precedence so a `level` of
@@ -64,4 +84,34 @@ export function createLogger(options: CreateLoggerOptions = {}): Logger {
 
 export function buildLogLevels(fn: (level: LogLevel, data: unknown) => void): Record<LogLevel, LogFn> {
   return Object.fromEntries(LogLevels.map((level) => [level, (data: unknown) => { fn(level, data) }])) as Record<LogLevel, LogFn>
+}
+
+// Maps each syslog level onto a `console` method for a human-readable terminal
+// logger. Used by the `cli` adapter and the MCP `cliProxy` client - a
+// zero-dependency replacement for a terminal-UI logging library.
+const CONSOLE_LEVEL_MAP: Record<LogLevel, 'log' | 'info' | 'warn' | 'error'> = {
+  debug: 'log',
+  info: 'info',
+  notice: 'info',
+  warning: 'warn',
+  error: 'error',
+  critical: 'error',
+  alert: 'error',
+  emergency: 'error'
+}
+
+/**
+ * Human-readable `console`-backed logger for terminal contexts. Strings are
+ * written verbatim; objects are JSON-stringified. Zero dependencies.
+ */
+export function createConsoleLogger(): Logger {
+  const toString = (value: unknown) => typeof value === 'string' ? value : JSON.stringify(value)
+  return {
+    ...buildLogLevels((level, data) => {
+      console[CONSOLE_LEVEL_MAP[level]](toString(data))
+    }),
+    progress: ({ progress, total, message }) => {
+      console.info(toString({ progress, total, message }))
+    }
+  }
 }

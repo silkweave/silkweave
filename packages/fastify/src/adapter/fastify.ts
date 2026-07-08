@@ -1,7 +1,6 @@
 import type { FastifyCorsOptions } from '@fastify/cors'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, actionMethod, ActionStreamRun, AdapterFactory, HttpMethod, isStreamingAction, methodHasBody, pathParamNames, resolveActionInput, runStreamingAction, SilkweaveContext, SilkweaveError, validateActionRouting } from '@silkweave/core'
-import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
+import { Action, actionMethod, ActionStreamRun, AdapterFactory, buildLogLevels, HttpMethod, isStreamingAction, Logger, LogLevel, methodHasBody, pathParamNames, resolveActionInput, runStreamingAction, SilkweaveContext, SilkweaveError, validateActionRouting } from '@silkweave/core'
 import { once } from 'events'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { Server } from 'http'

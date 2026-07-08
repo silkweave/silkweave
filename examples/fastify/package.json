@@ -13,7 +13,6 @@
   "dependencies": {
     "@silkweave/core": "workspace:*",
     "@silkweave/fastify": "workspace:*",
-    "@silkweave/logger": "workspace:*",
     "zod": "^3.25.0"
   },
   "devDependencies": {

@@ -62,7 +62,7 @@ Exposes a single stateless `POST /mcp` (each call mints a fresh transport with `
 
 ### cliProxy
 
-MCP CLI proxy client - connects to a running HTTP MCP server and invokes tools from the command line. Imported from the dedicated `@silkweave/mcp/cli-proxy` subpath (kept out of the package root so importing the `stdio`/`http` servers does not pull the CLI client's `commander` + `@clack/prompts` into the server path). Those two are **optional peer dependencies** - install them alongside `@silkweave/mcp` when you use the CLI proxy.
+MCP CLI proxy client - connects to a running HTTP MCP server and invokes tools from the command line. Imported from the dedicated `@silkweave/mcp/cli-proxy` subpath (kept out of the package root so importing the `stdio`/`http` servers does not pull the CLI client's `commander` into the server path). `commander` is an **optional peer dependency** - install it alongside `@silkweave/mcp` when you use the CLI proxy.
 
 ```typescript
 import { silkweave } from '@silkweave/core'

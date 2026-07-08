@@ -123,9 +123,6 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
       silkweave:
         specifier: workspace:*
         version: link:../../packages/silkweave
@@ -203,9 +200,6 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -274,9 +268,6 @@ importers:
       '@silkweave/fastify':
         specifier: workspace:*
         version: link:../../packages/fastify
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -305,18 +296,12 @@ importers:
 
   examples/mcp:
     dependencies:
-      '@clack/prompts':
-        specifier: ^1.0.1
-        version: 1.4.0
       '@silkweave/auth':
         specifier: workspace:*
         version: link:../../packages/auth
       '@silkweave/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
       '@silkweave/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
@@ -488,9 +473,6 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
       '@silkweave/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc
@@ -636,15 +618,9 @@ importers:
 
   packages/cli:
     dependencies:
-      '@clack/prompts':
-        specifier: ^1.0.1
-        version: 1.4.0
       '@silkweave/core':
         specifier: workspace:*
         version: link:../core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../logger
       change-case:
         specifier: ^5.4.4
         version: 5.4.4
@@ -737,9 +713,6 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../logger
       '@silkweave/mcp':
         specifier: workspace:*
         version: link:../mcp
@@ -792,9 +765,6 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../logger
       fastify:
         specifier: ^5.8.2
         version: 5.8.5
@@ -830,46 +800,6 @@ importers:
         specifier: ^8.56.1
         version: 8.59.4(eslint@10.4.0(jiti@2.7.0))(typescript@5.9.3)
 
-  packages/logger:
-    dependencies:
-      zod:
-        specifier: ^3.25.0
-        version: 3.25.76
-    devDependencies:
-      '@clack/prompts':
-        specifier: ^1.0.1
-        version: 1.4.0
-      '@eslint/js':
-        specifier: ^10.0.1
-        version: 10.0.1(eslint@10.4.0(jiti@2.7.0))
-      '@stylistic/eslint-plugin':
-        specifier: ^5.10.0
-        version: 5.10.0(eslint@10.4.0(jiti@2.7.0))
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.21
-      eslint:
-        specifier: ^10.4.0
-        version: 10.4.0(jiti@2.7.0)
-      rimraf:
-        specifier: ^6.1.3
-        version: 6.1.3
-      tsdown:
-        specifier: ^0.21.8
-        version: 0.21.10(oxc-resolver@11.19.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0))(typescript@5.9.3)
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.2
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      typescript-eslint:
-        specifier: ^8.56.1
-        version: 8.59.4(eslint@10.4.0(jiti@2.7.0))(typescript@5.9.3)
-      vitest:
-        specifier: ^4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@22.19.21)(vite@7.3.5(@types/node@22.19.21)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.2)(yaml@2.9.0))
-
   packages/mcp:
     dependencies:
       '@modelcontextprotocol/sdk':
@@ -881,9 +811,6 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../logger
       change-case:
         specifier: ^5.4.4
         version: 5.4.4
@@ -891,9 +818,6 @@ importers:
         specifier: ^3.25.0
         version: 3.25.76
     devDependencies:
-      '@clack/prompts':
-        specifier: ^1.0.1
-        version: 1.4.0
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.0(jiti@2.7.0))
@@ -1094,9 +1018,6 @@ importers:
       '@silkweave/fastify':
         specifier: workspace:*
         version: link:../fastify
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../logger
       '@silkweave/mcp':
         specifier: workspace:*
         version: link:../mcp
@@ -1140,9 +1061,6 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../core
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../logger
       '@trpc/server':
         specifier: ^11.7.1
         version: 11.17.0(typescript@5.9.3)
@@ -1250,9 +1168,6 @@ importers:
       '@silkweave/edge':
         specifier: workspace:*
         version: link:../packages/edge
-      '@silkweave/logger':
-        specifier: workspace:*
-        version: link:../packages/logger
       '@silkweave/trpc':
         specifier: workspace:*
         version: link:../packages/trpc

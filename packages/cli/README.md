@@ -1,6 +1,6 @@
 # @silkweave/cli
 
-CLI adapter for [Silkweave](https://github.com/silkweave/silkweave) - turn your actions into a complete command-line application with help text, option parsing, and styled terminal output via clack.
+CLI adapter for [Silkweave](https://github.com/silkweave/silkweave) - turn your actions into a complete command-line application with help text, option parsing, and plain `console` output.
 
 ## Install
 
@@ -63,7 +63,7 @@ $ mytool deploy production --dry-run
 
 ## Streaming Actions
 
-Actions defined with a `chunk` schema and an `async function*` `run` (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) stream output as **NDJSON on stdout** - one JSON-encoded chunk per line. The clack intro/progress UI is bypassed for streaming commands so the output is pipe-friendly.
+Actions defined with a `chunk` schema and an `async function*` `run` (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) stream output as **NDJSON on stdout** - one JSON-encoded chunk per line, so the output is pipe-friendly.
 
 ```bash
 $ mytool generate-messages --topic weather --count 3

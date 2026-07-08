@@ -1,5 +1,4 @@
-import { createAction, silkweave } from '@silkweave/core'
-import { Logger } from '@silkweave/logger'
+import { createAction, Logger, silkweave } from '@silkweave/core'
 import { stdio } from '@silkweave/mcp'
 import z from 'zod/v4'
 

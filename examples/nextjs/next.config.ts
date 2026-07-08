@@ -7,7 +7,6 @@ const SILKWEAVE_PACKAGES = [
   '@silkweave/auth',
   '@silkweave/core',
   '@silkweave/edge',
-  '@silkweave/logger',
   '@silkweave/mcp',
   '@silkweave/nextjs',
   '@silkweave/trpc'

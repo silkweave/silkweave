@@ -1,6 +1,5 @@
-import { createAction, silkweave } from '@silkweave/core'
+import { createAction, Logger, silkweave } from '@silkweave/core'
 import { fastify } from '@silkweave/fastify'
-import { Logger } from '@silkweave/logger'
 import z from 'zod/v4'
 
 const HelloAction = createAction({

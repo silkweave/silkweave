@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { buildLogLevels, createLogger } from './logger.js'
-import { LogLevels, type LogLevel } from './types.js'
+import { describe, expect, it, vi } from 'vitest'
+import { buildLogLevels, createConsoleLogger, createLogger, LogLevels, type LogLevel } from './logger.js'
 
 /** A WritableStream stand-in that records every line written. */
 function captureStream(): { lines: string[]; stream: NodeJS.WritableStream } {
@@ -74,5 +73,23 @@ describe('buildLogLevels', () => {
     levels.error('boom')
     levels.debug({ detail: true })
     expect(calls).toEqual([['error', 'boom'], ['debug', { detail: true }]])
+  })
+})
+
+describe('createConsoleLogger', () => {
+  it('maps each level onto the matching console method, stringifying objects', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const logger = createConsoleLogger()
+    logger.info('plain')
+    logger.warning({ code: 1 })
+    logger.critical('boom')
+    expect(info).toHaveBeenCalledWith('plain')
+    expect(warn).toHaveBeenCalledWith('{"code":1}')
+    expect(error).toHaveBeenCalledWith('boom')
+    info.mockRestore()
+    warn.mockRestore()
+    error.mockRestore()
   })
 })

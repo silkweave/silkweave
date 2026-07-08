@@ -49,20 +49,15 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "@silkweave/logger": "workspace:*",
     "change-case": "^5.4.4",
     "zod": "^3.25.0"
   },
   "peerDependencies": {
-    "@clack/prompts": "^1.0.1",
     "commander": "^13.1.0",
     "cors": "^2.8.5",
     "express": "^5.0.0"
   },
   "peerDependenciesMeta": {
-    "@clack/prompts": {
-      "optional": true
-    },
     "commander": {
       "optional": true
     },
@@ -74,7 +69,6 @@
     }
   },
   "devDependencies": {
-    "@clack/prompts": "^1.0.1",
     "@eslint/js": "^10.0.1",
     "@modelcontextprotocol/inspector": "^0.21.1",
     "@stylistic/eslint-plugin": "^5.10.0",

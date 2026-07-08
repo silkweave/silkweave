@@ -19,7 +19,6 @@
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
     "@silkweave/edge": "workspace:*",
-    "@silkweave/logger": "workspace:*",
     "@silkweave/trpc": "workspace:*",
     "@trpc/client": "^11.16.0",
     "@trpc/server": "^11.16.0",

@@ -1,7 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { intro, log } from '@clack/prompts'
-import { Action, ActionRun, ActionStreamRun, AdapterFactory, isStreamingAction, SilkweaveContext, SilkweaveError, SilkweaveOptions, unwrap } from '@silkweave/core'
-import { createCLILogger } from '@silkweave/logger'
+import { Action, ActionRun, ActionStreamRun, AdapterFactory, createConsoleLogger, isStreamingAction, SilkweaveContext, SilkweaveError, SilkweaveOptions, unwrap } from '@silkweave/core'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { once } from 'events'
@@ -9,18 +7,18 @@ import z from 'zod/v4'
 
 function handleCLIError(error: unknown) {
   if (error instanceof SilkweaveError) {
-    log.error(`[${error.code}] ${error.message}`)
+    console.error(`[${error.code}] ${error.message}`)
   } else if (error instanceof z.ZodError) {
-    log.error('Validation Error', { withGuide: false })
+    console.error('Validation Error')
     for (const issue of error.issues) {
-      log.error(`${issue.path}: ${issue.message}`)
+      console.error(`${issue.path}: ${issue.message}`)
     }
   } else if (error instanceof Error) {
-    log.error(error.message)
+    console.error(error.message)
   } else if (typeof error === 'string') {
-    log.error(error)
+    console.error(error)
   } else {
-    log.error(JSON.stringify(error))
+    console.error(JSON.stringify(error))
   }
   process.exitCode = 1
 }
@@ -78,14 +76,14 @@ function registerCommand(program: Command, action: Action, options: SilkweaveOpt
     addCliOption(command, key, type, defaultValue, action.args?.includes(key) ?? false)
   }
   command.action((...args) => {
-    const logger = createCLILogger()
+    const logger = createConsoleLogger()
     const input = parseCLIInput(action, args)
     const actionContext = context.fork({ logger, command })
     if (isStreamingAction(action)) {
       runStreamingCommand(action, input, actionContext).catch(handleCLIError)
       return
     }
-    intro(`${options.name} - ${action.name}`)
+    console.info(`${options.name} - ${action.name}`)
     const runFn = action.run as ActionRun<object, object>
     runFn(input, actionContext).then((result) => {
       logger.info(JSON.stringify(result, null, 2))

@@ -1,6 +1,5 @@
 import { AuthConfig, AuthInfo, validateToken } from '@silkweave/auth'
-import { SilkweaveContext } from '@silkweave/core'
-import { buildLogLevels, Logger, LogLevel } from '@silkweave/logger'
+import { buildLogLevels, Logger, LogLevel, SilkweaveContext } from '@silkweave/core'
 
 const CONSOLE_LEVEL_MAP: Record<LogLevel, 'log' | 'info' | 'warn' | 'error'> = {
   emergency: 'error',

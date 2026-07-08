@@ -16,7 +16,7 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
   ┌──────▼──────┐ ┌─────▼─────┐ │ ┌─────▼──────┐ ┌────▼─────┐
   │ MCP (stdio) │ │   Fastify │ │ │    CLI     │ │   Edge   │
   │ MCP (http)  │ │  REST API │ │ │ commander  │ │serverless│
-  │             │ │ + Swagger │ │ │  + clack   │ │  MCP     │
+  │             │ │ + Swagger │ │ │  console   │ │  MCP     │
   └─────────────┘ └───────────┘ │ └────────────┘ └──────────┘
                                 │
 ```
@@ -60,7 +60,7 @@ Silkweave eliminates this duplication. You define an **Action** - a name, a Zod 
 
 - **MCP adapters** register your actions as MCP tools with proper notifications, progress reporting, and error handling
 - **Fastify adapter** generates a REST API with full OpenAPI/Swagger documentation derived from your Zod schemas
-- **CLI adapter** builds a complete command-line interface with argument parsing, option flags, and beautiful terminal output via clack
+- **CLI adapter** builds a complete command-line interface with argument parsing, option flags, and plain `console` output
 
 Your action doesn't know or care which transport is running it.
 
@@ -74,11 +74,10 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 |---------|-----|-------------|
 | `@silkweave/core` | [![npm](https://img.shields.io/npm/v/@silkweave/core)](https://www.npmjs.com/package/@silkweave/core) | Core library - actions, adapters, builder, context, logger, utilities |
 | `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
-| `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + clack terminal UI |
+| `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + plain `console` output |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
 | `@silkweave/edge` | [![npm](https://img.shields.io/npm/v/@silkweave/edge)](https://www.npmjs.com/package/@silkweave/edge) | Edge / serverless adapter - stateless MCP over Web Standard Streamable HTTP |
 | `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - `createChatAction()` + `silkweaveTransport()` for `useChat` over tRPC subscriptions |
-| `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - pino, clack, and MCP notification support |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
 
@@ -373,7 +372,7 @@ fastify({
 
 ### CLI
 
-Transforms your actions into a complete command-line application with help text, option parsing, and styled terminal output via clack.
+Transforms your actions into a complete command-line application with help text, option parsing, and plain `console` output.
 
 ```typescript
 import { silkweave } from '@silkweave/core'
@@ -923,7 +922,7 @@ interface FastifyAdapterOptions {
   // ...plus all FastifyHttpOptions (logger, connectionTimeout, etc.)
 }
 
-// CLI via commander + clack - from @silkweave/cli
+// CLI via commander - from @silkweave/cli
 import { cli } from '@silkweave/cli'
 function cli(): AdapterFactory
 

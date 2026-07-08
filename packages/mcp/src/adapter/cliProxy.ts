@@ -1,9 +1,7 @@
-import { intro } from '@clack/prompts'
 import { Client } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { ContentBlock, LoggingMessageNotificationSchema, ProgressNotificationSchema, ToolResultContent } from '@modelcontextprotocol/sdk/types.js'
-import { AdapterFactory } from '@silkweave/core'
-import { createCLILogger } from '@silkweave/logger'
+import { AdapterFactory, createConsoleLogger } from '@silkweave/core'
 import { kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { randomUUID } from 'crypto'
@@ -104,9 +102,9 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = def
           }
           command.action(async (args: Record<string, unknown>) => {
             const { silent } = program.opts<{ silent: boolean }>()
-            const logger = createCLILogger()
+            const logger = createConsoleLogger()
             if (!silent) {
-              intro(`${options.name} - ${tool.name}`)
+              console.info(`${options.name} - ${tool.name}`)
               client.setNotificationHandler(LoggingMessageNotificationSchema, ({ params: { level, data } }) => {
                 logger[level](data)
               })

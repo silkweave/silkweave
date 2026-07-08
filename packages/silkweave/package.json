@@ -72,7 +72,6 @@
     "@silkweave/cli": "workspace:*",
     "@silkweave/core": "workspace:*",
     "@silkweave/fastify": "workspace:*",
-    "@silkweave/logger": "workspace:*",
     "@silkweave/mcp": "workspace:*",
     "@silkweave/edge": "workspace:*",
     "@silkweave/typegen": "workspace:*"

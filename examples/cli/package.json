@@ -14,7 +14,6 @@
   "dependencies": {
     "@silkweave/cli": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "@silkweave/logger": "workspace:*",
     "silkweave": "workspace:*",
     "zod": "^3.25.0"
   },

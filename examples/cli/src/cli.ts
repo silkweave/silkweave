@@ -1,6 +1,5 @@
 import { cli } from '@silkweave/cli'
-import { createAction, silkweave } from '@silkweave/core'
-import { Logger } from '@silkweave/logger'
+import { createAction, Logger, silkweave } from '@silkweave/core'
 import z from 'zod/v4'
 
 const HelloAction = createAction({

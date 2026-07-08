@@ -72,7 +72,7 @@ Silkweave eliminates this duplication. You define an **Action** - a name, a Zod 
 - **MCP adapters** register your actions as MCP tools with proper notifications, progress reporting, and error handling - over stdio, streamable HTTP, or stateless serverless (Edge / Web Standard)
 - **tRPC adapter** exposes your actions as end-to-end type-safe procedures (`InferTrpcRouter<typeof server>`), as a standalone server or a fetch handler
 - **Fastify adapter** generates a REST API with full OpenAPI/Swagger documentation derived from your Zod schemas
-- **CLI adapter** builds a complete command-line interface with argument parsing, option flags, and beautiful terminal output via clack
+- **CLI adapter** builds a complete command-line interface with argument parsing, option flags, and plain `console` output
 - **Framework integrations** meet you where you are - expose existing **NestJS** controllers as MCP tools via `@Mcp()`, project an action set onto **Next.js** App Router handlers (MCP + tRPC), or bridge a streaming action to the **Vercel AI SDK**'s `useChat`
 
 Your action doesn't know or care which transport is running it.
@@ -88,7 +88,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/core` | [![npm](https://img.shields.io/npm/v/@silkweave/core)](https://www.npmjs.com/package/@silkweave/core) | Core library - actions, adapters, builder, context, logger, utilities |
 | `@silkweave/auth` | [![npm](https://img.shields.io/npm/v/@silkweave/auth)](https://www.npmjs.com/package/@silkweave/auth) | Auth - resource-server core (bearer-token validation + protected-resource metadata, RFC 9728); opt-in OAuth 2.1 authorization-server proxy (PKCE, refresh, CIMD, dynamic client registration) via `@silkweave/auth/oauth` |
 | `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
-| `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + clack terminal UI |
+| `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + plain `console` output |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
 | `@silkweave/trpc` | [![npm](https://img.shields.io/npm/v/@silkweave/trpc)](https://www.npmjs.com/package/@silkweave/trpc) | tRPC adapter - end-to-end type-safe procedures (standalone server + fetch handler) |
 | `@silkweave/edge` | [![npm](https://img.shields.io/npm/v/@silkweave/edge)](https://www.npmjs.com/package/@silkweave/edge) | Web-Standard edge/serverless adapter - stateless MCP over Streamable HTTP (Cloudflare Workers, Vercel, Bun, Deno) |
@@ -96,7 +96,6 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/nextjs` | [![npm](https://img.shields.io/npm/v/@silkweave/nextjs)](https://www.npmjs.com/package/@silkweave/nextjs) | Next.js App Router adapter - `defineSilkweave({ actions })` projects one action set onto MCP + tRPC route handlers |
 | `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - wrap `streamText` as a streaming action and feed `useChat` over a tRPC subscription |
 | `@silkweave/typegen` | [![npm](https://img.shields.io/npm/v/@silkweave/typegen)](https://www.npmjs.com/package/@silkweave/typegen) | Type generator - emit `.d.ts` interfaces from action Zod schemas |
-| `@silkweave/logger` | [![npm](https://img.shields.io/npm/v/@silkweave/logger)](https://www.npmjs.com/package/@silkweave/logger) | Logging utilities - zero-dependency structured logger (JSON lines), optional clack terminal UI, and MCP notification support |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
 
@@ -434,7 +433,7 @@ fastify({
 
 ### CLI
 
-Transforms your actions into a complete command-line application with help text, option parsing, and styled terminal output via clack.
+Transforms your actions into a complete command-line application with help text, option parsing, and plain `console` output.
 
 ```typescript
 import { silkweave } from '@silkweave/core'
@@ -930,7 +929,7 @@ interface FastifyAdapterOptions {
   // ...plus all FastifyHttpOptions (logger, connectionTimeout, etc.)
 }
 
-// CLI via commander + clack - from @silkweave/cli
+// CLI via commander - from @silkweave/cli
 import { cli } from '@silkweave/cli'
 function cli(): AdapterFactory
 
