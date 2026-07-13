@@ -78,6 +78,7 @@ export function silkweaveTransport<M extends UIMessage = UIMessage>(
 ): ChatTransport<M> {
   return {
     async sendMessages({ messages, trigger, chatId, messageId, abortSignal, metadata, body, headers }: any) {
+      let subscription: SilkweaveTransportSubscription | undefined
       return new ReadableStream<UIMessageChunk>({
         start(controller) {
           let closed = false
@@ -86,7 +87,7 @@ export function silkweaveTransport<M extends UIMessage = UIMessage>(
             closed = true
             try { controller.close() } catch { /* already closed */ }
           }
-          const subscription = subscribe(
+          subscription = subscribe(
             { messages: messages as M[], trigger, chatId, messageId, metadata, body, headers },
             {
               onData: (chunk) => {
@@ -103,7 +104,7 @@ export function silkweaveTransport<M extends UIMessage = UIMessage>(
           )
           if (abortSignal) {
             const onAbort = () => {
-              subscription.unsubscribe()
+              subscription?.unsubscribe()
               close()
             }
             if (abortSignal.aborted) {
@@ -112,6 +113,11 @@ export function silkweaveTransport<M extends UIMessage = UIMessage>(
               abortSignal.addEventListener('abort', onAbort, { once: true })
             }
           }
+        },
+        // Cancelling the stream directly (without firing abortSignal) must still
+        // tear down the tRPC subscription, else it leaks server-side.
+        cancel() {
+          subscription?.unsubscribe()
         }
       })
     },

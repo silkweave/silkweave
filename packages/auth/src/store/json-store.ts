@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { AuthCodeData, ClientRegistration, OAuthStore, PendingAuthData, RefreshTokenData } from '../provider/store.js'
 
 function withTtl<T extends { expiresAt: number }>(obj: Record<string, T>, key: string): T | undefined {
@@ -20,7 +20,11 @@ interface JsonStore {
 }
 
 function writeJsonStore(path: string, store: JsonStore) {
-  writeFileSync(path, JSON.stringify(store, null, 2), 'utf-8')
+  // The store holds client secrets, refresh tokens, upstream access/ID tokens
+  // and PKCE verifiers in plaintext - keep it owner-only (0600), not the default
+  // 0644. `mode` only applies on creation, so also chmod an existing file.
+  writeFileSync(path, JSON.stringify(store, null, 2), { encoding: 'utf-8', mode: 0o600 })
+  chmodSync(path, 0o600)
 }
 
 function readJsonStore(path: string): JsonStore {

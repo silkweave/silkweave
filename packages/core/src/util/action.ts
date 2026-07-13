@@ -185,4 +185,13 @@ export function validateActionDisposition(action: Action): void {
       'invalid_action'
     )
   }
+  if (action.toolResult) {
+    // A `toolResult` hook returns a CallToolResult that would bypass the
+    // schema-parsed `structuredContent`, so the SDK's outputSchema validation
+    // would reject every call. The two are mutually exclusive by construction.
+    throw new SilkweaveError(
+      `Action '${action.name}': a 'toolResult' hook cannot be combined with disposition 'structured' - the hook would bypass the structuredContent the outputSchema contract requires`,
+      'invalid_action'
+    )
+  }
 }

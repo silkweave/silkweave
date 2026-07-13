@@ -2,7 +2,7 @@ import { AuthConfig } from '@silkweave/auth'
 import { Adapter, AdapterGenerator, SilkweaveOptions } from '@silkweave/core'
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
 import { buildRouter, TrpcHandlerContext } from '../lib/buildRouter.js'
-import { createActionLogger, resolveAuth } from '../lib/createContext.js'
+import { authResponseMeta, createActionLogger, resolveAuth, throwAuthError } from '../lib/createContext.js'
 
 export interface TrpcFetchAdapterOptions {
   /** URL prefix stripped from incoming requests before tRPC routing. Default `/trpc`. */
@@ -35,19 +35,25 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
   const endpoint = (options.endpoint ?? '/trpc').replace(/\/$/, '')
 
   let resolveReady!: () => void
-  const ready = new Promise<void>((resolve) => { resolveReady = resolve })
+  let rejectReady!: (error: unknown) => void
+  const ready = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
 
-  let handler: FetchHandler = async () => new Response(
-    JSON.stringify({ error: 'not_ready', message: 'tRPC adapter has not started yet' }),
-    { status: 503, headers: { 'Content-Type': 'application/json' } }
-  )
+  let handler: FetchHandler | undefined
 
   const adapter: AdapterGenerator = (_silkweaveOptions: SilkweaveOptions, baseContext): Adapter => {
     const context = baseContext.fork({ adapter: 'trpc' })
     return {
       context,
       start: async (actions) => {
-        const router = buildRouter(actions)
+        let router
+        try {
+          router = buildRouter(actions)
+        } catch (error) {
+          // Reject readiness so requests get a 503 instead of hanging forever,
+          // then rethrow so the builder's start() rejects too.
+          rejectReady(error)
+          throw error
+        }
         const logger = createActionLogger()
 
         const createContext = async (
@@ -59,9 +65,11 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
             context.fork({ request: opts.req })
           )
           if (resolved.kind === 'error') {
-            const err = new Error('Unauthorized') as Error & { silkweaveAuthError?: typeof resolved.error }
-            err.silkweaveAuthError = resolved.error
-            throw err
+            // @trpc/server captures createContext errors internally and never
+            // rethrows, so a plain throw would surface as a 500. Signal the
+            // 401/403 as a TRPCError whose challenge headers authResponseMeta
+            // applies to the Response.
+            throwAuthError(resolved.error)
           }
           return {
             silkweaveContext: context.fork({
@@ -73,23 +81,13 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
         }
 
         handler = async (request: Request): Promise<Response> => {
-          try {
-            return await fetchRequestHandler({
-              endpoint,
-              req: request,
-              router,
-              createContext
-            })
-          } catch (error) {
-            const authError = (error as { silkweaveAuthError?: { statusCode: number; headers: Record<string, string>; body: object } }).silkweaveAuthError
-            if (authError) {
-              return new Response(JSON.stringify(authError.body), {
-                status: authError.statusCode,
-                headers: { 'Content-Type': 'application/json', ...authError.headers }
-              })
-            }
-            throw error
-          }
+          return fetchRequestHandler({
+            endpoint,
+            req: request,
+            router,
+            createContext,
+            responseMeta: authResponseMeta
+          })
         }
 
         resolveReady()
@@ -99,8 +97,15 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
   }
 
   const dispatch: FetchHandler = async (request) => {
-    await ready
-    return handler(request)
+    try {
+      await ready
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'not_ready', message: 'tRPC adapter failed to start' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+    return handler!(request)
   }
 
   return {

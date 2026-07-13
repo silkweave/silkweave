@@ -2,11 +2,14 @@ import { Action, Silkweave } from '@silkweave/core'
 import type { AnyTRPCRootTypes, TRPCBuiltRouter, TRPCMutationProcedure, TRPCQueryProcedure, TRPCSubscriptionProcedure } from '@trpc/server'
 import type { z } from 'zod/v4'
 
-type CamelCase<S extends string> = S extends `${infer A}-${infer B}`
-  ? `${A}${Capitalize<CamelCase<B>>}`
-  : (S extends `${infer A}_${infer B}`
-    ? `${A}${Capitalize<CamelCase<B>>}`
-    : S)
+// Mirror the runtime key `camelCase(action.name)` from change-case: split on
+// `.`/`-`/`_`/space separators, capitalize each following segment, and lowercase
+// the leading character (so `list.users` -> `listUsers` and `Hello` -> `hello`,
+// matching what buildRouter registers).
+type CamelJoin<S extends string> = S extends `${infer A}${'.' | '-' | '_' | ' '}${infer B}`
+  ? `${A}${Capitalize<CamelJoin<B>>}`
+  : S
+type CamelCase<S extends string> = Uncapitalize<CamelJoin<S>>
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ChunkOf<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<infer C, unknown, unknown> ? C : never

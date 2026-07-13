@@ -4,7 +4,7 @@ import { createHTTPHandler } from '@trpc/server/adapters/standalone'
 import cors, { CorsOptions } from 'cors'
 import http, { IncomingMessage, ServerResponse } from 'http'
 import { buildRouter, TrpcHandlerContext } from '../lib/buildRouter.js'
-import { createActionLogger, resolveAuth } from '../lib/createContext.js'
+import { authResponseMeta, createActionLogger, resolveAuth, throwAuthError } from '../lib/createContext.js'
 
 export interface TrpcAdapterOptions {
   host?: string
@@ -48,13 +48,10 @@ export const trpc: AdapterFactory<TrpcAdapterOptions> = (options) => {
             context.fork({ request: opts.req })
           )
           if (resolved.kind === 'error') {
-            for (const [key, value] of Object.entries(resolved.error.headers)) {
-              opts.res.setHeader(key, value)
-            }
-            opts.res.statusCode = resolved.error.statusCode
-            opts.res.setHeader('Content-Type', 'application/json')
-            opts.res.end(JSON.stringify(resolved.error.body))
-            throw new Error('Unauthorized')
+            // Signal the 401/403 through tRPC (see throwAuthError). Writing to
+            // opts.res here would race tRPC's own error write and crash the
+            // process with ERR_STREAM_WRITE_AFTER_END on the finished response.
+            throwAuthError(resolved.error)
           }
           return {
             silkweaveContext: context.fork({
@@ -65,7 +62,7 @@ export const trpc: AdapterFactory<TrpcAdapterOptions> = (options) => {
           }
         }
 
-        const trpcHandler = createHTTPHandler({ router, basePath: endpoint, createContext })
+        const trpcHandler = createHTTPHandler({ router, basePath: endpoint, createContext, responseMeta: authResponseMeta })
 
         const handler = (req: IncomingMessage, res: ServerResponse) => {
           if (!req.url?.startsWith(endpoint)) {

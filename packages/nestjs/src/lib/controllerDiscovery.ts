@@ -2,6 +2,7 @@
 import { HttpException, Injectable, Logger, type CanActivate, type Type } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
 import { emitToolCall, SilkweaveError, type Action, type ActionKind, type OnToolCall, type SilkweaveContext, type ToolAnnotations } from '@silkweave/core'
+import { camelCase } from 'change-case'
 import { z } from 'zod/v4'
 import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
 import { MCP_METADATA, TRPC_METADATA, type McpMetadata, type TrpcMetadata } from './metadata.js'
@@ -274,12 +275,15 @@ export class ControllerDiscovery {
   }
 }
 
-/** Procedure key the tRPC router exposes for an action name (`Users.listBySpace` → `usersListBySpace`). */
+/**
+ * Procedure key the tRPC router exposes for an action name
+ * (`Users.listBySpace` → `usersListBySpace`). Must match `@silkweave/trpc`'s
+ * `buildRouter`, which keys procedures by change-case `camelCase`, so telemetry
+ * `tool` labels join with the wire name clients actually call (a hand-rolled
+ * camelCase diverges on acronyms, e.g. `API.getStatus`).
+ */
 function camelKey(name: string): string {
-  const parts = name.split(/[^a-zA-Z0-9]+/).filter(Boolean)
-  return parts
-    .map((part, index) => index === 0 ? part[0].toLowerCase() + part.slice(1) : part[0].toUpperCase() + part.slice(1))
-    .join('')
+  return camelCase(name)
 }
 
 /**

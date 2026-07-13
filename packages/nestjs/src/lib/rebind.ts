@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+import { Logger } from '@nestjs/common'
 import { PARAMTYPE } from './reflect/params.js'
 
 /**
@@ -23,7 +24,17 @@ interface RequestLike {
 }
 
 function newInstance(P: any): any | null {
-  try { return new P() } catch { return null }
+  try {
+    return new P()
+  } catch (error) {
+    // A DI-dependent pipe (constructor args) can't be plain-`new`ed here, so its
+    // validation/transformation would be silently skipped over MCP/tRPC. Warn so
+    // the dropped pipe is visible rather than a silent gap.
+    new Logger('Silkweave').warn(
+      `Parameter pipe ${(P as { name?: string })?.name ?? 'unknown'} could not be instantiated (does it have constructor dependencies?) and was skipped: ${error instanceof Error ? error.message : String(error)}`
+    )
+    return null
+  }
 }
 
 async function applyPipes(value: unknown, pipes: unknown[] | undefined, metatype: unknown, type: 'param' | 'query' | 'body', data: string | undefined): Promise<unknown> {

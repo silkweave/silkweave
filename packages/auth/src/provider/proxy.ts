@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import { createMemoryStore } from '../store/memory-store.js'
 import { OAuthStore } from './store.js'
 import { AuthInfo, OAuthProvider, OAuthResponse } from './types.js'
+import { assertSafeMetadataUrl } from './ssrf.js'
 import { matchRedirectUri } from './uri.js'
 
 export interface OAuthProxyConfig {
@@ -139,8 +140,18 @@ async function resolveClient(
     return errorResponse(400, 'invalid_client', 'Unknown client_id')
   }
 
+  const safety = assertSafeMetadataUrl(clientId)
+  if (!safety.ok) {
+    return errorResponse(400, 'invalid_client', 'Client metadata URL is not allowed')
+  }
+
   try {
-    const metaRes = await fetch(clientId)
+    // SSRF hardening: block redirects (a public URL could 3xx to an internal
+    // one) and cap the request time. See assertSafeMetadataUrl for coverage.
+    const metaRes = await fetch(clientId, { redirect: 'manual', signal: AbortSignal.timeout(5000) })
+    if (metaRes.status >= 300 && metaRes.status < 400) {
+      return errorResponse(400, 'invalid_client', 'Client metadata document must not redirect')
+    }
     if (!metaRes.ok) {
       return errorResponse(400, 'invalid_client', 'Failed to fetch client metadata document')
     }
@@ -237,6 +248,13 @@ async function handleRefreshToken(
     return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
   }
 
+  // Bind the refresh token to the presenting client. Public clients
+  // (token_endpoint_auth_method 'none') send client_id in the body; a token
+  // presented by a different client_id than it was issued to is rejected.
+  if (body.client_id && body.client_id !== tokenData.clientId) {
+    return errorResponse(400, 'invalid_grant', 'refresh_token was not issued to this client')
+  }
+
   const key = await getSigningKey()
   const accessToken = await signAccessToken(key, {
     scopes: tokenData.scopes,
@@ -247,12 +265,25 @@ async function handleRefreshToken(
     ttl: config.tokenTtl
   })
 
+  // Rotate (OAuth 2.1 for public clients): invalidate the presented token and
+  // issue a fresh one. Preserve the original absolute expiry so repeated
+  // rotation cannot extend a leaked token's lifetime indefinitely.
+  await store.deleteRefreshToken(refreshToken)
+  const newRefreshToken = randomBytes(32).toString('base64url')
+  await store.saveRefreshToken(newRefreshToken, {
+    clientId: tokenData.clientId,
+    scopes: tokenData.scopes,
+    email: tokenData.email,
+    sub: tokenData.sub,
+    expiresAt: tokenData.expiresAt
+  })
+
   return jsonResponse(200, {
     access_token: accessToken,
     token_type: 'Bearer',
     expires_in: config.tokenTtl,
     scope: tokenData.scopes.join(' '),
-    refresh_token: refreshToken
+    refresh_token: newRefreshToken
   })
 }
 

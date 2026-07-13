@@ -875,6 +875,9 @@ importers:
       '@silkweave/core':
         specifier: workspace:*
         version: link:../core
+      change-case:
+        specifier: ^5.4.4
+        version: 5.4.4
       class-validator:
         specifier: ^0.14.0 || ^0.15.0
         version: 0.14.4

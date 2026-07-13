@@ -43,11 +43,14 @@ function sendOAuth(reply: FastifyReply, oauthRes: OAuthResponse) {
 
 function mountOAuthRoutes(instance: FastifyInstance, auth: AuthConfig): Set<string> {
   const provider = auth.provider!
+  // The provider builds its upstream redirect_uri as `${resourceUrl}${callbackPath}`,
+  // so the callback route must match the configured callbackPath, not a hardcoded one.
+  const callbackPath = auth.callbackPath ?? '/auth/callback'
 
   const paths = new Set([
     '/.well-known/oauth-authorization-server',
     '/authorize',
-    '/auth/callback',
+    callbackPath,
     '/token',
     '/register'
   ])
@@ -58,7 +61,7 @@ function mountOAuthRoutes(instance: FastifyInstance, auth: AuthConfig): Set<stri
   instance.get('/authorize', async (req, reply) => {
     return sendOAuth(reply, await provider.authorize(toOAuthReq(req)))
   })
-  instance.get('/auth/callback', async (req, reply) => {
+  instance.get(callbackPath, async (req, reply) => {
     return sendOAuth(reply, await provider.callback(toOAuthReq(req)))
   })
   instance.post('/token', async (req, reply) => {
@@ -97,6 +100,19 @@ function pickStreamFormat(acceptHeader: string | undefined): StreamFormat | null
   return null
 }
 
+function encodeChunk(format: StreamFormat, chunk: unknown): string {
+  const payload = JSON.stringify(chunk)
+  return format === 'sse' ? `data: ${payload}\n\n` : `${payload}\n`
+}
+
+function encodeStreamError(format: StreamFormat, error: unknown): string {
+  const payload = JSON.stringify({
+    error: error instanceof Error ? error.message : String(error),
+    name: error instanceof Error ? error.name : 'Error'
+  })
+  return format === 'sse' ? `event: error\ndata: ${payload}\n\n` : `${payload}\n`
+}
+
 async function streamAction(
   reply: FastifyReply,
   format: StreamFormat,
@@ -109,31 +125,32 @@ async function streamAction(
   reply.raw.setHeader('Connection', 'keep-alive')
   reply.raw.flushHeaders?.()
   reply.hijack()
-  const streamRun = action.run as ActionStreamRun<object, unknown>
-  const iter = streamRun(input, context)
+  const raw = reply.raw
+  const iter = (action.run as ActionStreamRun<object, unknown>)(input, context)
+  // On client disconnect the next write() returns false and a plain
+  // `once(raw, 'drain')` would park forever - the generator would never resume,
+  // its finally/cleanup would never run, and response/context stay pinned. Track
+  // 'close' and race the drain against it so we bail and tear the generator down.
+  const gone = { value: raw.destroyed || raw.writableEnded }
+  const onClose = () => { gone.value = true }
+  raw.on('close', onClose)
+  const closed = once(raw, 'close')
   try {
     for await (const chunk of iter) {
-      const payload = JSON.stringify(chunk)
-      const line = format === 'sse' ? `data: ${payload}\n\n` : `${payload}\n`
-      if (!reply.raw.write(line)) {
-        await once(reply.raw, 'drain')
+      if (gone.value) { break }
+      if (!raw.write(encodeChunk(format, chunk))) {
+        await Promise.race([once(raw, 'drain'), closed])
+        if (gone.value) { break }
       }
     }
-    if (format === 'sse') {
-      reply.raw.write('event: done\ndata: {}\n\n')
-    }
+    if (!gone.value && format === 'sse') { raw.write('event: done\ndata: {}\n\n') }
   } catch (error) {
-    const payload = JSON.stringify({
-      error: error instanceof Error ? error.message : String(error),
-      name: error instanceof Error ? error.name : 'Error'
-    })
-    if (format === 'sse') {
-      reply.raw.write(`event: error\ndata: ${payload}\n\n`)
-    } else {
-      reply.raw.write(`${payload}\n`)
-    }
+    if (!gone.value) { raw.write(encodeStreamError(format, error)) }
   } finally {
-    reply.raw.end()
+    raw.off('close', onClose)
+    // Ask the generator to run its finally/cleanup (release DB handles etc).
+    await iter.return?.().catch(() => { /* generator cleanup best-effort */ })
+    if (!raw.writableEnded) { raw.end() }
   }
 }
 
@@ -269,11 +286,15 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
             handler: async (request, reply) => {
               const authInfo = auth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
               const actionContext = context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) })
-              const input = resolveActionInput(action, {
+              // Fastify's AJV only validates the JSON-Schema projection, which
+              // cannot express Zod refinements/transforms. Parse the merged input
+              // so .refine()/.email()/.transform() are enforced here as they are
+              // over MCP/tRPC/CLI (a ZodError becomes a 400 via setErrorHandler).
+              const input = action.input.parse(resolveActionInput(action, {
                 params: request.params as Record<string, string | undefined>,
                 query: request.query as Record<string, unknown>,
                 body: request.body
-              })
+              }))
               if (streaming) {
                 const format = pickStreamFormat(request.headers.accept)
                 if (format) {

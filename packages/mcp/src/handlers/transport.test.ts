@@ -89,4 +89,17 @@ describe('mcpTransport filterActions', () => {
     const body = await res.json() as { error: { message: string } }
     expect(body.error.message).toBe('Internal server error')
   })
+
+  it('rejects a JSON-RPC batch (would otherwise bypass the per-message filter)', async () => {
+    // A batch reflects only the first message to the filter but the transport
+    // would execute every entry - so a batch is rejected outright (400).
+    const batch = [
+      { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'LeadsDelete', arguments: {} } }
+    ]
+    const res = await rpc(batch, { 'x-role': 'reader' })
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: { message: string } }
+    expect(body.error.message).toMatch(/batch/i)
+  })
 })

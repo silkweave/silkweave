@@ -36,6 +36,28 @@ function parseCLIInput(action: Action, args: any[]) {
   return data
 }
 
+/**
+ * Map a Zod option type to its commander placeholder and, when the value needs
+ * coercing from commander's raw string, a `parseArg`. Numeric/bigint/json fields
+ * MUST carry a parser - without it every z.number() field fails Zod with
+ * `expected number, received string`.
+ */
+function optionSpec(type: z.ZodType): { placeholder: string; parseArg?: (value: string) => unknown } {
+  if (type instanceof z.ZodNumber) {
+    return { placeholder: '<number>', parseArg: (value) => Number(value) }
+  }
+  if (type instanceof z.ZodBigInt) {
+    return { placeholder: '<bigint>', parseArg: (value) => { try { return BigInt(value) } catch { return value } } }
+  }
+  if (type instanceof z.ZodString || type instanceof z.ZodEnum) {
+    return { placeholder: '<string>' }
+  }
+  if (type instanceof z.ZodObject || type instanceof z.ZodRecord || type instanceof z.ZodArray) {
+    return { placeholder: '<json>', parseArg: JSON.parse }
+  }
+  throw new Error(`Invalid zod type: ${type.def.type}`)
+}
+
 function addCliOption(command: Command, key: string, type: z.ZodType, defaultValue: any, isArgument: boolean) {
   const description = type.description
   if (isArgument) {
@@ -46,14 +68,13 @@ function addCliOption(command: Command, key: string, type: z.ZodType, defaultVal
   if (type instanceof z.ZodBoolean) {
     command.option(`--${flag}`, description, defaultValue)
     command.option(`--no-${flag}`)
-  } else if (type instanceof z.ZodNumber) {
-    command.option(`--${flag} <number>`, description, defaultValue)
-  } else if (type instanceof z.ZodString || type instanceof z.ZodEnum) {
-    command.option(`--${flag} <string>`, description, defaultValue)
-  } else if (type instanceof z.ZodObject || type instanceof z.ZodRecord || type instanceof z.ZodArray) {
-    command.option(`--${flag} <json>`, description ?? '', JSON.parse, defaultValue)
+    return
+  }
+  const { placeholder, parseArg } = optionSpec(type)
+  if (parseArg) {
+    command.option(`--${flag} ${placeholder}`, description ?? '', parseArg, defaultValue)
   } else {
-    throw new Error(`Invalid zod type: ${type.def.type}`)
+    command.option(`--${flag} ${placeholder}`, description, defaultValue)
   }
 }
 
@@ -71,9 +92,20 @@ async function runStreamingCommand(action: Action, input: object, context: Silkw
 function registerCommand(program: Command, action: Action, options: SilkweaveOptions, context: SilkweaveContext) {
   const command = program.command(kebabCase(action.name)).description(action.description)
   const shape = action.input.shape
+  const argKeys = action.args ?? []
+  const argSet = new Set(argKeys)
+  // Options first (order irrelevant), then positional arguments in `action.args`
+  // order - not input-shape key order - so commander's positional slots line up
+  // with how parseCLIInput reads them back (else the values are cross-assigned).
   for (const key of Object.keys(shape)) {
+    if (argSet.has(key)) { continue }
     const [type, { defaultValue }] = unwrap(shape[key])
-    addCliOption(command, key, type, defaultValue, action.args?.includes(key) ?? false)
+    addCliOption(command, key, type, defaultValue, false)
+  }
+  for (const argKey of argKeys) {
+    const key = String(argKey)
+    const [type, { defaultValue }] = unwrap(shape[key])
+    addCliOption(command, key, type, defaultValue, true)
   }
   command.action((...args) => {
     const logger = createConsoleLogger()

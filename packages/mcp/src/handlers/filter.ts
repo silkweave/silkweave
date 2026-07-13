@@ -13,9 +13,9 @@ export interface FilterRequest {
    * JSON-RPC method of the POSTed message (`'initialize'`, `'tools/list'`,
    * `'tools/call'`, `'ping'`, ...). Lets the callback skip expensive
    * permission lookups on `initialize`/`ping`, and doubles as an
-   * observability tap (e.g. counting `tools/list`). For a legacy JSON-RPC
-   * batch this is the first request's method. Empty string when the body is
-   * not a recognizable JSON-RPC message (the transport will reject it anyway).
+   * observability tap (e.g. counting `tools/list`). Empty string when the body
+   * is not a recognizable JSON-RPC message. JSON-RPC batches are rejected by the
+   * transport before the filter runs, so this always reflects a single message.
    */
   method: string
   /** `params.name` of a `tools/call` message; unset for every other method. */

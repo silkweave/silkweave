@@ -39,6 +39,41 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '3.2.1',
+    date: '2026-07-13',
+    summary: 'Security and correctness patch batch from the post-3.2 deep audit. No API breaks - upgrade recommended for anyone using auth, the edge/HTTP transports, or the tRPC/CLI/Fastify adapters.',
+    changes: [
+      {
+        type: 'fix',
+        text: 'tRPC standalone adapter with auth no longer crashes the Node process on an unauthenticated request. The auth failure is now signalled through tRPC (proper 401 + WWW-Authenticate challenge) instead of writing the raw response and racing tRPC into an ERR_STREAM_WRITE_AFTER_END crash. The same fix makes trpcFetch (and @silkweave/nextjs) return 401 with challenge headers instead of a 500 that leaked a stack trace.'
+      },
+      {
+        type: 'fix',
+        text: 'OAuth redirect_uri matching is now component-aware: a wildcard can no longer cross host/path boundaries. Closes an open-redirect / authorization-code-theft vector where patterns like https://*.example.com/cb matched attacker hosts and loopback patterns (http://localhost:*) were bypassable via userinfo injection (http://localhost:x@attacker.com).'
+      },
+      {
+        type: 'fix',
+        text: 'The /resource/:id sideload route now contains reads to its resource directory (path traversal via encoded ../ is rejected), and the stateless MCP transports (http + edge) reject JSON-RPC batches - which also closes a per-request filterActions bypass where only the first batch message was inspected.'
+      },
+      {
+        type: 'fix',
+        text: 'OAuth hardening: the JSON persistence store writes secrets 0600 (owner-only), the CIMD client_id fetch blocks private/loopback/link-local/metadata addresses and disallows redirects (SSRF), and refresh tokens are now rotated on use and bound to the presenting client.'
+      },
+      {
+        type: 'fix',
+        text: 'CLI adapter coerces numeric/bigint option values, so z.number() fields are usable on the command line (previously every numeric option failed validation); positional arguments are now bound in action.args order.'
+      },
+      {
+        type: 'feature',
+        text: 'edge() gains allowedHosts / allowedOrigins (opt-in DNS-rebinding protection) and corsOrigin (restrict the CORS Access-Control-Allow-Origin from the default *).'
+      },
+      {
+        type: 'improvement',
+        text: 'Fastify now runs Zod parse on the merged input (so .refine()/.email()/.transform() are enforced over REST like every other adapter), tears down a streaming action generator on client disconnect (no more leaked generators), and honors auth.callbackPath. Structured MCP actions reject a conflicting toolResult hook or a non-idempotent (.transform()) output schema at boot. Assorted correctness fixes across @silkweave/ai, @silkweave/nextjs, @silkweave/typegen, and the tRPC router type inference.'
+      }
+    ]
+  },
+  {
     version: '3.2.0',
     date: '2026-07-13',
     summary: 'MCP tools get first-class quality signals: annotations, typed output contracts, per-request filtering, and a telemetry hook.',

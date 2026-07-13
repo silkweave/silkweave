@@ -33,7 +33,11 @@ export function buildTrpcRoute(
 ): TrpcRouteHandlers {
   const { adapter, GET, POST } = trpcFetch({ endpoint: options.endpoint, auth: options.auth })
 
-  void silkweave(identity).actions(actions).adapter(adapter).start()
+  // Catch boot failures: an unhandled start() rejection would crash the Next
+  // server. trpcFetch's handler serves a 503 until `_ready` resolves.
+  silkweave(identity).actions(actions).adapter(adapter).start().catch((error: unknown) => {
+    console.error('[silkweave/nextjs] tRPC adapter failed to start:', error)
+  })
 
   const optionsHandler: NextRouteHandler = () =>
     Promise.resolve(new Response(null, { status: 204, headers: options.cors ? CORS_HEADERS : {} }))

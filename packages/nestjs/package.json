@@ -83,6 +83,7 @@
   },
   "dependencies": {
     "@silkweave/core": "workspace:*",
+    "change-case": "^5.4.4",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "zod": "^3.25.0"

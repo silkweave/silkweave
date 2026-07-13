@@ -60,7 +60,10 @@ const typeHandlers: Record<string, TypeHandler> = {
   },
 
   record: (def) => {
-    return f.createTypeLiteralNode([indexSignature(zodToTs(def.valueType), zodToTs(def.keyType))])
+    // `Record<K, V>` rather than `{ [key: K]: V }` - an index signature whose
+    // key type is a string-literal union (z.record(z.enum([...]), V)) is invalid
+    // TS (TS1337), whereas Record accepts any keyof-compatible key type.
+    return f.createTypeReferenceNode('Record', [zodToTs(def.keyType), zodToTs(def.valueType)])
   },
 
   tuple: (def) => f.createTupleTypeNode((def.items as z.ZodTypeAny[]).map(zodToTs)),

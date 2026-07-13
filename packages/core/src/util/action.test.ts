@@ -26,6 +26,17 @@ describe('validateActionDisposition', () => {
     expect(() => validateActionDisposition(action as Action)).toThrow(/requires an 'output' schema/)
   })
 
+  it('rejects a structured action that also defines a toolResult hook', () => {
+    const action = createAction({
+      ...base,
+      disposition: 'structured',
+      output: z.object({ id: z.string() }),
+      toolResult: (result) => ({ content: [{ type: 'text', text: JSON.stringify(result) }] }),
+      run: async ({ id }) => ({ id })
+    })
+    expect(() => validateActionDisposition(action as Action)).toThrow(/toolResult.*cannot be combined with disposition 'structured'/)
+  })
+
   it('rejects structured streaming actions', () => {
     const action: Action = {
       ...base,

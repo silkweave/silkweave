@@ -9,6 +9,19 @@ export interface EdgeAdapterOptions {
   auth?: AuthConfig
   path?: string
   /**
+   * DNS-rebinding protection. When `allowedHosts`/`allowedOrigins` are set the
+   * transport validates the inbound `Host`/`Origin` against them (browser pages
+   * on other origins are then rejected). Off by default to preserve the
+   * any-origin behavior; set these when the server is reachable from a browser.
+   */
+  allowedHosts?: string[]
+  allowedOrigins?: string[]
+  /**
+   * `Access-Control-Allow-Origin` value. Defaults to `'*'`. Set to a specific
+   * origin to stop reflecting every origin (pair with `allowedOrigins`).
+   */
+  corsOrigin?: string
+  /**
    * Per-request tool filter, applied before `registerTools()` on every POST
    * (the stateless transport recomputes the tool list per request). See
    * `FilterActions` for the request stand-in (`headers`/`url`/`method`/
@@ -28,11 +41,46 @@ export interface EdgeAdapter {
   DELETE: (request: Request) => Promise<Response>
 }
 
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': '*',
-  'Access-Control-Max-Age': '86400'
+function buildCorsHeaders(origin: string): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Max-Age': '86400'
+  }
+}
+
+/** A malformed OAuth request (e.g. non-JSON body) - surfaced as a 400, not a 500. */
+class OAuthRequestError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message)
+    this.name = 'OAuthRequestError'
+  }
+}
+
+/** Transport DNS-rebinding config, enabled only when host/origin allow-lists are set. */
+function dnsRebindingOptions(options: EdgeAdapterOptions): Record<string, unknown> {
+  if (!options.allowedHosts && !options.allowedOrigins) { return {} }
+  return {
+    enableDnsRebindingProtection: true,
+    ...(options.allowedHosts ? { allowedHosts: options.allowedHosts } : {}),
+    ...(options.allowedOrigins ? { allowedOrigins: options.allowedOrigins } : {})
+  }
+}
+
+/** Map a thrown handler error to a JSON error Response (400 for a bad OAuth body, else 500). */
+function edgeErrorResponse(error: unknown, corsHeaders: Record<string, string>): Response {
+  if (error instanceof OAuthRequestError) {
+    return new Response(JSON.stringify({ error: error.code, error_description: error.message }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+  console.error('edge handler error:', error)
+  return new Response(JSON.stringify({ jsonrpc: '2.0', error: { code: -32_603, message: 'Internal server error' }, id: null }), {
+    status: 500,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
 }
 
 async function parseOAuthRequest(url: URL, request: Request): Promise<OAuthRequest> {
@@ -41,7 +89,11 @@ async function parseOAuthRequest(url: URL, request: Request): Promise<OAuthReque
     const contentType = request.headers.get('content-type') ?? ''
     const text = await request.text()
     if (contentType.includes('json')) {
-      body = JSON.parse(text)
+      try {
+        body = JSON.parse(text)
+      } catch {
+        throw new OAuthRequestError('invalid_request', 'Request body is not valid JSON')
+      }
     } else {
       body = Object.fromEntries(new URLSearchParams(text))
     }
@@ -86,13 +138,16 @@ async function routeOAuth(
 export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   const mcpPath = options.path ?? '/mcp'
   const callbackPath = options.auth?.callbackPath ?? '/auth/callback'
+  const CORS_HEADERS = buildCorsHeaders(options.corsOrigin ?? '*')
 
   let _actions: Action[] = []
   let _options: SilkweaveOptions | null = null
   let _context: SilkweaveContext | null = null
   let _readyResolve: () => void
-  const _ready = new Promise<void>((resolve) => {
+  let _readyReject: (error: unknown) => void
+  const _ready = new Promise<void>((resolve, reject) => {
     _readyResolve = resolve
+    _readyReject = reject
   })
 
   // Pre-compute valid paths for fast rejection of bogus requests
@@ -119,7 +174,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     }
     : null
 
-  const handleRequest = async (request: Request): Promise<Response> => {
+  const handleRequestInner = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
 
     // Fast rejection - no async work, no allocations for unknown paths
@@ -166,6 +221,18 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     // wait for silkweave().start() to complete
     await _ready
 
+    // JSON-RPC batching was removed from the MCP spec (2025-06-18). A batch also
+    // defeats per-request filterActions (rpcInfo reflects only the first message
+    // while the transport would execute every entry), so reject batches before
+    // dispatch. Parsed once here and reused by the filter below.
+    const rawBody: unknown = await request.clone().json().catch(() => undefined)
+    if (Array.isArray(rawBody)) {
+      return new Response(
+        JSON.stringify({ jsonrpc: '2.0', error: { code: -32_600, message: 'JSON-RPC batch requests are not supported' }, id: null }),
+        { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      )
+    }
+
     let requestContext = _context!
     if (options.auth) {
       const result = await validateToken(request.headers.get('authorization'), options.auth, _context!.fork({ request }))
@@ -182,16 +249,14 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
 
     let activeActions = _actions
     if (options.filterActions) {
-      // Clone so the transport can still consume the original body stream.
-      const body: unknown = await request.clone().json().catch(() => undefined)
       try {
         activeActions = await options.filterActions(_actions, {
           headers: Object.fromEntries(request.headers.entries()),
           url: request.url,
-          ...rpcInfo(body)
+          ...rpcInfo(rawBody)
         })
       } catch (error) {
-        const mapped = filterErrorResponse(error, body)
+        const mapped = filterErrorResponse(error, rawBody)
         return new Response(JSON.stringify(mapped.body), {
           status: mapped.status,
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
@@ -201,7 +266,8 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
 
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
-      enableJsonResponse: options.enableJsonResponse
+      enableJsonResponse: options.enableJsonResponse,
+      ...dnsRebindingOptions(options)
     })
 
     const server = new McpServer({
@@ -218,15 +284,33 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     return transport.handleRequest(request)
   }
 
+  // Top-level guard: any throw (malformed OAuth body, a boot-failure rejection
+  // from `await _ready`, an unexpected error) becomes a JSON error Response
+  // rather than an opaque host 500 / unhandled rejection on the serverless runtime.
+  const handleRequest = async (request: Request): Promise<Response> => {
+    try {
+      return await handleRequestInner(request)
+    } catch (error) {
+      return edgeErrorResponse(error, CORS_HEADERS)
+    }
+  }
+
   const adapter: AdapterGenerator = (silkweaveOptions: SilkweaveOptions, baseContext: SilkweaveContext) => {
     _options = silkweaveOptions
     _context = baseContext.fork({ adapter: 'edge' })
     return {
       context: _context,
       start: async (actions) => {
-        actions.forEach(validateActionDisposition)
-        _actions = actions
-        _readyResolve()
+        try {
+          actions.forEach(validateActionDisposition)
+          _actions = actions
+          _readyResolve()
+        } catch (error) {
+          // Reject `_ready` so awaiting handlers get a 500 instead of hanging
+          // forever, then rethrow so the builder's start() rejects too.
+          _readyReject(error)
+          throw error
+        }
       },
       stop: async () => {
         _actions = []

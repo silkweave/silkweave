@@ -51,6 +51,14 @@ export function mcpTransport(
   actions.forEach(validateActionDisposition)
 
   const post: RequestHandler = async (req, res) => {
+    // JSON-RPC batching was removed from the MCP spec (2025-06-18). A batch also
+    // defeats per-request filterActions: rpcInfo reflects only the first message
+    // but the SDK transport would execute every entry, so a later batch entry
+    // could invoke a tool the filter gated on the first. Reject batches outright.
+    if (Array.isArray(req.body)) {
+      res.status(400).json({ jsonrpc: '2.0', error: { code: -32_600, message: 'JSON-RPC batch requests are not supported' }, id: null })
+      return
+    }
     let active = actions
     if (options.filterActions) {
       try {

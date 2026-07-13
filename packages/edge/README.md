@@ -92,6 +92,9 @@ const { adapter, handler } = edge({
 | `enableJsonResponse` | `boolean` | `false` | Return JSON responses instead of SSE streams |
 | `auth` | `AuthConfig` | - | Bearer-token validation + OAuth routes (see [Auth](#auth)) |
 | `path` | `string` | `/mcp` | The MCP transport path |
+| `allowedHosts` | `string[]` | - | Opt-in DNS-rebinding protection: when set, the transport validates the inbound `Host` header against this list (browser pages on other hosts are rejected) |
+| `allowedOrigins` | `string[]` | - | Opt-in DNS-rebinding protection: validate the inbound `Origin` header against this list |
+| `corsOrigin` | `string` | `*` | The `Access-Control-Allow-Origin` value. Set to a specific origin (pair with `allowedOrigins`) instead of reflecting every origin |
 | `filterActions` | `FilterActions` | - | Per-request tool filter, applied before tools are registered on every POST (the stateless transport recomputes the tool list per request, so permission changes apply on the next `tools/list`). Receives the actions (with their `tags`) and a request stand-in `{ headers, url, method, toolName }` - `method` is the JSON-RPC method (skip DB lookups on `initialize`/`ping`), `toolName` is set for `tools/call`. May be async. A throw surfaces as its `SilkweaveError.statusCode` (e.g. 401) with a JSON-RPC error body, or 500 for other errors - never an empty tool list |
 | `onToolCall` | `OnToolCall` | - | Telemetry hook invoked once per tool call, fire-and-forget (never awaited on the result path; errors logged and swallowed). Events carry `{ action, tool, transport: 'mcp', durationMs, ok, errorCode?, errorMessage?, resultBytes?, sideloaded?, context }` |
 

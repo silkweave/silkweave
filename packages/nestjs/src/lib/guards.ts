@@ -1,4 +1,4 @@
-import { ForbiddenException, type CanActivate, type Type } from '@nestjs/common'
+import { ForbiddenException, Logger, type CanActivate, type Type } from '@nestjs/common'
 import { GUARDS_METADATA } from '@nestjs/common/constants.js'
 import { ApplicationConfig, ModuleRef, Reflector } from '@nestjs/core'
 import { isObservable, lastValueFrom } from 'rxjs'
@@ -27,9 +27,22 @@ export function collectGlobalGuards(
   allowList: Type<CanActivate>[]
 ): CanActivate[] {
   if (allowList.length === 0) { return [] }
+  const requestWrappers = appConfig.getGlobalRequestGuards()
+  // A request-scoped APP_GUARD has no static `.instance` (it's resolved per
+  // request against a context id we don't have here), so it would be silently
+  // dropped below - meaning an allow-listed guard the developer opted in to
+  // never runs over MCP/tRPC (a potential auth bypass). Surface it loudly.
+  for (const wrapper of requestWrappers) {
+    const metatype = (wrapper as { metatype?: Type<CanActivate> }).metatype
+    if (wrapper.instance == null && metatype && allowList.some((c) => c === metatype)) {
+      new Logger('Silkweave').warn(
+        `Global guard ${metatype.name} is request-scoped and cannot be enforced over MCP/tRPC - tool calls will NOT be guarded by it. Make it singleton-scoped (the default) to enforce it.`
+      )
+    }
+  }
   const globals: CanActivate[] = [
     ...appConfig.getGlobalGuards(),
-    ...appConfig.getGlobalRequestGuards().map((w) => w.instance)
+    ...requestWrappers.map((w) => w.instance)
   ].filter((g): g is CanActivate => g != null)
   return globals.filter((g) => allowList.some((c) => g instanceof c))
 }

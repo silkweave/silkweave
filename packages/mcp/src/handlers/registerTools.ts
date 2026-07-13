@@ -92,13 +92,26 @@ function structuredResult(action: Action, result: object | object[]) {
       'output_validation_error'
     ))
   }
+  // The SDK independently re-parses `structuredContent` against the same schema.
+  // A non-idempotent output schema (a field-level `.transform()`) yields data
+  // that fails that second parse, which the SDK raises as an opaque protocol
+  // error. Detect it here and degrade to a clear isError result (SDK-exempt)
+  // instead - structured contracts must be idempotent (no transforms).
+  if (!action.output!.safeParse(parsed.data).success) {
+    return errorToolResult(new SilkweaveError(
+      `Output schema for '${action.name}' is not idempotent (a field-level .transform()?) and cannot back a 'structured' contract - use disposition 'json' or remove the transform.`,
+      'output_schema_not_structurable'
+    ))
+  }
   return structuredToolResult(parsed.data as object)
 }
 
 /** MCP-only telemetry fields, computed only when a hook is registered. */
 function resultMeta(result: object | object[], formatted: { content?: { type: string }[] }): Pick<ToolCallEvent, 'resultBytes' | 'sideloaded'> {
   return {
-    resultBytes: JSON.stringify(result).length,
+    // Actual UTF-8 byte count (String.length counts UTF-16 code units, which
+    // understates multibyte payloads). TextEncoder keeps this edge-safe.
+    resultBytes: new TextEncoder().encode(JSON.stringify(result)).length,
     sideloaded: (formatted.content ?? []).some((block) => block.type === 'resource')
   }
 }

@@ -22,10 +22,14 @@ export function buildMcpRoute(
     enableJsonResponse: options.enableJsonResponse
   })
 
-  // Resolve the adapter's `_ready` promise. The handler awaits it internally, so
-  // we don't need to await here - a floating start is safe and avoids forcing a
-  // top-level `await` into the consumer's route module.
-  void silkweave(identity).actions(actions).adapter(adapter).start()
+  // Kick off the adapter's `_ready` promise (the handler awaits it internally).
+  // We don't await here - that would force a top-level `await` into the route
+  // module - but we MUST catch: an unhandled start() rejection (e.g. an invalid
+  // `disposition: 'structured'` action) would otherwise crash the Next server.
+  // On boot failure edge()'s `_ready` rejects, so requests get a 500, not a hang.
+  silkweave(identity).actions(actions).adapter(adapter).start().catch((error: unknown) => {
+    console.error('[silkweave/nextjs] MCP adapter failed to start:', error)
+  })
 
   const route = (request: Request): Promise<Response> => handler(rewriteRequestPath(request, basePath))
 
