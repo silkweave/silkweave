@@ -13,6 +13,7 @@ export default defineConfig({
     'src/logger.ts',
     'src/mcp.ts',
     'src/mcp-cli-proxy.ts',
+    'src/mcp-server.ts',
     'src/typegen.ts'
   ]
 })

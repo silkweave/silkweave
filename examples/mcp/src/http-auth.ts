@@ -1,6 +1,6 @@
 import { AuthConfig } from '@silkweave/auth'
 import { createAction, silkweave } from '@silkweave/core'
-import { http } from '@silkweave/mcp'
+import { http } from '@silkweave/mcp/server'
 import z from 'zod/v4'
 
 const API_TOKEN = process.env.API_TOKEN ?? 'test-token'

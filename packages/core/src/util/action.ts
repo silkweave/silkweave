@@ -1,8 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import z from 'zod/v4'
 import { SilkweaveContext } from './context.js'
 import { SilkweaveError } from './error.js'
+
+/**
+ * The shape an action's `toolResult` hook returns - a structural, dependency-free
+ * mirror of the MCP SDK's `CallToolResult`. Kept in core (rather than importing
+ * `@modelcontextprotocol/sdk`) so a CLI/Fastify/tRPC-only install never pulls the
+ * entire MCP HTTP server stack for a single type. An SDK `CallToolResult` is
+ * assignable to this; the MCP adapters narrow it back at the SDK boundary.
+ */
+export interface ToolResult {
+  content: Array<{ type: string } & Record<string, unknown>>
+  structuredContent?: Record<string, unknown>
+  isError?: boolean
+  _meta?: Record<string, unknown>
+  [key: string]: unknown
+}
 
 export type ActionKind = 'query' | 'mutation'
 
@@ -99,7 +113,7 @@ export interface Action<
   tags?: string[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O> | ActionStreamRun<I, C>
-  toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
+  toolResult?: (response: O, context: SilkweaveContext) => ToolResult | undefined
 }
 
 export interface NonStreamingActionInput<I extends object, O extends object, N extends string, K extends ActionKind> {
@@ -117,7 +131,7 @@ export interface NonStreamingActionInput<I extends object, O extends object, N e
   tags?: string[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O>
-  toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
+  toolResult?: (response: O, context: SilkweaveContext) => ToolResult | undefined
 }
 
 export interface StreamingActionInput<I extends object, C, N extends string, K extends ActionKind> {
@@ -135,7 +149,7 @@ export interface StreamingActionInput<I extends object, C, N extends string, K e
   tags?: string[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionStreamRun<I, C>
-  toolResult?: (response: C[], context: SilkweaveContext) => CallToolResult | undefined
+  toolResult?: (response: C[], context: SilkweaveContext) => ToolResult | undefined
 }
 
 export function createAction<
@@ -186,7 +200,7 @@ export function validateActionDisposition(action: Action): void {
     )
   }
   if (action.toolResult) {
-    // A `toolResult` hook returns a CallToolResult that would bypass the
+    // A `toolResult` hook returns a ToolResult that would bypass the
     // schema-parsed `structuredContent`, so the SDK's outputSchema validation
     // would reject every call. The two are mutually exclusive by construction.
     throw new SilkweaveError(

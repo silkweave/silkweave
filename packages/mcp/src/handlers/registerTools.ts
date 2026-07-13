@@ -1,10 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
 import { Action, ActionRun, createLogger, emitToolCall, isStreamingAction, OnToolCall, runStreamingAction, SilkweaveContext, SilkweaveError, ToolCallEvent } from '@silkweave/core'
 import { capitalCase, pascalCase } from 'change-case'
 import { errorToolResult, handleToolError, jsonToolResult, smartToolResult, structuredToolResult } from '../util/result.js'
-import { authStorage } from './auth.js'
 
 type LogStream = NonNullable<Parameters<typeof createLogger>[0]>['stream']
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>
@@ -126,7 +126,9 @@ function errorMeta(error: unknown): Pick<ToolCallEvent, 'errorCode' | 'errorMess
 /** Format via the action's `toolResult` hook, else the resolved disposition. */
 function formatToolResult(action: Action, result: object | object[], context: SilkweaveContext, disposition: unknown) {
   if (action.toolResult) {
-    const response = action.toolResult(result, context)
+    // core's dependency-free ToolResult is structurally the SDK CallToolResult;
+    // narrow it back at the SDK boundary.
+    const response = action.toolResult(result, context) as CallToolResult | undefined
     if (response) { return response }
   }
   // A structured action's output schema is a contract fixed at tools/list
@@ -165,12 +167,12 @@ export function registerTools(
       ...(action.disposition === 'structured' && action.output ? { outputSchema: action.output } : {})
     }, async (input, extra) => {
       const logger = createToolLogger(extra, stream)
-      const currentAuth = authStorage.getStore()
+      // `auth` (when present) is carried on `context` by the transport's
+      // per-request fork; this fork inherits it - no AsyncLocalStorage needed.
       const actionContext = context.fork({
         logger,
         extra,
-        request: requestFromExtra(extra.requestInfo),
-        ...(currentAuth ? { auth: currentAuth } : {})
+        request: requestFromExtra(extra.requestInfo)
       })
       // Client-sent `_meta.disposition` wins; otherwise fall back to the
       // action's configured default (`json` when neither is set).

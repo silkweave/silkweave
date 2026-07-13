@@ -1,8 +1,6 @@
 import { Action, Silkweave, SilkweaveOptions } from '@silkweave/core'
 import type { InferTrpcRouter } from '@silkweave/trpc'
-import { McpRouteHandlers, McpRouteOptions, TrpcRouteHandlers, TrpcRouteOptions } from '../types.js'
-import { buildMcpRoute } from './mcpRoute.js'
-import { buildTrpcRoute } from './trpcRoute.js'
+import { McpRouteHandlers, McpRouteOptions, NextRouteHandler, TrpcRouteHandlers, TrpcRouteOptions } from '../types.js'
 
 /** Maps the actions tuple into the `Record<name, Action>` shape `Silkweave` carries. */
 type ActionsRecord<Arr extends readonly Action[]> = {
@@ -48,14 +46,36 @@ export interface SilkweaveApp<Arr extends readonly Action[]> {
  * export type AppRouter = typeof app.Router
  * ```
  */
+/**
+ * Build route handlers whose implementing module is `import()`ed lazily on first
+ * request, so an app that mounts only one surface never loads the other's stack:
+ * an MCP-only app never pulls in `@silkweave/trpc` (an optional peer), and a
+ * tRPC-only app never pulls in `@silkweave/edge`. `build()` memoizes across
+ * methods, so the underlying `silkweave().start()` runs at most once.
+ */
+function lazyHandlers<K extends string>(
+  methods: readonly K[],
+  load: () => Promise<Record<K, NextRouteHandler>>
+): Record<K, NextRouteHandler> {
+  let built: Promise<Record<K, NextRouteHandler>> | undefined
+  const build = () => (built ??= load())
+  const handlers = {} as Record<K, NextRouteHandler>
+  for (const method of methods) {
+    handlers[method] = async (request) => (await build())[method](request)
+  }
+  return handlers
+}
+
 export function defineSilkweave<const Arr extends readonly Action[]>(
   options: DefineSilkweaveOptions<Arr>
 ): SilkweaveApp<Arr> {
   const { actions, ...identity } = options
 
   return {
-    mcp: (mcpOptions) => buildMcpRoute(identity, actions, mcpOptions),
-    trpc: (trpcOptions) => buildTrpcRoute(identity, actions, trpcOptions),
+    mcp: (mcpOptions) => lazyHandlers(['GET', 'POST', 'DELETE', 'OPTIONS'], async () =>
+      (await import('./mcpRoute.js')).buildMcpRoute(identity, actions, mcpOptions)),
+    trpc: (trpcOptions) => lazyHandlers(['GET', 'POST', 'OPTIONS'], async () =>
+      (await import('./trpcRoute.js')).buildTrpcRoute(identity, actions, trpcOptions)),
     Router: undefined as unknown as InferTrpcRouter<AppServer<Arr>>
   }
 }

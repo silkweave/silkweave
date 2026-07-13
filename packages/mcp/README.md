@@ -43,7 +43,7 @@ Configure in Claude Desktop or Claude Code:
 
 ```typescript
 import { silkweave } from '@silkweave/core'
-import { http } from '@silkweave/mcp'
+import { http } from '@silkweave/mcp/server'
 
 await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .adapter(http({ host: 'localhost', port: 8080, allowedHosts: ['localhost'] }))

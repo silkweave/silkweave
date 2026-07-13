@@ -7,7 +7,7 @@ import {
   protectedResourceMetadata,
   sideloadResource,
   type FilterActions
-} from '@silkweave/mcp'
+} from '@silkweave/mcp/server'
 import { type CorsOptions } from 'cors'
 import express, { type RequestHandler } from 'express'
 import type { NestAdapterRegisterContext, NestSilkweaveAdapter } from '../lib/types.js'

@@ -39,6 +39,34 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '4.0.0',
+    date: '2026-07-13',
+    summary: 'Dependency-boundary cleanup from the post-3.2 audit: every package now installs only what it actually uses. Breaking, but the migration is mostly a few import-path and install changes.',
+    unreleased: true,
+    changes: [
+      {
+        type: 'breaking',
+        text: 'The Express http() server moved off the @silkweave/mcp root to the @silkweave/mcp/server subpath. Update `import { http } from \'@silkweave/mcp\'` to `\'@silkweave/mcp/server\'` (same for mcpTransport, oauthRoutes, protectedResourceMetadata, sideloadResource, mcpCors, authMiddleware). The root now carries only the express-free surface (stdio, registerTools, result helpers, filterActions), so stdio-only and serverless consumers no longer pull express/cors.'
+      },
+      {
+        type: 'breaking',
+        text: '@silkweave/core no longer depends on @modelcontextprotocol/sdk (it now has zero runtime dependencies). The action toolResult hook is typed against a new dependency-free core `ToolResult` type instead of the SDK\'s CallToolResult - structurally identical, so most code is unaffected. A CLI/Fastify/tRPC/typegen-only install no longer drags in the entire MCP HTTP server stack.'
+      },
+      {
+        type: 'breaking',
+        text: '@silkweave/nextjs now declares @silkweave/trpc (and @trpc/server) as optional peer dependencies and lazy-loads each route builder: an MCP-only app never installs or loads the tRPC stack, and a tRPC-only app never loads @silkweave/edge. If you use app.trpc(), add @silkweave/trpc + @trpc/server to your install.'
+      },
+      {
+        type: 'breaking',
+        text: '@silkweave/fastify now declares @scalar/fastify-api-reference (the Swagger/Scalar docs UI) as an optional peer dependency. Headless API deployments no longer pay its install weight; if you want the docs UI, add @scalar/fastify-api-reference to your install (the adapter logs a hint and serves the API without it otherwise).'
+      },
+      {
+        type: 'improvement',
+        text: '@silkweave/edge is now genuinely Node-builtin-free: the shared MCP result helpers use web-standard crypto/base64, and per-request auth is threaded through the silkweave context instead of AsyncLocalStorage - so the edge/serverless path no longer imports node:crypto or node:async_hooks.'
+      }
+    ]
+  },
+  {
     version: '3.2.1',
     date: '2026-07-13',
     summary: 'Security and correctness patch batch from the post-3.2 deep audit. No API breaks - upgrade recommended for anyone using auth, the edge/HTTP transports, or the tRPC/CLI/Fastify adapters.',

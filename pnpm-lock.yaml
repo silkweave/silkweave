@@ -667,10 +667,6 @@ importers:
         version: 8.59.4(eslint@10.4.0(jiti@2.7.0))(typescript@5.9.3)
 
   packages/core:
-    dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(zod@3.25.76)
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -766,9 +762,6 @@ importers:
       '@fastify/swagger':
         specifier: ^9.7.0
         version: 9.7.0
-      '@scalar/fastify-api-reference':
-        specifier: ^1.49.0
-        version: 1.57.2
       '@silkweave/auth':
         specifier: workspace:*
         version: link:../auth
@@ -785,6 +778,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.0(jiti@2.7.0))
+      '@scalar/fastify-api-reference':
+        specifier: ^1.49.0
+        version: 1.57.2
       '@stylistic/eslint-plugin':
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.4.0(jiti@2.7.0))
@@ -976,12 +972,6 @@ importers:
       '@silkweave/edge':
         specifier: workspace:*
         version: link:../edge
-      '@silkweave/trpc':
-        specifier: workspace:*
-        version: link:../trpc
-      '@trpc/server':
-        specifier: ^11.7.1
-        version: 11.17.0(typescript@5.9.3)
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -989,9 +979,15 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.0(jiti@2.7.0))
+      '@silkweave/trpc':
+        specifier: workspace:*
+        version: link:../trpc
       '@stylistic/eslint-plugin':
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.4.0(jiti@2.7.0))
+      '@trpc/server':
+        specifier: ^11.7.1
+        version: 11.17.0(typescript@5.9.3)
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.21

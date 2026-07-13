@@ -37,14 +37,22 @@
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@fastify/swagger": "^9.7.0",
-    "@scalar/fastify-api-reference": "^1.49.0",
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
     "fastify": "^5.8.2",
     "zod": "^3.25.0"
   },
+  "peerDependencies": {
+    "@scalar/fastify-api-reference": "^1.49.0"
+  },
+  "peerDependenciesMeta": {
+    "@scalar/fastify-api-reference": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@scalar/fastify-api-reference": "^1.49.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^22.0.0",
     "eslint": "^10.4.0",

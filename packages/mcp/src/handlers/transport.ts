@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { Action, OnToolCall, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
 import { type RequestHandler } from 'express'
+import { authFromRequest } from './auth.js'
 import { filterErrorResponse, rpcInfo, type FilterActions } from './filter.js'
 import { registerTools } from './registerTools.js'
 
@@ -74,7 +75,11 @@ export function mcpTransport(
     }
     try {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
-      const server = createMcpServer(silkweaveOptions, active, context, options.onToolCall)
+      // Fork the caller's resolved auth (attached by authMiddleware) into the
+      // per-request context; registerTools' tool-call fork inherits it.
+      const auth = authFromRequest(req)
+      const reqContext = auth ? context.fork({ auth }) : context
+      const server = createMcpServer(silkweaveOptions, active, reqContext, options.onToolCall)
       res.on('close', () => { void transport.close(); void server.close() })
       await server.connect(transport)
       await transport.handleRequest(req, res, req.body)

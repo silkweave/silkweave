@@ -45,6 +45,10 @@
       "types": "./build/mcp.d.mts",
       "default": "./build/mcp.mjs"
     },
+    "./mcp/server": {
+      "types": "./build/mcp-server.d.mts",
+      "default": "./build/mcp-server.mjs"
+    },
     "./mcp/cli-proxy": {
       "types": "./build/mcp-cli-proxy.d.mts",
       "default": "./build/mcp-cli-proxy.mjs"

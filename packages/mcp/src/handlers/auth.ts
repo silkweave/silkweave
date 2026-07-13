@@ -1,19 +1,26 @@
 import { AuthConfig, AuthInfo, validateToken } from '@silkweave/auth'
 import { SilkweaveContext } from '@silkweave/core'
-import { type RequestHandler } from 'express'
-import { AsyncLocalStorage } from 'node:async_hooks'
+import { type Request, type RequestHandler } from 'express'
 
 /**
- * Per-request bearer-token storage used by tool handlers to read the resolved
- * `AuthInfo` for the currently-handled MCP call.
+ * Key under which `authMiddleware` stashes the resolved `AuthInfo` on the
+ * Express request. `mcpTransport` reads it back and forks it into the per-request
+ * silkweave context (whose `fork` the tool-call context inherits), so auth
+ * reaches tool handlers without `AsyncLocalStorage` - keeping this handler set
+ * free of `node:async_hooks` for edge/serverless portability.
  */
-export const authStorage = new AsyncLocalStorage<AuthInfo>()
+export const AUTH_REQUEST_KEY = '__silkweaveAuth'
+
+/** Read the `AuthInfo` a prior `authMiddleware` attached to the request, if any. */
+export function authFromRequest(req: Request): AuthInfo | undefined {
+  return (req as Request & { [AUTH_REQUEST_KEY]?: AuthInfo })[AUTH_REQUEST_KEY]
+}
 
 /**
  * Express middleware that validates the `Authorization: Bearer …` header via
- * the supplied `AuthConfig`. On success the resolved `AuthInfo` is placed in
- * `authStorage` for the duration of the downstream handler - `mcpTransport`'s
- * tool callbacks pick it up to populate the silkweave context's `auth` key.
+ * the supplied `AuthConfig`. On success the resolved `AuthInfo` is attached to
+ * the request (see `authFromRequest` / `AUTH_REQUEST_KEY`); `mcpTransport` forks
+ * it into the silkweave context for the tool call.
  *
  * The middleware should NOT be applied to OAuth-discovery / token routes -
  * compose it only on the routes that require an authenticated caller (the MCP
@@ -28,9 +35,8 @@ export function authMiddleware(auth: AuthConfig, context: SilkweaveContext): Req
       return
     }
     if (result.auth) {
-      authStorage.run(result.auth, () => { next() })
-    } else {
-      next()
+      (req as Request & { [AUTH_REQUEST_KEY]?: AuthInfo })[AUTH_REQUEST_KEY] = result.auth
     }
+    next()
   }
 }

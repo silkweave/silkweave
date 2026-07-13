@@ -24,6 +24,11 @@
       "types": "./build/index.d.mts",
       "default": "./build/index.mjs"
     },
+    "./server": {
+      "@silkweave/source": "./src/server.ts",
+      "types": "./build/server.d.mts",
+      "default": "./build/server.mjs"
+    },
     "./tools": {
       "@silkweave/source": "./src/tools.ts",
       "types": "./build/tools.d.mts",

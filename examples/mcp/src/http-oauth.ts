@@ -1,7 +1,7 @@
 import { AuthInfo } from '@silkweave/auth'
 import { createJsonStore, google } from '@silkweave/auth/oauth'
 import { createAction, silkweave } from '@silkweave/core'
-import { http } from '@silkweave/mcp'
+import { http } from '@silkweave/mcp/server'
 import z from 'zod/v4'
 
 const store = createJsonStore('store.json')

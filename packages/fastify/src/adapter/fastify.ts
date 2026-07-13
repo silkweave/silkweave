@@ -212,6 +212,26 @@ function splitInputSchema(action: Action, method: HttpMethod): {
   }
 }
 
+/**
+ * Register the Scalar API-reference UI. It's an optional peer, so a missing
+ * module is skipped with a hint rather than crashing a headless deployment.
+ * Resolving the import here (vs. handing `register` a rejecting plugin promise)
+ * is what makes the absence catchable now instead of later during `listen`.
+ */
+async function registerScalarDocs(instance: FastifyInstance): Promise<void> {
+  const scalar = await import('@scalar/fastify-api-reference').catch((error: unknown) => {
+    const code = (error as { code?: string }).code
+    if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
+      instance.log.info('@scalar/fastify-api-reference is not installed - skipping the API reference UI. Install it to enable the docs UI.')
+      return null
+    }
+    throw error
+  })
+  if (scalar) {
+    await instance.register(scalar.default, { routePrefix: '/' })
+  }
+}
+
 export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, auth, cors: corsConfig, ...fastifyOptions }) => {
   const instance = fastifyInstance(fastifyOptions)
   return (options, baseContext) => {
@@ -233,7 +253,7 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
             }
           }
         })
-        await instance.register(import('@scalar/fastify-api-reference'), { routePrefix: '/' })
+        await registerScalarDocs(instance)
 
         if (auth?.authorizationServers?.length && auth.resourceUrl) {
           instance.get('/.well-known/oauth-protected-resource', () => {
