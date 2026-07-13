@@ -347,7 +347,9 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
   path?: string                     // REST route, e.g. 'spaces/:spaceId/users'
   queryParams?: (keyof I)[]         // input fields read from the query string
   args?: (keyof I)[]
-  disposition?: 'json' | 'smart'    // default MCP result format
+  disposition?: 'json' | 'smart' | 'structured'   // MCP result format ('json' is the default)
+  annotations?: ToolAnnotations     // MCP behavior hints (readOnlyHint, destructiveHint, ...)
+  tags?: string[]                   // grouping labels for per-request tool filtering
   isEnabled?: (context: SilkweaveContext) => boolean
   run:
     | ((input: I, context: SilkweaveContext) => Promise<O>)
@@ -364,8 +366,10 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
       <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
       <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
       <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
-      <li><strong><code>toolResult</code></strong> - Optional hook to customize how the return value is formatted as an MCP <code>CallToolResult</code>. Return <code>undefined</code> to use the default <a href="#smart-tool-results"><code>smartToolResult</code></a> behavior. Only affects MCP adapters.</li>
-      <li><strong><code>disposition</code></strong> - Optional default MCP result format - <code>'json'</code> (<code>jsonToolResult</code>) or <code>'smart'</code> (the default, <code>smartToolResult</code>). A simpler alternative to a <code>toolResult</code> hook when you just want compact JSON; a client's <code>_meta.disposition</code> still overrides it. MCP adapters only.</li>
+      <li><strong><code>toolResult</code></strong> - Optional hook to customize how the return value is formatted as an MCP <code>CallToolResult</code>. Return <code>undefined</code> to fall through to the resolved <code>disposition</code>. Only affects MCP adapters.</li>
+      <li><strong><code>disposition</code></strong> - MCP result format - <code>'json'</code> (the default, <code>jsonToolResult</code>), <code>'smart'</code> (<code>smartToolResult</code>, sideloads payloads over 4096 chars), or <code>'structured'</code> (declares <code>output</code> as the tool's MCP <code>outputSchema</code> contract and ships schema-parsed <code>structuredContent</code> - see <a href="#smart-tool-results">Tool Results</a>). A client's <code>_meta.disposition</code> overrides <code>'json'</code>/<code>'smart'</code> but never <code>'structured'</code>. MCP adapters only.</li>
+      <li><strong><code>annotations</code></strong> - Optional MCP tool annotations (<code>readOnlyHint</code>, <code>destructiveHint</code>, <code>idempotentHint</code>, <code>openWorldHint</code>, <code>title</code>) forwarded to <code>tools/list</code>; MCP hosts use them to group and permission-gate tools. Adapters derive <code>readOnlyHint</code> from <code>kind</code> (<code>'query'</code> &rArr; read-only) and merge explicit annotations over the derived base.</li>
+      <li><strong><code>tags</code></strong> - Optional free-form grouping labels (e.g. <code>['leads', 'write']</code>) for the MCP adapters' per-request <code>filterActions</code> to match on.</li>
     </ul>
   </section>
 
@@ -1084,14 +1088,14 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
   <!-- SMART TOOL RESULTS                                             -->
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <section id="smart-tool-results">
-    <h2>Smart Tool Results</h2>
-    <p>When an MCP tool returns a large response, the entire payload is ingested into the LLM's context window. This burns tokens, degrades reasoning quality, and can hit context limits. Silkweave addresses this server-side with <strong>smart tool results</strong>.</p>
-    <p>All MCP adapters (stdio, HTTP, and Vercel) use <code>smartToolResult()</code> by default to format action return values:</p>
+    <h2>Tool Results</h2>
+    <p>MCP tool results default to compact JSON (<code>jsonToolResult</code>). Two opt-in dispositions cover the other cases: <strong>smart</strong> results protect the LLM's context window from large payloads, and <strong>structured</strong> results declare a typed output contract.</p>
+    <p><strong>Smart results</strong> (<code>disposition: 'smart'</code>; the default before 3.2). When an MCP tool returns a large response, the entire payload is ingested into the LLM's context window - burning tokens and degrading reasoning quality. <code>smartToolResult()</code> addresses this server-side:</p>
     <ul>
-      <li><strong>Small responses</strong> (&le; 4096 chars) - returned as inline <code>TextContent</code> JSON, same as before</li>
+      <li><strong>Small responses</strong> (&le; 4096 chars) - returned as inline <code>TextContent</code> JSON</li>
       <li><strong>Large responses</strong> (&gt; 4096 chars) - automatically split into a short text summary + a base64 <strong>embedded resource</strong>, keeping the LLM's context window lean while preserving full data access</li>
     </ul>
-    <p>Some MCP clients (e.g. VS Code since December 2025) handle large responses client-side, but most don't. <code>smartToolResult</code> ensures good behavior regardless of client capabilities - it's a server-side best practice that works everywhere.</p>
+    <p><strong>Structured results</strong> (<code>disposition: 'structured'</code>). The action's <code>output</code> Zod schema is forwarded to <code>tools/list</code> as the tool's MCP <code>outputSchema</code> - agents see the result shape <em>before</em> calling - and the result ships as <code>structuredContent</code> plus a JSON text mirror. The MCP SDK enforces output schemas on <strong>both</strong> sides (the server validates before responding; SDK clients validate independently), so silkweave parses the result through the schema before shipping: extra fields are stripped (returning a wider object than the schema is safe by construction) and a genuine mismatch degrades to an agent-legible <code>isError</code> tool result naming the failing fields, never an opaque protocol error. A client's <code>_meta.disposition</code> cannot demote a structured tool, and <code>'structured'</code> requires a non-streaming action with an <code>output</code> schema (validated at registration).</p>
   </section>
 
   <section id="custom-tool-result">
@@ -1104,8 +1108,8 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
       </div>
       <pre><code set:html={hl(smartResultRaw)} /></pre>
     </div>
-    <p>Return <code>undefined</code> from <code>toolResult</code> to fall through to the default <code>smartToolResult</code> behavior. The hook only affects MCP adapters - CLI and Fastify handle serialization independently.</p>
-    <p>For the common case of just choosing compact JSON over smart splitting (without a hook), set <code>disposition: 'json'</code> on the action. It is only a <em>default</em> - a client that sends <code>_meta.disposition</code> on the tool call overrides it (resolution order: client <code>_meta.disposition</code> &rarr; action <code>disposition</code> &rarr; <code>'smart'</code>). In <a href="#integration-nestjs">NestJS</a> this is exposed per-tool as <code>@Mcp(&#123; result: 'json' &#125;)</code>, or module-wide via <code>SilkweaveModule.forRoot(&#123; defaultResult: 'json' &#125;)</code> (per-method <code>result</code> wins over the module default, and a client's <code>_meta.disposition</code> wins over both).</p>
+    <p>Return <code>undefined</code> from <code>toolResult</code> to fall through to the resolved <code>disposition</code>. The hook only affects MCP adapters - CLI and Fastify handle serialization independently.</p>
+    <p>Without a hook, <code>disposition</code> picks the format per action. <code>'json'</code> and <code>'smart'</code> are only <em>defaults</em> - a client that sends <code>_meta.disposition</code> on the tool call overrides them (resolution order: client <code>_meta.disposition</code> &rarr; action <code>disposition</code> &rarr; <code>'json'</code>; before 3.2 the fallback was <code>'smart'</code>). In <a href="#integration-nestjs">NestJS</a> this is exposed per-tool as <code>@Mcp(&#123; result &#125;)</code>, or module-wide via <code>SilkweaveModule.forRoot(&#123; defaultResult &#125;)</code> (per-method <code>result</code> wins over the module default, and a client's <code>_meta.disposition</code> wins over both).</p>
   </section>
 
   <section id="result-utilities">
@@ -1114,8 +1118,9 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
     <table class="docs-table">
       <thead><tr><th>Function</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>smartToolResult(data)</code></td><td>Default formatter - automatic embedded resource splitting at 4096 chars</td></tr>
-        <tr><td><code>jsonToolResult(data, isError?)</code></td><td>Simple inline <code>TextContent</code> JSON (no splitting)</td></tr>
+        <tr><td><code>smartToolResult(data)</code></td><td>Embedded-resource splitting at 4096 chars (<code>disposition: 'smart'</code>)</td></tr>
+        <tr><td><code>jsonToolResult(data, isError?)</code></td><td>Simple inline <code>TextContent</code> JSON (no splitting) - the default formatter</td></tr>
+        <tr><td><code>structuredToolResult(data)</code></td><td><code>structuredContent</code> + JSON text mirror for <code>disposition: 'structured'</code> (pass output-schema-parsed data)</td></tr>
         <tr><td><code>errorToolResult(error)</code></td><td>Format a <code>SilkweaveError</code> as an error result</td></tr>
         <tr><td><code>handleToolError(error)</code></td><td>Catch-all error handler used by all MCP adapters</td></tr>
       </tbody>
@@ -1201,6 +1206,42 @@ if (auth) {
       <pre><code set:html={hl(guardRaw)} /></pre>
     </div>
     <p>When <code>isEnabled</code> returns <code>false</code>, the action is not registered with that adapter - it won't appear in MCP tool lists, Swagger docs, or CLI help.</p>
+    <p><code>isEnabled</code> is evaluated once at <code>start()</code>. For <em>per-request</em> scoping over MCP, see <a href="#per-request-filtering">Per-Request Tool Filtering</a>.</p>
+  </section>
+
+  <section id="per-request-filtering">
+    <h3>Per-Request Tool Filtering</h3>
+    <p>The stateless MCP transports (<code>http()</code>, <code>edge()</code>, NestJS <code>mcp()</code>) recompute the tool list on <strong>every</strong> request, so per-API-key permissions, tool groups, or read-only keys are a single <code>filterActions</code> callback:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Per-key tool scoping</span></div>
+      <pre><code set:html={hl(`http({
+  host: 'localhost', port: 8080,
+  filterActions: async (actions, request) => {
+    // request: { headers, url, method, toolName? }
+    if (request.method === 'initialize' || request.method === 'ping') { return actions }
+    const key = await lookupApiKey(request.headers.authorization)
+    if (!key) { throw new SilkweaveError('invalid api key', 'invalid_key', 401) }
+    return actions.filter((action) => action.tags?.some((tag) => key.allowedTags.includes(tag)))
+  }
+})`)} /></pre>
+    </div>
+    <p>The filter applies to <code>tools/list</code> <em>and</em> <code>tools/call</code> alike - a client that cached a wider list is still denied - and permission changes apply on the next <code>tools/list</code> (clients refetch on reconnect). <code>request.method</code> is the JSON-RPC method of the POSTed message and <code>request.toolName</code> is <code>params.name</code> on <code>tools/call</code>, so the callback can skip expensive lookups on <code>initialize</code>/<code>ping</code> and double as an observability tap. <strong>Error semantics:</strong> a thrown <code>SilkweaveError</code> surfaces as its <code>statusCode</code> (e.g. 401) with a JSON-RPC error body, anything else as a 500 - a throw never degrades to an empty tool list.</p>
+  </section>
+
+  <section id="telemetry">
+    <h3>Telemetry</h3>
+    <p>Every MCP adapter accepts an <code>onToolCall</code> hook - one seam observes every tool call, fire-and-forget (never awaited on the result path; hook errors are logged and swallowed):</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>Tool-call telemetry</span></div>
+      <pre><code set:html={hl(`http({
+  host: 'localhost', port: 8080,
+  onToolCall: (event) => {
+    // { action, tool, transport, durationMs, ok, errorCode?, errorMessage?, resultBytes?, sideloaded?, context }
+    console.log(JSON.stringify({ event: 'tool_call', tool: event.tool, ms: event.durationMs, ok: event.ok }))
+  }
+})`)} /></pre>
+    </div>
+    <p>Events fire after result formatting, so they carry <code>resultBytes</code> (serialized result size) and <code>sideloaded</code> (whether <code>smartToolResult</code> offloaded to an embedded resource); <code>event.context</code> gives access to the resolved <code>auth</code> for per-key/per-user attribution. In <a href="#integration-nestjs">NestJS</a>, pass a class token instead - <code>SilkweaveModule.forRoot(&#123; telemetry: MyTelemetryService &#125;)</code> resolves a <code>SilkweaveTelemetry</code> provider through DI and covers MCP <em>and</em> tRPC calls (guard denials included), exactly one event per call.</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->

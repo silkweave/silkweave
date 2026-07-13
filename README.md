@@ -56,6 +56,7 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
   - [Multiple Adapters Simultaneously](#multiple-adapters-simultaneously)
   - [CLI Arguments vs Options](#cli-arguments-vs-options)
   - [Complex Input Types](#complex-input-types)
+  - [MCP Tool Quality](#mcp-tool-quality)
   - [Action Linter](#action-linter)
 - [MCP Client Configuration](#mcp-client-configuration)
 - [API Reference](#api-reference)
@@ -69,7 +70,7 @@ Building an MCP server usually means wiring up transports, registering tools, se
 
 Silkweave eliminates this duplication. You define an **Action** - a name, a Zod schema, and an async function - and Silkweave handles the rest:
 
-- **MCP adapters** register your actions as MCP tools with proper notifications, progress reporting, and error handling - over stdio, streamable HTTP, or stateless serverless (Edge / Web Standard)
+- **MCP adapters** register your actions as MCP tools with proper notifications, progress reporting, and error handling - over stdio, streamable HTTP, or stateless serverless (Edge / Web Standard) - plus agent-quality signals: [tool annotations, typed output contracts, per-request tool filtering, and call telemetry](#mcp-tool-quality)
 - **tRPC adapter** exposes your actions as end-to-end type-safe procedures (`InferTrpcRouter<typeof server>`), as a standalone server or a fetch handler
 - **Fastify adapter** generates a REST API with full OpenAPI/Swagger documentation derived from your Zod schemas
 - **CLI adapter** builds a complete command-line interface with argument parsing, option flags, and plain `console` output
@@ -753,6 +754,37 @@ export const ImportAction = createAction({
 ```
 
 In MCP, this becomes a tool with a full JSON Schema. In the CLI, `tags` becomes `--tags <json>` accepting a JSON string. In Fastify, it's a documented POST body.
+
+### MCP Tool Quality
+
+Four features (3.2) make the MCP surface agent-grade - all opt-in, all defined on the action or the adapter:
+
+```typescript
+createAction({
+  name: 'users.get',
+  description: 'Get a user by id',
+  input: z.object({ id: z.string().describe('User id from UsersList') }),
+  output: z.object({ id: z.string(), name: z.string() }),
+  disposition: 'structured',                    // output becomes the MCP outputSchema contract
+  annotations: { idempotentHint: true },        // merged over the kind-derived readOnlyHint
+  tags: ['users', 'read'],                      // matched by filterActions below
+  kind: 'query',
+  run: async ({ id }) => getUser(id)
+})
+
+http({
+  host: 'localhost', port: 8080,
+  filterActions: async (actions, request) => scopeToApiKey(actions, request),  // per-request tool list
+  onToolCall: (event) => log('tool_call', event)                               // fire-and-forget telemetry
+})
+```
+
+- **Tool annotations** - every tool ships `ToolAnnotations` (`readOnlyHint` derived from `kind`; explicit fields win), which MCP hosts use to group and permission-gate tools.
+- **Structured output** (`disposition: 'structured'`) - the `output` schema is visible in `tools/list` before the call and the schema-parsed result ships as `structuredContent` (extra fields stripped; mismatches degrade to agent-legible tool errors). Note the default result format is now compact JSON - `disposition: 'smart'` opts back into embedded-resource sideloading for large payloads.
+- **Per-request tool filtering** (`filterActions`) - the stateless transports recompute the tool list per request, so per-API-key permissions are one callback; a thrown `SilkweaveError` surfaces as its `statusCode`, never an empty tool list.
+- **Telemetry** (`onToolCall`) - one fire-and-forget event per call (`durationMs`, `ok`, `resultBytes`, `sideloaded`, resolved auth via `context`); in NestJS wired through DI (`forRoot({ telemetry: MyTelemetryService })`) covering MCP **and** tRPC.
+
+See the [@silkweave/mcp README](./packages/mcp) for details.
 
 ### Action Linter
 

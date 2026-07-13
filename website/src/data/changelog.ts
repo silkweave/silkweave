@@ -39,6 +39,43 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '3.2.0',
+    date: '2026-07-13',
+    summary: 'MCP tools get first-class quality signals: annotations, typed output contracts, per-request filtering, and a telemetry hook.',
+    changes: [
+      {
+        type: 'breaking',
+        text: 'MCP tool results now default to compact JSON (jsonToolResult) instead of smart embedded-resource splitting. Restore the old behavior per action with disposition: \'smart\', per tool with @Mcp({ result: \'smart\' }), or module-wide with defaultResult: \'smart\' in @silkweave/nestjs. A client\'s _meta.disposition still overrides either default.',
+        commit: 'a9edf71'
+      },
+      {
+        type: 'feature',
+        text: 'Structured output: disposition: \'structured\' declares the action\'s output Zod schema as the tool\'s MCP outputSchema - agents see the result shape in tools/list before calling - and ships the schema-parsed result as structuredContent. Extra fields are stripped before shipping (so returning a wider object is safe against the SDK\'s two-sided validation), and a genuine mismatch degrades to an agent-legible isError result naming the failing fields. In NestJS, @Mcp({ result: \'structured\', output }) requires an explicit schema - reflected @ApiOkResponse schemas are deliberately rejected as hard contracts.',
+        commit: 'a9edf71'
+      },
+      {
+        type: 'feature',
+        text: 'Tool annotations: every MCP tool now carries ToolAnnotations (readOnlyHint derived from kind, or from the HTTP verb in NestJS - @Get => read-only + idempotent, @Delete => destructive) with explicit overrides via Action.annotations / @Mcp({ annotations }). Clients like Claude Code use these to group and permission-gate tools.',
+        commit: 'bd3cb4f'
+      },
+      {
+        type: 'feature',
+        text: 'Per-request tool filtering: filterActions on http(), mcpTransport(), edge(), and NestJS mcp() recomputes the tool list per request (per-API-key permissions, tool groups, read-only keys). The callback receives { headers, url, method, toolName } - method is the JSON-RPC method, so initialize/ping can skip lookups - and applies to tools/call too. A thrown SilkweaveError surfaces as its statusCode with a JSON-RPC error body, never an empty tool list. Actions gain free-form tags to filter on.',
+        commit: '1c9e5d7'
+      },
+      {
+        type: 'feature',
+        text: 'Telemetry: an onToolCall hook on every MCP adapter reports one fire-and-forget event per tool call ({ action, tool, transport, durationMs, ok, errorCode, resultBytes, sideloaded, context }). @silkweave/nestjs wires it through DI - forRoot({ telemetry: MyTelemetryService }) - covering MCP and tRPC calls (guard denials included), exactly one event per call.',
+        commit: '3a7f6fe'
+      },
+      {
+        type: 'fix',
+        text: 'Workspace tests now resolve cross-package @silkweave/* imports to TS source at runtime (not stale build output), and the shared Vitest config no longer leaks bundler resolution conditions into CJS require() chains.',
+        commit: '1c9e5d7'
+      }
+    ]
+  },
+  {
     version: '3.1.0',
     date: '2026-07-08',
     summary: 'A leaner dependency graph: the logger folds into core and @clack/prompts is gone entirely.',
