@@ -60,6 +60,7 @@ Exposes a single stateless `POST /mcp` (each call mints a fresh transport with `
 | `allowedHosts` | `string[]` | Allowed hosts for DNS rebinding protection |
 | `cors` | `CorsOptions \| boolean` | CORS config. `false` to disable, `true`/omit for permissive defaults (`origin: '*'`), or a [cors](https://www.npmjs.com/package/cors) options object. MCP-required headers are always exposed. |
 | `filterActions` | `FilterActions` | Per-request tool filter - see [Per-request tool filtering](#per-request-tool-filtering-filteractions) |
+| `onToolCall` | `OnToolCall` | Telemetry hook - see [Telemetry](#telemetry-ontoolcall) |
 
 #### Per-request tool filtering (`filterActions`)
 
@@ -83,6 +84,27 @@ http({
 - **Error semantics**: a thrown `SilkweaveError` propagates as its `statusCode` (401/403/...) with a JSON-RPC error body - SDK clients surface it as an auth failure. Any other throw maps to 500. A throw never produces an empty tool list; return `[]` explicitly if "no tools" is the intended answer.
 - Permission changes apply on the next `tools/list` (clients refetch on reconnect) - no `listChanged` session machinery needed or offered.
 - The same option exists on `mcpTransport()`, `@silkweave/edge`'s `edge()`, and `@silkweave/nestjs`'s `mcp()`. Actions carry optional `tags: string[]` as the natural thing to filter on.
+
+#### Telemetry (`onToolCall`)
+
+One hook observes every tool call - available on `stdio()`, `http()`, `mcpTransport()`, and `@silkweave/edge`'s `edge()`:
+
+```typescript
+http({
+  host: 'localhost', port: 8080,
+  onToolCall: (event) => {
+    // { action, tool, transport: 'mcp', durationMs, ok, errorCode?, errorMessage?, resultBytes?, sideloaded?, context }
+    const auth = event.context.getOptional('auth')
+    console.log(JSON.stringify({ event: 'tool_call', ...event, context: undefined, userId: auth?.userId }))
+  }
+})
+```
+
+- **Fire-and-forget**: never awaited on the result path; sync throws and async rejections are logged and swallowed - the hook can never fail, slow, or reorder a call.
+- Fires after result formatting, so events carry `resultBytes` (serialized raw-result size) and `sideloaded` (whether `smartToolResult` offloaded to an embedded resource).
+- `ok` is `false` when the action threw (with `errorCode`/`errorMessage` - a `SilkweaveError`'s `code`, else the error's name) or when the formatted result is an `isError` tool result.
+- Streaming actions report `durationMs` across full generator consumption.
+- `@silkweave/nestjs` wires this through DI instead - `forRoot({ telemetry: MyTelemetryService })` covers MCP **and** tRPC calls.
 
 ### cliProxy
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { HttpException, Injectable, Logger, type CanActivate, type Type } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { SilkweaveError, type Action, type ActionKind, type SilkweaveContext, type ToolAnnotations } from '@silkweave/core'
+import { emitToolCall, SilkweaveError, type Action, type ActionKind, type OnToolCall, type SilkweaveContext, type ToolAnnotations } from '@silkweave/core'
 import { z } from 'zod/v4'
 import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
 import { MCP_METADATA, TRPC_METADATA, type McpMetadata, type TrpcMetadata } from './metadata.js'
@@ -49,6 +49,14 @@ export interface DiscoverOptions {
   openapi?: OpenApiDocument
   globalGuards?: Type<CanActivate>[]
   defaultResult?: 'json' | 'smart'
+  /**
+   * Telemetry emitter for `@Trpc` procedure invocations (guard denials
+   * included). MCP tool calls are NOT emitted here - the `mcp()` adapter
+   * instruments the MCP registrar instead, where result metadata
+   * (`resultBytes`/`sideloaded`) is known - so exactly one event fires per
+   * call on either transport.
+   */
+  onToolCall?: OnToolCall
 }
 
 @Injectable()
@@ -95,7 +103,7 @@ export class ControllerDiscovery {
     for (const d of discovered) {
       const shared = this.reflect(d, lookup)
       if (d.mcp) { actions.push(this.mcpAction(d, shared, globalGuards, options.defaultResult)) }
-      if (d.trpc) { actions.push(this.trpcAction(d, shared, globalGuards)) }
+      if (d.trpc) { actions.push(this.trpcAction(d, shared, globalGuards, options.onToolCall)) }
     }
     return actions
   }
@@ -198,7 +206,7 @@ export class ControllerDiscovery {
   }
 
   /** Synthesize the tRPC-targeted action (kind/output/subscription + httpStatus errors). */
-  private trpcAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[]): Action {
+  private trpcAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[], onToolCall?: OnToolCall): Action {
     const meta = d.trpc!
     const shape = { ...shared.baseShape, ...inputShape(meta.input) }
     const name = meta.name ?? `${shared.base}.${d.methodName}`
@@ -221,7 +229,7 @@ export class ControllerDiscovery {
         input: z.object(shape),
         chunk: resolveSchema(meta.chunk) ?? z.unknown(),
         isEnabled,
-        run: streamingRun(applyGuards, method, instance, bindings, applyParamPipes, true)
+        run: streamingRun(applyGuards, method, instance, bindings, applyParamPipes, true, onToolCall ? { hook: onToolCall, name } : undefined)
       } as Action
     }
 
@@ -248,18 +256,54 @@ export class ControllerDiscovery {
       kind,
       isEnabled,
       run: async (input: object, context: SilkweaveContext): Promise<object> => {
+        const started = Date.now()
         try {
           await applyGuards(context, input)
           const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
           const response = context.getOptional<unknown>('response')
           const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
+          emitTrpcEvent(onToolCall, name, context, started)
           return result ?? {}
         } catch (error) {
-          throw toSilkweaveError(error)
+          const mapped = toSilkweaveError(error)
+          emitTrpcEvent(onToolCall, name, context, started, mapped)
+          throw mapped
         }
       }
     } as Action
   }
+}
+
+/** Procedure key the tRPC router exposes for an action name (`Users.listBySpace` → `usersListBySpace`). */
+function camelKey(name: string): string {
+  const parts = name.split(/[^a-zA-Z0-9]+/).filter(Boolean)
+  return parts
+    .map((part, index) => index === 0 ? part[0].toLowerCase() + part.slice(1) : part[0].toUpperCase() + part.slice(1))
+    .join('')
+}
+
+/**
+ * Emit a tRPC-side telemetry event (fire-and-forget). Gated to the `trpc`
+ * adapter context so a `typegen`-driven evaluation never counts as a call.
+ */
+function emitTrpcEvent(hook: OnToolCall | undefined, name: string, context: SilkweaveContext, started: number, error?: unknown): void {
+  if (!hook || context.getOptional<string>('adapter') !== 'trpc') { return }
+  const meta = error == null
+    ? {}
+    : error instanceof SilkweaveError
+      ? { errorCode: error.code, errorMessage: error.message }
+      : error instanceof Error
+        ? { errorCode: error.name, errorMessage: error.message }
+        : { errorCode: 'unknown' }
+  emitToolCall(hook, {
+    action: name,
+    tool: camelKey(name),
+    transport: 'trpc',
+    durationMs: Date.now() - started,
+    ok: error == null,
+    ...meta,
+    context
+  })
 }
 
 /**
@@ -280,17 +324,22 @@ function streamingRun(
   instance: object,
   bindings: Binding[],
   applyParamPipes: boolean,
-  mapErrors: boolean
+  mapErrors: boolean,
+  telemetry?: { hook: OnToolCall; name: string }
 ) {
   return async function* (input: object, context: SilkweaveContext): AsyncGenerator<unknown, void, void> {
+    const started = Date.now()
     try {
       await applyGuards(context, input)
       const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
       const response = context.getOptional<unknown>('response')
       const gen = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes) as AsyncIterable<unknown>
       for await (const chunk of gen) { yield chunk }
+      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started) }
     } catch (error) {
-      throw mapErrors ? toSilkweaveError(error) : error
+      const mapped = mapErrors ? toSilkweaveError(error) : error
+      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started, mapped) }
+      throw mapped
     }
   }
 }

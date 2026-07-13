@@ -1,11 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { Action, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
+import { Action, OnToolCall, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
 import { type RequestHandler } from 'express'
 import { filterErrorResponse, rpcInfo, type FilterActions } from './filter.js'
 import { registerTools } from './registerTools.js'
 
-function createMcpServer(options: SilkweaveOptions, actions: Action[], context: SilkweaveContext): McpServer {
+function createMcpServer(options: SilkweaveOptions, actions: Action[], context: SilkweaveContext, onToolCall?: OnToolCall): McpServer {
   const server = new McpServer({
     name: options.name,
     description: options.description,
@@ -13,7 +13,7 @@ function createMcpServer(options: SilkweaveOptions, actions: Action[], context: 
   }, {
     capabilities: { tools: {}, logging: {} }
   })
-  registerTools(server, actions, context)
+  registerTools(server, actions, context, { onToolCall })
   return server
 }
 
@@ -28,6 +28,8 @@ export interface McpTransportOptions {
    * See `FilterActions` for the request stand-in and error semantics.
    */
   filterActions?: FilterActions
+  /** Telemetry hook invoked once per tool call (fire-and-forget). */
+  onToolCall?: OnToolCall
 }
 
 /**
@@ -64,7 +66,7 @@ export function mcpTransport(
     }
     try {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
-      const server = createMcpServer(silkweaveOptions, active, context)
+      const server = createMcpServer(silkweaveOptions, active, context, options.onToolCall)
       res.on('close', () => { void transport.close(); void server.close() })
       await server.connect(transport)
       await transport.handleRequest(req, res, req.body)

@@ -357,6 +357,33 @@ The allow-list is explicit-by-class on purpose - a blanket "run every global" wo
 
 Controllers are normal Nest providers - inject services via the constructor as usual.
 
+## Telemetry
+
+Pass a `SilkweaveTelemetry` **class token** to `forRoot` and every MCP tool call and tRPC procedure invocation reports one `ToolCallEvent` - the service is a regular injectable (resolved through DI at call time), so it can use your logger, config, or repositories:
+
+```ts
+@Injectable()
+export class ToolTelemetryService implements SilkweaveTelemetry {
+  constructor(private readonly logger: MyLogger) {}
+  onToolCall(event: ToolCallEvent) {
+    // { action, tool, transport: 'mcp' | 'trpc', durationMs, ok, errorCode?, errorMessage?, resultBytes?, sideloaded?, context }
+    const auth = event.context.getOptional('auth')
+    this.logger.info('tool_call', { tool: event.tool, transport: event.transport, durationMs: event.durationMs, ok: event.ok, userId: auth?.userId })
+  }
+}
+
+SilkweaveModule.forRoot({
+  silkweave: { name: 'app', description: 'My App', version: '1.0.0' },
+  adapters: [mcp({ basePath: '/mcp' }), trpc({ basePath: '/trpc' })],
+  telemetry: ToolTelemetryService   // must also be a provider in one of your modules
+})
+```
+
+- **Exactly one event per call.** MCP events are emitted from the MCP registrar (and carry `resultBytes`/`sideloaded` - metrics only that layer knows); tRPC events from the synthesized action wrapper. Guard denials count as failed calls (`ok: false`, `errorCode: 'http_error'`, message from the mapped `HttpException`) on either transport.
+- **Fire-and-forget.** The hook is never awaited on the call path; throws/rejections are logged and swallowed - telemetry can never fail, slow, or reorder a call.
+- Subscriptions (`async *` routes) report `durationMs` across full stream consumption.
+- The event carries the tool's **wire name** (`LeadsBulkUpdate` over MCP, `leadsBulkUpdate` over tRPC) plus the action name, so one dashboard can group across transports.
+
 ## What does *not* run
 
 Because the handler is invoked directly (not through Nest's HTTP request pipeline), the following do **not** apply on a tool call - only `@UseGuards()` (plus any opted-in `globalGuards`) and parameter-bound pipes do:

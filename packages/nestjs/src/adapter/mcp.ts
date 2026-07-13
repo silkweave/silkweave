@@ -63,7 +63,7 @@ function compose(...handlers: RequestHandler[]): RequestHandler {
 export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
   return {
     name: 'mcp',
-    register({ httpAdapter, silkweaveOptions, baseContext, actions }: NestAdapterRegisterContext): void {
+    register({ httpAdapter, silkweaveOptions, baseContext, actions, onToolCall }: NestAdapterRegisterContext): void {
       const basePath = (options.basePath ?? '/mcp').replace(/\/$/, '')
       if (!basePath) { throw new Error('@silkweave/nestjs mcp(): basePath cannot be empty or "/" - pick a path like "/mcp".') }
 
@@ -103,7 +103,7 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
         adapter.get(`${basePath}/resource/:id`, ...prefix(corsHandler, protect(sideloadResource({ resourceDir: options.resourceDir }))))
       }
 
-      const transport = mcpTransport(silkweaveOptions, baseContext, actions, { filterActions: options.filterActions })
+      const transport = mcpTransport(silkweaveOptions, baseContext, actions, { filterActions: options.filterActions, onToolCall })
       adapter.post(basePath, ...prefix(corsHandler, express.json(), protect(transport.post)))
     }
   }

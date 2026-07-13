@@ -1,8 +1,8 @@
 import { Inject, Module, type DynamicModule, type MiddlewareConsumer, type NestModule } from '@nestjs/common'
-import { DiscoveryModule, HttpAdapterHost } from '@nestjs/core'
-import { createContext } from '@silkweave/core'
+import { DiscoveryModule, HttpAdapterHost, ModuleRef } from '@nestjs/core'
+import { createContext, type OnToolCall } from '@silkweave/core'
 import { ControllerDiscovery } from './controllerDiscovery.js'
-import { SILKWEAVE_MODULE_OPTIONS, type SilkweaveModuleOptions } from './types.js'
+import { SILKWEAVE_MODULE_OPTIONS, type SilkweaveModuleOptions, type SilkweaveTelemetry } from './types.js'
 
 /**
  * Root module for `@silkweave/nestjs`.
@@ -38,8 +38,26 @@ export class SilkweaveModule implements NestModule {
   constructor(
     @Inject(SILKWEAVE_MODULE_OPTIONS) private readonly options: SilkweaveModuleOptions,
     private readonly discovery: ControllerDiscovery,
-    private readonly httpAdapterHost: HttpAdapterHost
+    private readonly httpAdapterHost: HttpAdapterHost,
+    private readonly moduleRef: ModuleRef
   ) { }
+
+  /**
+   * Build the telemetry emitter from the configured class token. The instance
+   * is resolved through DI lazily on first event (and memoized) - `configure()`
+   * runs before providers are guaranteed ready, same reason global guards
+   * resolve at call time.
+   */
+  private telemetryEmitter(): OnToolCall | undefined {
+    const token = this.options.telemetry
+    if (!token) { return undefined }
+    let instance: SilkweaveTelemetry | undefined
+    return (event) => {
+      const resolved = instance ?? this.moduleRef.get<SilkweaveTelemetry>(token, { strict: false })
+      instance = resolved
+      return resolved.onToolCall(event)
+    }
+  }
 
   static forRoot(options: SilkweaveModuleOptions): DynamicModule {
     return {
@@ -59,10 +77,14 @@ export class SilkweaveModule implements NestModule {
     if (!httpAdapter) {
       throw new Error('@silkweave/nestjs: HttpAdapterHost.httpAdapter is not available.')
     }
+    const onToolCall = this.telemetryEmitter()
     const allActions = this.discovery.discover({
       openapi: this.options.openapi,
       globalGuards: this.options.globalGuards,
-      defaultResult: this.options.defaultResult
+      defaultResult: this.options.defaultResult,
+      // tRPC events come from the synthesized action wrapper; MCP events from
+      // the MCP registrar (via each adapter's register context) - one per call.
+      onToolCall
     })
     for (const adapter of this.options.adapters) {
       const baseContext = createContext({ ...(this.options.context ?? {}), adapter: adapter.name })
@@ -73,7 +95,8 @@ export class SilkweaveModule implements NestModule {
         httpAdapter,
         silkweaveOptions: this.options.silkweave,
         baseContext,
-        actions
+        actions,
+        onToolCall
       })
     }
   }

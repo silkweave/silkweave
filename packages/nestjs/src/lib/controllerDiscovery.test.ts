@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { Body, Controller, Delete, ForbiddenException, Get, Injectable, Param, Post, Put, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { createContext, type Action, type SilkweaveContext } from '@silkweave/core'
+import { createContext, type Action, type SilkweaveContext, type ToolCallEvent } from '@silkweave/core'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { Mcp } from '../decorator/mcp.js'
@@ -34,11 +34,11 @@ class MessagesController {
   }
 }
 
-function discoverController(controller: object): Action[] {
+function discoverController(controller: object, options: Parameters<ControllerDiscovery['discover']>[0] = {}): Action[] {
   const discovery = { getProviders: () => [], getControllers: () => [{ instance: controller }] } as unknown as DiscoveryService
   const moduleRef = { get: (ref: new () => unknown) => new ref(), create: (ref: new () => unknown) => new ref() } as unknown as ModuleRef
   const cd = new ControllerDiscovery(discovery, new MetadataScanner(), new Reflector(), moduleRef, new ApplicationConfig())
-  return cd.discover()
+  return cd.discover(options)
 }
 
 function discover(): Action[] {
@@ -177,5 +177,56 @@ describe('ControllerDiscovery structured output', () => {
   it('boot-errors on result: structured without an explicit output schema', () => {
     expect(() => discoverController(new StructuredWithoutOutputController()))
       .toThrow(/requires an explicit output schema/)
+  })
+})
+
+@Controller('reports')
+class ReportsController {
+  @Get()
+  @Mcp()
+  @Trpc()
+  list(): { rows: number } { return { rows: 3 } }
+
+  @Post('explode')
+  @Trpc()
+  explode(): never { throw new ForbiddenException('no access') }
+}
+
+describe('ControllerDiscovery telemetry (trpc wrapper)', () => {
+  const setup = () => {
+    const events: ToolCallEvent[] = []
+    const actions = discoverController(new ReportsController(), { onToolCall: (event) => { events.push(event) } })
+    return { events, actions }
+  }
+  const trpcCtx = () => createContext({ adapter: 'trpc' })
+
+  it('emits one trpc event per successful procedure call', async () => {
+    const { events, actions } = setup()
+    const trpcList = actions.find((a) => a.name === 'Reports.list' && a.isEnabled?.(trpcCtx()))!
+    await trpcList.run({}, trpcCtx())
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ action: 'Reports.list', tool: 'reportsList', transport: 'trpc', ok: true })
+    expect(events[0].resultBytes).toBeUndefined()
+  })
+
+  it('emits ok: false with the mapped http status code on a thrown HttpException', async () => {
+    const { events, actions } = setup()
+    const explode = actions.find((a) => a.name === 'Reports.explode')!
+    await expect(explode.run({}, trpcCtx())).rejects.toThrow('no access')
+    expect(events[0]).toMatchObject({ ok: false, transport: 'trpc', errorCode: 'http_error', errorMessage: 'no access' })
+  })
+
+  it('does not emit from the MCP action (the MCP registrar owns that seam - no double-fire)', async () => {
+    const { events, actions } = setup()
+    const mcpList = actions.find((a) => a.name === 'Reports.list' && a.isEnabled?.(createContext({ adapter: 'mcp' })))!
+    await mcpList.run({}, createContext({ adapter: 'mcp' }))
+    expect(events).toHaveLength(0)
+  })
+
+  it('does not emit under the typegen adapter context', async () => {
+    const { events, actions } = setup()
+    const trpcList = actions.find((a) => a.name === 'Reports.list' && a.isEnabled?.(trpcCtx()))!
+    await trpcList.run({}, createContext({ adapter: 'typegen' }))
+    expect(events).toHaveLength(0)
   })
 })

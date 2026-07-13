@@ -1,9 +1,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { AdapterFactory, validateActionDisposition } from '@silkweave/core'
+import { AdapterFactory, OnToolCall, validateActionDisposition } from '@silkweave/core'
 import { registerTools } from '../handlers/registerTools.js'
 
-export const stdio: AdapterFactory = () => {
+export interface StdioAdapterOptions {
+  /** Telemetry hook invoked once per tool call (fire-and-forget). */
+  onToolCall?: OnToolCall
+}
+
+export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions) => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'stdio' })
     const server = new McpServer({
@@ -17,7 +22,7 @@ export const stdio: AdapterFactory = () => {
       context,
       start: async (actions) => {
         actions.forEach(validateActionDisposition)
-        registerTools(server, actions, context, { logStream: false })
+        registerTools(server, actions, context, { logStream: false, onToolCall: adapterOptions?.onToolCall })
         const transport = new StdioServerTransport()
         await server.connect(transport)
       },

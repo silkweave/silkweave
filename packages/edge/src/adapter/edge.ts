@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
+import { Action, AdapterGenerator, OnToolCall, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
 import { filterErrorResponse, registerTools, rpcInfo, type FilterActions } from '@silkweave/mcp/tools'
 
 export interface EdgeAdapterOptions {
@@ -16,6 +16,8 @@ export interface EdgeAdapterOptions {
    * `SilkweaveError.statusCode` or 500 - never an empty tool list).
    */
   filterActions?: FilterActions
+  /** Telemetry hook invoked once per tool call (fire-and-forget). */
+  onToolCall?: OnToolCall
 }
 
 export interface EdgeAdapter {
@@ -210,7 +212,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       capabilities: { tools: {}, logging: {} }
     })
 
-    registerTools(server, activeActions, requestContext)
+    registerTools(server, activeActions, requestContext, { onToolCall: options.onToolCall })
 
     await server.connect(transport)
     return transport.handleRequest(request)

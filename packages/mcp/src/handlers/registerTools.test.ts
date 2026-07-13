@@ -1,8 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { createContext, type Action } from '@silkweave/core'
-import { describe, expect, it } from 'vitest'
+import { createContext, SilkweaveError, type Action, type ToolCallEvent } from '@silkweave/core'
+import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod/v4'
 import { registerTools, type RegisterToolsOptions } from './registerTools.js'
 
@@ -134,5 +134,62 @@ describe('registerTools default disposition (json)', () => {
     const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
     const content = result.content as { type: string }[]
     expect(content.some((block) => block.type === 'resource')).toBe(true)
+  })
+})
+
+describe('registerTools onToolCall telemetry', () => {
+  const collect = () => {
+    const events: ToolCallEvent[] = []
+    return { events, onToolCall: (event: ToolCallEvent) => { events.push(event) } }
+  }
+
+  it('emits one event per successful call with result metadata', async () => {
+    const { events, onToolCall } = collect()
+    const client = await connect([action({})], { onToolCall })
+    await client.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      action: 'hello.world',
+      tool: 'HelloWorld',
+      transport: 'mcp',
+      ok: true,
+      sideloaded: false,
+      resultBytes: JSON.stringify({ greeting: 'Hello Ada' }).length
+    })
+    expect(events[0].durationMs).toBeTypeOf('number')
+    expect(events[0].context.getOptional('logger')).toBeDefined()
+  })
+
+  it('reports sideloaded: true when smartToolResult offloads a large payload', async () => {
+    const { events, onToolCall } = collect()
+    const big = { blob: 'x'.repeat(5000) }
+    const client = await connect([action({ disposition: 'smart', run: async () => big })], { onToolCall })
+    await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
+    expect(events[0]).toMatchObject({ ok: true, sideloaded: true })
+  })
+
+  it('emits ok: false with the SilkweaveError code when the action throws', async () => {
+    const { events, onToolCall } = collect()
+    const failing = action({ run: async () => { throw new SilkweaveError('nope', 'forbidden', 403) } })
+    const client = await connect([failing], { onToolCall })
+    const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
+    expect(result.isError).toBe(true)
+    expect(events[0]).toMatchObject({ ok: false, errorCode: 'forbidden', errorMessage: 'nope' })
+    expect(events[0].resultBytes).toBeUndefined()
+  })
+
+  it('never fails or slows the call when the hook throws or rejects', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    const client = await connect([action({})], {
+      onToolCall: () => { throw new Error('telemetry down') }
+    })
+    const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
+    expect(result.isError).toBeUndefined()
+    const asyncClient = await connect([action({})], {
+      onToolCall: async () => { throw new Error('telemetry down') }
+    })
+    const asyncResult = await asyncClient.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
+    expect(asyncResult.isError).toBeUndefined()
+    spy.mockRestore()
   })
 })

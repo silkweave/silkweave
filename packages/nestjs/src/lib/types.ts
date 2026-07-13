@@ -1,7 +1,23 @@
 import type { CanActivate, Type } from '@nestjs/common'
 import type { HttpAdapterHost } from '@nestjs/core'
-import type { Action, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
+import type { Action, OnToolCall, SilkweaveContext, SilkweaveOptions, ToolCallEvent } from '@silkweave/core'
 import type { OpenApiDocument } from './reflect/openapi.js'
+
+/**
+ * Telemetry service contract for `SilkweaveModuleOptions.telemetry`. Implement
+ * it as a regular injectable provider (it can inject your logger, config,
+ * repositories) and pass the **class token** to `forRoot` - it is resolved
+ * through DI at call time.
+ *
+ * `onToolCall` fires once per tool/procedure invocation, fire-and-forget:
+ * never awaited on the call path, errors logged and swallowed. MCP events are
+ * emitted from the MCP registrar (and carry `resultBytes`/`sideloaded`); tRPC
+ * events from the synthesized action wrapper (guard denials included) -
+ * exactly one event per call either way.
+ */
+export interface SilkweaveTelemetry {
+  onToolCall(event: ToolCallEvent): void | Promise<void>
+}
 
 /**
  * Context passed to a Nest Silkweave adapter when `SilkweaveModule` wires it
@@ -19,6 +35,12 @@ export interface NestAdapterRegisterContext {
   baseContext: SilkweaveContext
   /** Actions filtered to those enabled on this adapter. */
   actions: Action[]
+  /**
+   * Telemetry emitter resolved from `SilkweaveModuleOptions.telemetry` (when
+   * configured). The `mcp()` adapter threads it into the MCP registrar so MCP
+   * events carry the result metadata only that layer knows.
+   */
+  onToolCall?: OnToolCall
 }
 
 /**
@@ -73,10 +95,18 @@ export interface SilkweaveModuleOptions {
   /**
    * Default MCP result format for every `@Mcp` tool - `'json'` (compact JSON,
    * `jsonToolResult`) or `'smart'` (inline small / embedded-resource large,
-   * `smartToolResult`). Defaults to `'smart'`. A per-method `@Mcp({ result })`
-   * overrides this, and a client's per-call `_meta.disposition` overrides both.
+   * `smartToolResult`). Defaults to `'json'` (since 3.2; was `'smart'`). A
+   * per-method `@Mcp({ result })` overrides this, and a client's per-call
+   * `_meta.disposition` overrides both.
    */
   defaultResult?: 'json' | 'smart'
+  /**
+   * Class token of a `SilkweaveTelemetry` provider, resolved through DI at
+   * call time (so it can inject your logger/config). One `onToolCall` event
+   * fires per tool/procedure invocation across MCP and tRPC - see
+   * `SilkweaveTelemetry` for the seam split and event fields.
+   */
+  telemetry?: Type<SilkweaveTelemetry>
 }
 
 export const SILKWEAVE_MODULE_OPTIONS = '__silkweave_module_options__'

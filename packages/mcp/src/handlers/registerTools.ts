@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
-import { Action, ActionRun, createLogger, isStreamingAction, runStreamingAction, SilkweaveContext, SilkweaveError } from '@silkweave/core'
+import { Action, ActionRun, createLogger, emitToolCall, isStreamingAction, OnToolCall, runStreamingAction, SilkweaveContext, SilkweaveError, ToolCallEvent } from '@silkweave/core'
 import { capitalCase, pascalCase } from 'change-case'
 import { errorToolResult, handleToolError, jsonToolResult, smartToolResult, structuredToolResult } from '../util/result.js'
 import { authStorage } from './auth.js'
@@ -16,6 +16,13 @@ export interface RegisterToolsOptions {
    * transports default to `process.stderr`.
    */
   logStream?: LogStream
+  /**
+   * Telemetry hook invoked once per tool call (fire-and-forget; errors are
+   * logged, never propagated). Fires after result formatting, so events carry
+   * `resultBytes` (serialized raw-result size) and `sideloaded` (whether
+   * `smartToolResult` offloaded to an embedded resource).
+   */
+  onToolCall?: OnToolCall
 }
 
 /**
@@ -88,6 +95,21 @@ function structuredResult(action: Action, result: object | object[]) {
   return structuredToolResult(parsed.data as object)
 }
 
+/** MCP-only telemetry fields, computed only when a hook is registered. */
+function resultMeta(result: object | object[], formatted: { content?: { type: string }[] }): Pick<ToolCallEvent, 'resultBytes' | 'sideloaded'> {
+  return {
+    resultBytes: JSON.stringify(result).length,
+    sideloaded: (formatted.content ?? []).some((block) => block.type === 'resource')
+  }
+}
+
+/** Error identity for telemetry: a SilkweaveError's `code`, else the error's name. */
+function errorMeta(error: unknown): Pick<ToolCallEvent, 'errorCode' | 'errorMessage'> {
+  if (error instanceof SilkweaveError) { return { errorCode: error.code, errorMessage: error.message } }
+  if (error instanceof Error) { return { errorCode: error.name, errorMessage: error.message } }
+  return { errorCode: 'unknown' }
+}
+
 /** Format via the action's `toolResult` hook, else the resolved disposition. */
 function formatToolResult(action: Action, result: object | object[], context: SilkweaveContext, disposition: unknown) {
   if (action.toolResult) {
@@ -140,10 +162,20 @@ export function registerTools(
       // Client-sent `_meta.disposition` wins; otherwise fall back to the
       // action's configured default (`json` when neither is set).
       const disposition = extra._meta?.disposition ?? action.disposition
+      const base = { action: action.name, tool: pascalCase(action.name), transport: 'mcp' as const, context: actionContext }
+      const started = Date.now()
       try {
         const result = await runAction(action, input, actionContext, extra)
-        return formatToolResult(action, result, actionContext, disposition)
+        const formatted = formatToolResult(action, result, actionContext, disposition)
+        emitToolCall(options.onToolCall, {
+          ...base,
+          durationMs: Date.now() - started,
+          ok: formatted.isError !== true,
+          ...(options.onToolCall ? resultMeta(result, formatted) : {})
+        })
+        return formatted
       } catch (error) {
+        emitToolCall(options.onToolCall, { ...base, durationMs: Date.now() - started, ok: false, ...errorMeta(error) })
         return handleToolError(error)
       }
     })

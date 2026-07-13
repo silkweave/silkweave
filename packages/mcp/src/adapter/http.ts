@@ -1,6 +1,6 @@
 import { createMcpExpressApp, type CreateMcpExpressAppOptions } from '@modelcontextprotocol/sdk/server/express.js'
 import { AuthConfig } from '@silkweave/auth'
-import { Action, AdapterFactory, createContext, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
+import { Action, AdapterFactory, createContext, OnToolCall, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
 import { CorsOptions } from 'cors'
 import express, { type Express } from 'express'
 import { Server } from 'http'
@@ -31,6 +31,8 @@ export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
    * never an empty tool list).
    */
   filterActions?: FilterActions
+  /** Telemetry hook invoked once per tool call (fire-and-forget). */
+  onToolCall?: OnToolCall
 }
 
 /**
@@ -46,7 +48,7 @@ export function buildMcpExpressApp(
   actions: Action[],
   options: StartMcpHttpOptions
 ): Express {
-  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, ...mcpAppOptions } = options
+  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, ...mcpAppOptions } = options
   const app = createMcpExpressApp({ ...mcpAppOptions, host })
 
   const corsHandler = mcpCors(corsConfig ?? true)
@@ -79,7 +81,7 @@ export function buildMcpExpressApp(
     app.get('/resource/:id', sideloadResource({ resourceDir }))
   }
 
-  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions })
+  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall })
   app.post('/mcp', express.json(), transport.post)
 
   return app
