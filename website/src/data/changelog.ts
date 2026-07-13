@@ -42,7 +42,6 @@ export const releases: Release[] = [
     version: '4.0.0',
     date: '2026-07-13',
     summary: 'Dependency-boundary cleanup from the post-3.2 audit: every package now installs only what it actually uses. Breaking, but the migration is mostly a few import-path and install changes.',
-    unreleased: true,
     changes: [
       {
         type: 'breaking',

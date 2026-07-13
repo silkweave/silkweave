@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-mcp",
-  "version": "3.2.1",
+  "version": "4.0.0",
   "description": "Silkweave MCP adapters (stdio, http, http+auth, http+oauth, cli-proxy)",
   "private": true,
   "type": "module",

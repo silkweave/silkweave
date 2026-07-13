@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/cli",
-  "version": "3.2.1",
+  "version": "4.0.0",
   "description": "Silkweave CLI Adapter",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
