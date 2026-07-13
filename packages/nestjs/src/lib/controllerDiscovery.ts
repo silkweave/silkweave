@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { HttpException, Injectable, Logger, type CanActivate, type Type } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { SilkweaveError, type Action, type ActionKind, type SilkweaveContext } from '@silkweave/core'
+import { SilkweaveError, type Action, type ActionKind, type SilkweaveContext, type ToolAnnotations } from '@silkweave/core'
 import { z } from 'zod/v4'
 import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
 import { MCP_METADATA, TRPC_METADATA, type McpMetadata, type TrpcMetadata } from './metadata.js'
@@ -158,6 +158,7 @@ export class ControllerDiscovery {
       description,
       input: z.object(shape),
       ...((meta.result ?? defaultResult) ? { disposition: meta.result ?? defaultResult } : {}),
+      annotations: { ...verbAnnotations(shared.route.method), ...meta.annotations },
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',
       ...(streaming
         ? { chunk: z.unknown(), run: streamingRun(applyGuards, method, instance, bindings, applyParamPipes, false) }
@@ -236,6 +237,17 @@ export class ControllerDiscovery {
       }
     } as Action
   }
+}
+
+/**
+ * Verb-derived MCP annotation defaults for a controller route. Explicit
+ * `@Mcp({ annotations })` fields are merged over these by the caller.
+ */
+function verbAnnotations(method: string): ToolAnnotations {
+  if (method === 'GET') { return { readOnlyHint: true, idempotentHint: true } }
+  if (method === 'PUT') { return { readOnlyHint: false, idempotentHint: true } }
+  if (method === 'DELETE') { return { readOnlyHint: false, destructiveHint: true, idempotentHint: true } }
+  return { readOnlyHint: false }
 }
 
 /** Build a streaming (`async *`) run that applies guards then yields the method's chunks. */

@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { Body, Controller, ForbiddenException, Injectable, Post, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common'
+import { Body, Controller, Delete, ForbiddenException, Get, Injectable, Param, Post, Put, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
 import { createContext, type Action, type SilkweaveContext } from '@silkweave/core'
 import { describe, expect, it } from 'vitest'
@@ -32,12 +32,15 @@ class MessagesController {
   }
 }
 
-function discover(): Action[] {
-  const controller = new MessagesController()
+function discoverController(controller: object): Action[] {
   const discovery = { getProviders: () => [], getControllers: () => [{ instance: controller }] } as unknown as DiscoveryService
   const moduleRef = { get: (ref: new () => unknown) => new ref(), create: (ref: new () => unknown) => new ref() } as unknown as ModuleRef
   const cd = new ControllerDiscovery(discovery, new MetadataScanner(), new Reflector(), moduleRef, new ApplicationConfig())
   return cd.discover()
+}
+
+function discover(): Action[] {
+  return discoverController(new MessagesController())
 }
 
 /** A forked MCP context carrying the inbound tool-call headers, as the transport would supply. */
@@ -84,5 +87,48 @@ describe('ControllerDiscovery (integration)', () => {
   it('fails closed when the call carries no request at all (no header => denied)', async () => {
     const [action] = discover()
     await expect(action.run({ sessionId: 'session-a', text: 'hi' }, mcpContext(null))).rejects.toBeInstanceOf(ForbiddenException)
+  })
+})
+
+@Controller('things')
+class ThingsController {
+  @Get()
+  @Mcp()
+  list(): unknown[] { return [] }
+
+  @Put(':id')
+  @Mcp()
+  replace(@Param('id') id: string): { id: string } { return { id } }
+
+  @Delete(':id')
+  @Mcp()
+  remove(@Param('id') id: string): { id: string } { return { id } }
+
+  @Post('archive')
+  @Mcp({ annotations: { destructiveHint: true } })
+  archive(): object { return {} }
+}
+
+describe('ControllerDiscovery annotations', () => {
+  const byName = (actions: Action[], name: string): Action => actions.find((a) => a.name === name)!
+
+  it('derives read-only + idempotent hints from @Get', () => {
+    const actions = discoverController(new ThingsController())
+    expect(byName(actions, 'Things.list').annotations).toEqual({ readOnlyHint: true, idempotentHint: true })
+  })
+
+  it('derives idempotent (not read-only) from @Put', () => {
+    const actions = discoverController(new ThingsController())
+    expect(byName(actions, 'Things.replace').annotations).toEqual({ readOnlyHint: false, idempotentHint: true })
+  })
+
+  it('derives destructive + idempotent from @Delete', () => {
+    const actions = discoverController(new ThingsController())
+    expect(byName(actions, 'Things.remove').annotations).toEqual({ readOnlyHint: false, destructiveHint: true, idempotentHint: true })
+  })
+
+  it('merges explicit @Mcp({ annotations }) over the verb-derived defaults', () => {
+    const actions = discoverController(new ThingsController())
+    expect(byName(actions, 'Things.archive').annotations).toEqual({ readOnlyHint: false, destructiveHint: true })
   })
 })

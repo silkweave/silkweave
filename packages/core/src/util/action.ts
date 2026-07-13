@@ -7,6 +7,26 @@ export type ActionKind = 'query' | 'mutation'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
+/**
+ * MCP tool annotations (spec `ToolAnnotations`) - client-facing hints about a
+ * tool's behavior, used by MCP hosts to group and permission-gate tools. All
+ * hints are advisory. Structurally compatible with the MCP SDK's
+ * `ToolAnnotations`, defined here so non-MCP packages can set them without a
+ * type dependency on the SDK.
+ */
+export interface ToolAnnotations {
+  /** Human-readable title override for the tool. */
+  title?: string
+  /** The tool does not modify its environment. */
+  readOnlyHint?: boolean
+  /** The tool may perform destructive updates (only meaningful when not read-only). */
+  destructiveHint?: boolean
+  /** Repeated calls with the same arguments have no additional effect. */
+  idempotentHint?: boolean
+  /** The tool may interact with an open world of external entities. */
+  openWorldHint?: boolean
+}
+
 export type ActionRun<I, O> = (input: I, context: SilkweaveContext) => Promise<O>
 export type ActionStreamRun<I, C> = (input: I, context: SilkweaveContext) => AsyncGenerator<C, void, void>
 
@@ -57,6 +77,14 @@ export interface Action<
    * adapters.
    */
   disposition?: 'json' | 'smart'
+  /**
+   * MCP tool annotations forwarded to `tools/list`. When unset, MCP adapters
+   * derive `readOnlyHint` from `kind` (`'query'` ⇒ read-only); explicit
+   * annotations are merged over the derived base, so setting e.g. only
+   * `destructiveHint` keeps the derived `readOnlyHint`. Ignored by non-MCP
+   * adapters.
+   */
+  annotations?: ToolAnnotations
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O> | ActionStreamRun<I, C>
   toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
@@ -73,6 +101,7 @@ export interface NonStreamingActionInput<I extends object, O extends object, N e
   queryParams?: (keyof I)[]
   args?: (keyof I)[]
   disposition?: 'json' | 'smart'
+  annotations?: ToolAnnotations
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O>
   toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
@@ -89,6 +118,7 @@ export interface StreamingActionInput<I extends object, C, N extends string, K e
   queryParams?: (keyof I)[]
   args?: (keyof I)[]
   disposition?: 'json' | 'smart'
+  annotations?: ToolAnnotations
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionStreamRun<I, C>
   toolResult?: (response: C[], context: SilkweaveContext) => CallToolResult | undefined

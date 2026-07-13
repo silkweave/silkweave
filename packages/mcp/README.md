@@ -179,6 +179,22 @@ createAction({
 
 This is only a **default** - a client that sends `_meta.disposition` on the tool call always wins. Resolution order: client `_meta.disposition` → action `disposition` → `'smart'`. (`@silkweave/nestjs` exposes this as `@Mcp({ result: 'json' })`.)
 
+### Tool annotations
+
+Every tool is registered with MCP `annotations` - behavior hints clients use to group and permission-gate tools. The registrar derives `readOnlyHint` from the action's `kind` (`'query'` ⇒ `true`, otherwise `false`) and merges the action's explicit `annotations` over that base:
+
+```typescript
+createAction({
+  name: 'campaigns.delete',
+  description: 'Delete a campaign permanently',
+  input: z.object({ id: z.string() }),
+  annotations: { destructiveHint: true, idempotentHint: true },  // merged over { readOnlyHint: false }
+  run: async ({ id }) => remove(id)
+})
+```
+
+All hints are advisory (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` - see `ToolAnnotations` in `@silkweave/core`). `@silkweave/nestjs` derives them from the HTTP verb instead (`@Get` ⇒ read-only + idempotent, `@Delete` ⇒ destructive + idempotent) with an `@Mcp({ annotations })` override.
+
 ## MCP Result Utilities
 
 All result utilities are exported from `@silkweave/mcp`:

@@ -96,7 +96,9 @@ export function registerTools(
     server.registerTool(pascalCase(action.name), {
       title: capitalCase(action.name),
       description: action.description,
-      inputSchema: action.input
+      inputSchema: action.input,
+      // Derived base (query ⇒ read-only), explicit annotations merged over.
+      annotations: { readOnlyHint: action.kind === 'query', ...action.annotations }
     }, async (input, extra) => {
       const logger = createToolLogger(extra, stream)
       const currentAuth = authStorage.getStore()

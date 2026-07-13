@@ -133,6 +133,7 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 | `input` | `Record<string, z.ZodType> \| z.ZodObject` | - | Zod override merged over the reflected fields (per-field). A raw shape (`{ field: z.string() }`) **or** a whole `z.object({ ... })` (its `.shape` is unwrapped). The escape hatch for shapes reflection can't express - discriminated unions, custom validators, `@Transform`. It **adds to** the reflected fields; it does not replace them (see the warning below) |
 | `pipes` | `'apply' \| 'skip'` | `'apply'` | Whether to run parameter-bound pipes (`@Param('id', ParseIntPipe)`) when re-binding |
 | `result` | `'json' \| 'smart'` | `'smart'` | Default MCP result format - `'json'` returns compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and offloads large ones to an embedded resource (`smartToolResult`). A client that sends `_meta.disposition` on the call overrides it |
+| `annotations` | `ToolAnnotations` | verb-derived | MCP tool annotations merged over the verb-derived defaults: `@Get` ⇒ `{ readOnlyHint: true, idempotentHint: true }`, `@Put` ⇒ `{ readOnlyHint: false, idempotentHint: true }`, `@Delete` ⇒ `{ readOnlyHint: false, destructiveHint: true, idempotentHint: true }`, else `{ readOnlyHint: false }`. Set a field to override its derived value (e.g. `{ destructiveHint: true }` on a POST that deletes) |
 
 ### Result format
 

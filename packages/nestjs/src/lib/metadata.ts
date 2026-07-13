@@ -1,4 +1,5 @@
 import type { Type } from '@nestjs/common'
+import type { ToolAnnotations } from '@silkweave/core'
 import type { z } from 'zod/v4'
 
 /** Reflect-metadata key carrying `@Mcp` options on a controller method. */
@@ -52,6 +53,15 @@ export interface McpMetadata {
    * call overrides it.
    */
   result?: 'json' | 'smart'
+  /**
+   * MCP tool annotations (read-only/destructive/idempotent hints) merged over
+   * the verb-derived defaults: `@Get` ⇒ `{ readOnlyHint: true, idempotentHint:
+   * true }`, `@Put` ⇒ `{ idempotentHint: true }`, `@Delete` ⇒
+   * `{ destructiveHint: true, idempotentHint: true }`, anything else ⇒
+   * `{ readOnlyHint: false }`. Set a field here to override its derived value
+   * (e.g. `{ destructiveHint: true }` on a POST that deletes).
+   */
+  annotations?: ToolAnnotations
 }
 
 /** tRPC procedure kind for a `@Trpc`-decorated route. */

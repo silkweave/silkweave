@@ -70,6 +70,7 @@ Returns a builder with `.adapter()`, `.action()`, `.actions()`, `.set()`, and `.
 | `queryParams` | `(keyof I)[]` | Optional input fields read from the URL query string instead of the body (e.g. `['offset', 'limit']`). See [REST routing](#rest-routing). |
 | `args` | `(keyof I)[]` | Fields to expose as CLI positional arguments |
 | `disposition` | `'json' \| 'smart'` | Optional default MCP result format - `'json'` ⇒ `jsonToolResult`, `'smart'` (default) ⇒ `smartToolResult`. A client's `_meta.disposition` overrides it. MCP adapters only. |
+| `annotations` | `ToolAnnotations` | Optional MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`, `title`) forwarded to `tools/list`. MCP adapters derive `readOnlyHint` from `kind` (`'query'` ⇒ `true`) and merge explicit annotations over the derived base. MCP adapters only. |
 | `isEnabled` | `(context) => boolean` | Gate action availability per adapter |
 | `run` | `(input, context) => Promise<O>` *or* `async function*(input, context): AsyncGenerator<Chunk>` | The action implementation. Use a regular `async` function for buffered request/response; use an `async function*` and declare `chunk` to stream. |
 | `toolResult` | `(response, context) => CallToolResult \| undefined` | Custom MCP result formatting (optional). For streaming actions, `response` is the buffered array of chunks (used when the client did not request streaming). |
