@@ -5,7 +5,8 @@ import {
   mcpTransport,
   oauthRoutes,
   protectedResourceMetadata,
-  sideloadResource
+  sideloadResource,
+  type FilterActions
 } from '@silkweave/mcp'
 import { type CorsOptions } from 'cors'
 import express, { type RequestHandler } from 'express'
@@ -22,6 +23,15 @@ export interface McpAdapterOptions {
   sideloadResources?: boolean
   /** Directory the sideload route reads from. Default `'resources'`. */
   resourceDir?: string
+  /**
+   * Per-request tool filter, applied before tools are registered on every
+   * `POST ${basePath}` (the stateless transport recomputes the tool list per
+   * request, so e.g. API-key permission changes apply on the next
+   * `tools/list`). Receives the synthesized actions (with their `tags`) and a
+   * request stand-in (`headers`/`url`/`method`/`toolName`). A throw surfaces
+   * as its `SilkweaveError.statusCode` (else 500) - never an empty tool list.
+   */
+  filterActions?: FilterActions
 }
 
 function compose(...handlers: RequestHandler[]): RequestHandler {
@@ -93,7 +103,7 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
         adapter.get(`${basePath}/resource/:id`, ...prefix(corsHandler, protect(sideloadResource({ resourceDir: options.resourceDir }))))
       }
 
-      const transport = mcpTransport(silkweaveOptions, baseContext, actions)
+      const transport = mcpTransport(silkweaveOptions, baseContext, actions, { filterActions: options.filterActions })
       adapter.post(basePath, ...prefix(corsHandler, express.json(), protect(transport.post)))
     }
   }

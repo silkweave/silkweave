@@ -59,6 +59,30 @@ Exposes a single stateless `POST /mcp` (each call mints a fresh transport with `
 | `port` | `number` | Listen port |
 | `allowedHosts` | `string[]` | Allowed hosts for DNS rebinding protection |
 | `cors` | `CorsOptions \| boolean` | CORS config. `false` to disable, `true`/omit for permissive defaults (`origin: '*'`), or a [cors](https://www.npmjs.com/package/cors) options object. MCP-required headers are always exposed. |
+| `filterActions` | `FilterActions` | Per-request tool filter - see [Per-request tool filtering](#per-request-tool-filtering-filteractions) |
+
+#### Per-request tool filtering (`filterActions`)
+
+Because the transport is stateless, the tool list is recomputed on **every** request - which makes per-request scoping (per-API-key permissions, tool groups, read-only keys) a single callback:
+
+```typescript
+http({
+  host: 'localhost', port: 8080,
+  filterActions: async (actions, request) => {
+    // request: { headers, url, method, toolName? }
+    if (request.method === 'initialize' || request.method === 'ping') { return actions }  // skip the DB lookup
+    const key = await lookupApiKey(request.headers.authorization)
+    if (!key) { throw new SilkweaveError('invalid api key', 'invalid_key', 401) }
+    return actions.filter((action) => action.tags?.some((tag) => key.allowedTags.includes(tag)))
+  }
+})
+```
+
+- Applies to `tools/list` **and** `tools/call` alike - a client that cached a wider list is still denied.
+- `request.method` is the JSON-RPC method of the POSTed message; `request.toolName` is `params.name` on `tools/call`. Both double as an observability tap (e.g. counting `tools/list`).
+- **Error semantics**: a thrown `SilkweaveError` propagates as its `statusCode` (401/403/...) with a JSON-RPC error body - SDK clients surface it as an auth failure. Any other throw maps to 500. A throw never produces an empty tool list; return `[]` explicitly if "no tools" is the intended answer.
+- Permission changes apply on the next `tools/list` (clients refetch on reconnect) - no `listChanged` session machinery needed or offered.
+- The same option exists on `mcpTransport()`, `@silkweave/edge`'s `edge()`, and `@silkweave/nestjs`'s `mcp()`. Actions carry optional `tags: string[]` as the natural thing to filter on.
 
 ### cliProxy
 

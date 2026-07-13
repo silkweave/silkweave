@@ -2,12 +2,20 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
 import { Action, AdapterGenerator, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
-import { registerTools } from '@silkweave/mcp/tools'
+import { filterErrorResponse, registerTools, rpcInfo, type FilterActions } from '@silkweave/mcp/tools'
 
 export interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
   auth?: AuthConfig
   path?: string
+  /**
+   * Per-request tool filter, applied before `registerTools()` on every POST
+   * (the stateless transport recomputes the tool list per request). See
+   * `FilterActions` for the request stand-in (`headers`/`url`/`method`/
+   * `toolName`) and error semantics (a throw surfaces as its
+   * `SilkweaveError.statusCode` or 500 - never an empty tool list).
+   */
+  filterActions?: FilterActions
 }
 
 export interface EdgeAdapter {
@@ -170,6 +178,25 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       }
     }
 
+    let activeActions = _actions
+    if (options.filterActions) {
+      // Clone so the transport can still consume the original body stream.
+      const body: unknown = await request.clone().json().catch(() => undefined)
+      try {
+        activeActions = await options.filterActions(_actions, {
+          headers: Object.fromEntries(request.headers.entries()),
+          url: request.url,
+          ...rpcInfo(body)
+        })
+      } catch (error) {
+        const mapped = filterErrorResponse(error, body)
+        return new Response(JSON.stringify(mapped.body), {
+          status: mapped.status,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+        })
+      }
+    }
+
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: options.enableJsonResponse
@@ -183,7 +210,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       capabilities: { tools: {}, logging: {} }
     })
 
-    registerTools(server, _actions, requestContext)
+    registerTools(server, activeActions, requestContext)
 
     await server.connect(transport)
     return transport.handleRequest(request)

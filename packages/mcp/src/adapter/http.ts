@@ -8,6 +8,7 @@ import { authMiddleware } from '../handlers/auth.js'
 import { mcpCors } from '../handlers/cors.js'
 import { protectedResourceMetadata } from '../handlers/metadata.js'
 import { oauthRoutes } from '../handlers/oauth.js'
+import { type FilterActions } from '../handlers/filter.js'
 import { sideloadResource } from '../handlers/sideload.js'
 import { mcpTransport } from '../handlers/transport.js'
 
@@ -21,6 +22,15 @@ export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
   sideloadResources?: boolean
   /** Directory the sideload route reads from. Default `'resources'`. */
   resourceDir?: string
+  /**
+   * Per-request tool filter, applied before `registerTools()` on every
+   * `POST /mcp` (the stateless transport recomputes the tool list per request,
+   * so permission changes apply on the next `tools/list`). See `FilterActions`
+   * for the request stand-in (`headers`/`url`/`method`/`toolName`) and error
+   * semantics (a throw surfaces as its `SilkweaveError.statusCode` or 500 -
+   * never an empty tool list).
+   */
+  filterActions?: FilterActions
 }
 
 /**
@@ -36,7 +46,7 @@ export function buildMcpExpressApp(
   actions: Action[],
   options: StartMcpHttpOptions
 ): Express {
-  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, ...mcpAppOptions } = options
+  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, ...mcpAppOptions } = options
   const app = createMcpExpressApp({ ...mcpAppOptions, host })
 
   const corsHandler = mcpCors(corsConfig ?? true)
@@ -69,7 +79,7 @@ export function buildMcpExpressApp(
     app.get('/resource/:id', sideloadResource({ resourceDir }))
   }
 
-  const transport = mcpTransport(silkweaveOptions, context, actions)
+  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions })
   app.post('/mcp', express.json(), transport.post)
 
   return app

@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { Action, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
 import { type RequestHandler } from 'express'
+import { filterErrorResponse, rpcInfo, type FilterActions } from './filter.js'
 import { registerTools } from './registerTools.js'
 
 function createMcpServer(options: SilkweaveOptions, actions: Action[], context: SilkweaveContext): McpServer {
@@ -21,6 +22,14 @@ export interface McpTransportHandlers {
   post: RequestHandler
 }
 
+export interface McpTransportOptions {
+  /**
+   * Per-request tool filter, applied before `registerTools()` on every POST.
+   * See `FilterActions` for the request stand-in and error semantics.
+   */
+  filterActions?: FilterActions
+}
+
 /**
  * Build the MCP Streamable HTTP transport route handler.
  *
@@ -33,15 +42,29 @@ export interface McpTransportHandlers {
 export function mcpTransport(
   silkweaveOptions: SilkweaveOptions,
   context: SilkweaveContext,
-  actions: Action[]
+  actions: Action[],
+  options: McpTransportOptions = {}
 ): McpTransportHandlers {
   // Fail at boot, not per request - the factory runs once when the app is built.
   actions.forEach(validateActionDisposition)
 
   const post: RequestHandler = async (req, res) => {
+    let active = actions
+    if (options.filterActions) {
+      try {
+        active = await options.filterActions(actions, { headers: req.headers, url: req.originalUrl ?? req.url, ...rpcInfo(req.body) })
+      } catch (error) {
+        // A throw never degrades to an empty tool list - it surfaces as its
+        // statusCode (SilkweaveError) or a 500, so a bad key reads as an auth
+        // failure rather than "server has no tools".
+        const { status, body } = filterErrorResponse(error, req.body)
+        res.status(status).json(body)
+        return
+      }
+    }
     try {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
-      const server = createMcpServer(silkweaveOptions, actions, context)
+      const server = createMcpServer(silkweaveOptions, active, context)
       res.on('close', () => { void transport.close(); void server.close() })
       await server.connect(transport)
       await transport.handleRequest(req, res, req.body)

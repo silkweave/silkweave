@@ -75,6 +75,12 @@ export interface McpMetadata {
    * (e.g. `{ destructiveHint: true }` on a POST that deletes).
    */
   annotations?: ToolAnnotations
+  /**
+   * Free-form grouping labels carried on the synthesized action (e.g.
+   * `['leads', 'write']`) for the `mcp({ filterActions })` per-request filter
+   * (or any other consumer) to match on. No behavior on their own.
+   */
+  tags?: string[]
 }
 
 /** tRPC procedure kind for a `@Trpc`-decorated route. */

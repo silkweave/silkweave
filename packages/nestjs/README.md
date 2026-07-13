@@ -135,6 +135,7 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 | `result` | `'json' \| 'smart' \| 'structured'` | `'json'` | MCP result format - `'json'` returns compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and offloads large ones to an embedded resource (`smartToolResult`); `'structured'` declares the tool's output schema as an MCP `outputSchema` contract and ships schema-parsed `structuredContent`. A client `_meta.disposition` overrides `'json'`/`'smart'` but never `'structured'`. `'structured'` **requires an explicit output schema** (`@Mcp({ output })` or `@Trpc({ output })`) - a reflected `@ApiOkResponse` is not accepted and boot-errors, since reflection is one level deep and must not silently become a hard, call-failing contract |
 | `output` | `z.ZodType \| Type \| Record<string, z.ZodType>` | - | Explicit output schema backing `result: 'structured'` - a Zod type, DTO class, or raw shape (like `@Trpc({ output })`; wins over it when both are set). The parsed (extra-fields-stripped) result ships as `structuredContent`, so returning a wider object than the schema is safe |
 | `annotations` | `ToolAnnotations` | verb-derived | MCP tool annotations merged over the verb-derived defaults: `@Get` ⇒ `{ readOnlyHint: true, idempotentHint: true }`, `@Put` ⇒ `{ readOnlyHint: false, idempotentHint: true }`, `@Delete` ⇒ `{ readOnlyHint: false, destructiveHint: true, idempotentHint: true }`, else `{ readOnlyHint: false }`. Set a field to override its derived value (e.g. `{ destructiveHint: true }` on a POST that deletes) |
+| `tags` | `string[]` | - | Free-form grouping labels carried on the synthesized action (e.g. `['leads', 'write']`) for the `mcp({ filterActions })` per-request filter to match on |
 
 ### Result format
 
@@ -206,6 +207,7 @@ Mounts the MCP Streamable HTTP transport directly at `basePath`, with sideload (
 | `cors` | `CorsOptions \| boolean` | `true` | CORS config |
 | `sideloadResources` | `boolean` | `true` | Mount `{basePath}/resource/:id` |
 | `resourceDir` | `string` | `'resources'` | Directory the sideload route reads from |
+| `filterActions` | `FilterActions` | - | Per-request tool filter, applied before tools are registered on every `POST {basePath}` (the stateless transport recomputes the tool list per request, so e.g. API-key permission changes apply on the next `tools/list`). Receives the synthesized actions (with their `@Mcp({ tags })`) and a request stand-in `{ headers, url, method, toolName }`; may be async. A throw surfaces as its `SilkweaveError.statusCode` (e.g. 401 for an invalid key) with a JSON-RPC error body, or 500 for other errors - never an empty tool list |
 
 ## tRPC
 

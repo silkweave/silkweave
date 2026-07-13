@@ -91,6 +91,12 @@ export interface Action<
    * adapters.
    */
   annotations?: ToolAnnotations
+  /**
+   * Free-form grouping labels (e.g. `['leads', 'write']`). Carried on the
+   * action for per-request filtering (`filterActions` in the MCP adapters) and
+   * other consumers; no behavior in core itself.
+   */
+  tags?: string[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O> | ActionStreamRun<I, C>
   toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
@@ -108,6 +114,7 @@ export interface NonStreamingActionInput<I extends object, O extends object, N e
   args?: (keyof I)[]
   disposition?: 'json' | 'smart' | 'structured'
   annotations?: ToolAnnotations
+  tags?: string[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O>
   toolResult?: (response: O, context: SilkweaveContext) => CallToolResult | undefined
@@ -125,6 +132,7 @@ export interface StreamingActionInput<I extends object, C, N extends string, K e
   args?: (keyof I)[]
   disposition?: 'json' | 'smart'
   annotations?: ToolAnnotations
+  tags?: string[]
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionStreamRun<I, C>
   toolResult?: (response: C[], context: SilkweaveContext) => CallToolResult | undefined

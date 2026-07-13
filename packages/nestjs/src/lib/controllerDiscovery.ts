@@ -180,6 +180,7 @@ export class ControllerDiscovery {
       input: z.object(shape),
       ...(disposition ? { disposition } : {}),
       ...(disposition === 'structured' && output ? { output } : {}),
+      ...(meta.tags ? { tags: meta.tags } : {}),
       annotations: { ...verbAnnotations(shared.route.method), ...meta.annotations },
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',
       ...(streaming
