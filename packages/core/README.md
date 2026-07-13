@@ -62,14 +62,14 @@ Returns a builder with `.adapter()`, `.action()`, `.actions()`, `.set()`, and `.
 | `name` | `string` | Unique action identifier |
 | `description` | `string` | Human-readable description |
 | `input` | `z.ZodObject` | Zod schema for input validation |
-| `output` | `z.ZodObject` | Optional Zod schema for the return type (used by typegen and Fastify OpenAPI). Mutually exclusive with `chunk`. |
+| `output` | `z.ZodObject` | Optional Zod schema for the return type (used by typegen, Fastify OpenAPI, and as the MCP `outputSchema` contract when `disposition: 'structured'`). Mutually exclusive with `chunk`. |
 | `chunk` | `z.ZodType` | Optional Zod schema for individual chunks yielded by a streaming `run`. Required (and `run` must be an `async function*`) to make this a streaming action. See [Streaming Actions](#streaming-actions). |
 | `kind` | `'query' \| 'mutation'` | Optional. Defaults to `'mutation'`. Marks the action as a cacheable read for tRPC. |
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'DELETE'` | Optional REST verb for `@silkweave/fastify` / `@silkweave/nestjs` `rest`. Defaults to `POST`, or `GET` when `kind: 'query'`. See [REST routing](#rest-routing). |
 | `path` | `string` | Optional REST route template, may contain `:param` placeholders (e.g. `'spaces/:spaceId/users'`). Each placeholder must be a key of `input`. See [REST routing](#rest-routing). |
 | `queryParams` | `(keyof I)[]` | Optional input fields read from the URL query string instead of the body (e.g. `['offset', 'limit']`). See [REST routing](#rest-routing). |
 | `args` | `(keyof I)[]` | Fields to expose as CLI positional arguments |
-| `disposition` | `'json' \| 'smart'` | Optional default MCP result format - `'json'` ⇒ `jsonToolResult`, `'smart'` (default) ⇒ `smartToolResult`. A client's `_meta.disposition` overrides it. MCP adapters only. |
+| `disposition` | `'json' \| 'smart' \| 'structured'` | Optional MCP result format - `'json'` (default) ⇒ `jsonToolResult`, `'smart'` ⇒ `smartToolResult` (sideloads payloads > 4096 chars), `'structured'` ⇒ declares `output` as the tool's MCP `outputSchema` contract and ships schema-parsed `structuredContent`. A client's `_meta.disposition` overrides `'json'`/`'smart'`; `'structured'` ignores it (the contract is fixed at `tools/list` time). `'structured'` requires a non-streaming action with `output` (validated at registration by `validateActionDisposition()`). MCP adapters only. |
 | `annotations` | `ToolAnnotations` | Optional MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`, `title`) forwarded to `tools/list`. MCP adapters derive `readOnlyHint` from `kind` (`'query'` ⇒ `true`) and merge explicit annotations over the derived base. MCP adapters only. |
 | `isEnabled` | `(context) => boolean` | Gate action availability per adapter |
 | `run` | `(input, context) => Promise<O>` *or* `async function*(input, context): AsyncGenerator<Chunk>` | The action implementation. Use a regular `async` function for buffered request/response; use an `async function*` and declare `chunk` to stream. |

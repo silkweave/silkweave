@@ -163,21 +163,46 @@ const MyAction = createAction({
 
 Return `undefined` from `toolResult` to fall through to the default `smartToolResult` behavior.
 
-### Default `disposition`
+### `disposition`
 
-For the common case of simply choosing `jsonToolResult` over `smartToolResult` (without a hook), set `disposition` on the action:
+Tool results default to compact JSON (`jsonToolResult`). Set `disposition` on the action to change the format:
 
 ```typescript
 createAction({
   name: 'my-action',
-  description: 'Returns compact JSON by default',
+  description: 'Sideloads large payloads to an embedded resource',
   input: z.object({}),
-  disposition: 'json',           // 'json' ⇒ jsonToolResult, 'smart' (default) ⇒ smartToolResult
+  disposition: 'smart',          // 'json' (default) ⇒ jsonToolResult, 'smart' ⇒ smartToolResult
   run: async () => fetchData()
 })
 ```
 
-This is only a **default** - a client that sends `_meta.disposition` on the tool call always wins. Resolution order: client `_meta.disposition` → action `disposition` → `'smart'`. (`@silkweave/nestjs` exposes this as `@Mcp({ result: 'json' })`.)
+`'json'` and `'smart'` are only **defaults** - a client that sends `_meta.disposition` on the tool call always wins. Resolution order: client `_meta.disposition` → action `disposition` → `'json'`. (`@silkweave/nestjs` exposes this as `@Mcp({ result })`.)
+
+> **Breaking change in 3.2:** the fallback default flipped from `'smart'` to `'json'`. Set `disposition: 'smart'` per action (or `defaultResult: 'smart'` in `@silkweave/nestjs`) to restore payload sideloading.
+
+### Structured output (`disposition: 'structured'`)
+
+A structured action declares its `output` Zod schema as the tool's MCP `outputSchema` - visible to agents in `tools/list` before they call, and returned as `structuredContent`:
+
+```typescript
+createAction({
+  name: 'users.get',
+  description: 'Get a user by id',
+  input: z.object({ id: z.string() }),
+  output: z.object({ id: z.string(), name: z.string() }),
+  disposition: 'structured',
+  run: async ({ id }) => getUser(id)   // may return a wider object - extra fields are stripped
+})
+```
+
+Important semantics (the MCP SDK enforces output schemas on **both** sides - the server validates before responding and SDK clients validate independently against `tools/list` - so the schema is a hard contract, not a hint):
+
+- The result is **parsed through `output` before shipping**: `structuredContent` is the parsed (extra-fields-stripped) data, plus a JSON text mirror in `content`. Returning a wider object than the schema is therefore safe by construction.
+- A genuine mismatch (missing required field, wrong type) returns an **`isError` tool result** naming the failing fields - not an opaque protocol error - since `isError` results are exempt from SDK output validation.
+- `_meta.disposition` is **ignored** for structured actions; the contract is fixed at `tools/list` time.
+- `'structured'` requires a non-streaming action with an `output` schema - validated at registration (`validateActionDisposition()`), so misconfiguration fails at boot.
+- Fields that can be `null` at runtime must be declared `.nullable()` (zod's `.optional()` does not accept `null`).
 
 ### Tool annotations
 
@@ -201,8 +226,9 @@ All result utilities are exported from `@silkweave/mcp`:
 
 | Function | Description |
 |----------|-------------|
-| `smartToolResult(data)` | Default formatter with automatic embedded resource splitting at 4096 chars |
-| `jsonToolResult(data, isError?)` | Simple inline `TextContent` JSON (no splitting) |
+| `smartToolResult(data)` | Formatter with automatic embedded resource splitting at 4096 chars (`disposition: 'smart'`) |
+| `jsonToolResult(data, isError?)` | Simple inline `TextContent` JSON (no splitting) - the default formatter |
+| `structuredToolResult(data)` | `structuredContent` + JSON text mirror for `disposition: 'structured'` actions. Pass output-schema-**parsed** data, never the raw result |
 | `errorToolResult(error)` | Format a `SilkweaveError` as an error result |
 | `handleToolError(error)` | Catch-all error handler used by all MCP adapters |
 

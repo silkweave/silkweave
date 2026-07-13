@@ -153,11 +153,33 @@ export class ControllerDiscovery {
     const { method, instance } = d
     const { bindings, streaming } = shared
 
+    // `result: 'structured'` turns the output schema into a hard MCP contract,
+    // so it must be author-asserted: @Mcp({ output }) or an explicit
+    // @Trpc({ output }) on the same method. Reflected @ApiOkResponse schemas
+    // (one level deep, null-vs-optional gaps) are deliberately NOT accepted.
+    const disposition = meta.result ?? defaultResult
+    const output = resolveSchema(meta.output) ?? resolveSchema(d.trpc?.output)
+    if (disposition === 'structured') {
+      if (streaming) {
+        throw new SilkweaveError(
+          `${d.classRef.name}.${d.methodName}: @Mcp({ result: 'structured' }) is not supported on a streaming (async *) route - there is no single result to validate`,
+          'invalid_action'
+        )
+      }
+      if (!output) {
+        throw new SilkweaveError(
+          `${d.classRef.name}.${d.methodName}: @Mcp({ result: 'structured' }) requires an explicit output schema - set @Mcp({ output }) or @Trpc({ output }). Reflected @ApiOkResponse schemas are not accepted as structured contracts.`,
+          'invalid_action'
+        )
+      }
+    }
+
     return {
       name,
       description,
       input: z.object(shape),
-      ...((meta.result ?? defaultResult) ? { disposition: meta.result ?? defaultResult } : {}),
+      ...(disposition ? { disposition } : {}),
+      ...(disposition === 'structured' && output ? { output } : {}),
       annotations: { ...verbAnnotations(shared.route.method), ...meta.annotations },
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',
       ...(streaming

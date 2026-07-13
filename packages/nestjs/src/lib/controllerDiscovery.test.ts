@@ -3,7 +3,9 @@ import { Body, Controller, Delete, ForbiddenException, Get, Injectable, Param, P
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
 import { createContext, type Action, type SilkweaveContext } from '@silkweave/core'
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod/v4'
 import { Mcp } from '../decorator/mcp.js'
+import { Trpc } from '../decorator/trpc.js'
 import { ControllerDiscovery } from './controllerDiscovery.js'
 
 // API key -> the WhatsApp sessions it is scoped to (OpenWA-style per-key scoping).
@@ -130,5 +132,50 @@ describe('ControllerDiscovery annotations', () => {
   it('merges explicit @Mcp({ annotations }) over the verb-derived defaults', () => {
     const actions = discoverController(new ThingsController())
     expect(byName(actions, 'Things.archive').annotations).toEqual({ readOnlyHint: false, destructiveHint: true })
+  })
+})
+
+const userShape = { id: z.string(), label: z.string() }
+
+@Controller('users')
+class StructuredController {
+  @Get(':id')
+  @Mcp({ result: 'structured', output: userShape })
+  get(@Param('id') id: string): { id: string; label: string } { return { id, label: 'Ada' } }
+}
+
+@Controller('users')
+class StructuredViaTrpcController {
+  @Get(':id')
+  @Mcp({ result: 'structured' })
+  @Trpc({ output: userShape })
+  get(@Param('id') id: string): { id: string; label: string } { return { id, label: 'Ada' } }
+}
+
+@Controller('users')
+class StructuredWithoutOutputController {
+  @Get(':id')
+  @Mcp({ result: 'structured' })
+  get(@Param('id') id: string): { id: string } { return { id } }
+}
+
+describe('ControllerDiscovery structured output', () => {
+  it('accepts @Mcp({ result: structured, output }) and sets disposition + output on the action', () => {
+    const [action] = discoverController(new StructuredController())
+    expect(action.disposition).toBe('structured')
+    expect(action.output).toBeDefined()
+    expect(action.output!.safeParse({ id: 'u1', label: 'x' }).success).toBe(true)
+  })
+
+  it('reuses an explicit @Trpc({ output }) as the structured contract', () => {
+    const actions = discoverController(new StructuredViaTrpcController())
+    const mcpAction = actions.find((a) => a.isEnabled?.(createContext({ adapter: 'mcp' })))!
+    expect(mcpAction.disposition).toBe('structured')
+    expect(mcpAction.output).toBeDefined()
+  })
+
+  it('boot-errors on result: structured without an explicit output schema', () => {
+    expect(() => discoverController(new StructuredWithoutOutputController()))
+      .toThrow(/requires an explicit output schema/)
   })
 })

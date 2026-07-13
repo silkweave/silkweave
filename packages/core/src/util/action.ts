@@ -2,6 +2,7 @@
 import { type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import z from 'zod/v4'
 import { SilkweaveContext } from './context.js'
+import { SilkweaveError } from './error.js'
 
 export type ActionKind = 'query' | 'mutation'
 
@@ -69,14 +70,19 @@ export interface Action<
   queryParams?: (keyof I)[]
   args?: (keyof I)[]
   /**
-   * Default MCP result disposition for this action - `'json'` formats the
-   * response with `jsonToolResult` (compact JSON text), `'smart'` (the default
-   * when unset) uses `smartToolResult` (inlines small payloads, offloads large
-   * ones to an embedded resource). This is only a default: a client that sends
-   * `_meta.disposition` on the tool call always wins. Ignored by non-MCP
-   * adapters.
+   * MCP result disposition for this action. `'json'` (the default when unset)
+   * formats the response with `jsonToolResult` (compact JSON text); `'smart'`
+   * uses `smartToolResult` (inlines small payloads, offloads large ones to an
+   * embedded resource); `'structured'` declares the `output` schema as an MCP
+   * `outputSchema` contract - the result is parsed through `output` (stripping
+   * extra fields) and shipped as `structuredContent` alongside a JSON text
+   * mirror. `'json'`/`'smart'` are only defaults a client's `_meta.disposition`
+   * can override; a `'structured'` action ignores `_meta.disposition`, since
+   * its schema contract is fixed at `tools/list` time. `'structured'` requires
+   * a non-streaming action with an `output` schema (validated at registration
+   * via `validateActionDisposition()`). Ignored by non-MCP adapters.
    */
-  disposition?: 'json' | 'smart'
+  disposition?: 'json' | 'smart' | 'structured'
   /**
    * MCP tool annotations forwarded to `tools/list`. When unset, MCP adapters
    * derive `readOnlyHint` from `kind` (`'query'` ⇒ read-only); explicit
@@ -100,7 +106,7 @@ export interface NonStreamingActionInput<I extends object, O extends object, N e
   path?: string
   queryParams?: (keyof I)[]
   args?: (keyof I)[]
-  disposition?: 'json' | 'smart'
+  disposition?: 'json' | 'smart' | 'structured'
   annotations?: ToolAnnotations
   isEnabled?: (context: SilkweaveContext) => boolean
   run: ActionRun<I, O>
@@ -147,4 +153,28 @@ export function createAction(action: Action): Action {
  */
 export function isStreamingAction(action: Action): boolean {
   return action.run?.constructor?.name === 'AsyncGeneratorFunction'
+}
+
+/**
+ * Validate an action's MCP `disposition` at registration time. `'structured'`
+ * declares the `output` schema as a hard MCP `outputSchema` contract, so it
+ * requires a non-streaming action with an `output` schema - anything else is a
+ * misconfiguration surfaced at boot rather than a per-call protocol error.
+ * MCP adapters call this from `start()` (or, for per-request transports, when
+ * the handler is built).
+ */
+export function validateActionDisposition(action: Action): void {
+  if (action.disposition !== 'structured') { return }
+  if (isStreamingAction(action) || action.chunk) {
+    throw new SilkweaveError(
+      `Action '${action.name}': disposition 'structured' is not supported on a streaming action - there is no single result to validate against an output schema`,
+      'invalid_action'
+    )
+  }
+  if (!action.output) {
+    throw new SilkweaveError(
+      `Action '${action.name}': disposition 'structured' requires an 'output' schema - it becomes the tool's MCP outputSchema contract`,
+      'invalid_action'
+    )
+  }
 }

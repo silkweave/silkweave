@@ -132,7 +132,8 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 | `description` | `string` | `@ApiOperation` summary/description, else generated | Tool description |
 | `input` | `Record<string, z.ZodType> \| z.ZodObject` | - | Zod override merged over the reflected fields (per-field). A raw shape (`{ field: z.string() }`) **or** a whole `z.object({ ... })` (its `.shape` is unwrapped). The escape hatch for shapes reflection can't express - discriminated unions, custom validators, `@Transform`. It **adds to** the reflected fields; it does not replace them (see the warning below) |
 | `pipes` | `'apply' \| 'skip'` | `'apply'` | Whether to run parameter-bound pipes (`@Param('id', ParseIntPipe)`) when re-binding |
-| `result` | `'json' \| 'smart'` | `'smart'` | Default MCP result format - `'json'` returns compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and offloads large ones to an embedded resource (`smartToolResult`). A client that sends `_meta.disposition` on the call overrides it |
+| `result` | `'json' \| 'smart' \| 'structured'` | `'json'` | MCP result format - `'json'` returns compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and offloads large ones to an embedded resource (`smartToolResult`); `'structured'` declares the tool's output schema as an MCP `outputSchema` contract and ships schema-parsed `structuredContent`. A client `_meta.disposition` overrides `'json'`/`'smart'` but never `'structured'`. `'structured'` **requires an explicit output schema** (`@Mcp({ output })` or `@Trpc({ output })`) - a reflected `@ApiOkResponse` is not accepted and boot-errors, since reflection is one level deep and must not silently become a hard, call-failing contract |
+| `output` | `z.ZodType \| Type \| Record<string, z.ZodType>` | - | Explicit output schema backing `result: 'structured'` - a Zod type, DTO class, or raw shape (like `@Trpc({ output })`; wins over it when both are set). The parsed (extra-fields-stripped) result ships as `structuredContent`, so returning a wider object than the schema is safe |
 | `annotations` | `ToolAnnotations` | verb-derived | MCP tool annotations merged over the verb-derived defaults: `@Get` ⇒ `{ readOnlyHint: true, idempotentHint: true }`, `@Put` ⇒ `{ readOnlyHint: false, idempotentHint: true }`, `@Delete` ⇒ `{ readOnlyHint: false, destructiveHint: true, idempotentHint: true }`, else `{ readOnlyHint: false }`. Set a field to override its derived value (e.g. `{ destructiveHint: true }` on a POST that deletes) |
 
 ### Result format
@@ -143,11 +144,11 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 SilkweaveModule.forRoot({
   silkweave: { name: 'my-api', version: '1.0.0' },
   adapters: [mcp()],
-  defaultResult: 'json'   // module-wide default; a per-method @Mcp({ result }) still wins
+  defaultResult: 'smart'   // module-wide default; a per-method @Mcp({ result }) still wins
 })
 ```
 
-Precedence (highest first): a client's per-call `_meta.disposition` → `@Mcp({ result })` → module `defaultResult` → `'smart'`.
+Precedence (highest first): a client's per-call `_meta.disposition` → `@Mcp({ result })` → module `defaultResult` → `'json'`. (Before 3.2 the fallback was `'smart'`; set `defaultResult: 'smart'` to restore payload sideloading module-wide.) `result: 'structured'` sits outside this chain - a structured tool's contract cannot be demoted per-call.
 
 ## How reflection works
 

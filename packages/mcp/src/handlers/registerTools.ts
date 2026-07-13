@@ -1,9 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
-import { Action, ActionRun, createLogger, isStreamingAction, runStreamingAction, SilkweaveContext } from '@silkweave/core'
+import { Action, ActionRun, createLogger, isStreamingAction, runStreamingAction, SilkweaveContext, SilkweaveError } from '@silkweave/core'
 import { capitalCase, pascalCase } from 'change-case'
-import { handleToolError, jsonToolResult, smartToolResult } from '../util/result.js'
+import { errorToolResult, handleToolError, jsonToolResult, smartToolResult, structuredToolResult } from '../util/result.js'
 import { authStorage } from './auth.js'
 
 type LogStream = NonNullable<Parameters<typeof createLogger>[0]>['stream']
@@ -67,13 +67,37 @@ async function runAction(action: Action, input: object, context: SilkweaveContex
   return (action.run as ActionRun<object, object>)(input, context)
 }
 
+/**
+ * Result path for a `disposition: 'structured'` action: parse the raw result
+ * through the output schema and ship the PARSED data as `structuredContent`.
+ * Parsing strips extra fields (so the client-side JSON-Schema validator, which
+ * rejects `additionalProperties`, passes by construction) and a genuine
+ * mismatch (missing required field, wrong type) degrades to an `isError` tool
+ * result - which the SDK exempts from output validation - instead of an opaque
+ * protocol error.
+ */
+function structuredResult(action: Action, result: object | object[]) {
+  const parsed = action.output!.safeParse(result)
+  if (!parsed.success) {
+    const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join('.') || '(root)'))].join(', ')
+    return errorToolResult(new SilkweaveError(
+      `Output validation failed for '${action.name}' at: ${fields}. The tool returned a shape that does not match its declared output schema - this is a server-side bug, not an input problem; retrying with different arguments will not help.`,
+      'output_validation_error'
+    ))
+  }
+  return structuredToolResult(parsed.data as object)
+}
+
 /** Format via the action's `toolResult` hook, else the resolved disposition. */
 function formatToolResult(action: Action, result: object | object[], context: SilkweaveContext, disposition: unknown) {
   if (action.toolResult) {
     const response = action.toolResult(result, context)
     if (response) { return response }
   }
-  return disposition === 'json' ? jsonToolResult(result) : smartToolResult(result)
+  // A structured action's output schema is a contract fixed at tools/list
+  // time - a client's `_meta.disposition` cannot demote it.
+  if (action.disposition === 'structured') { return structuredResult(action, result) }
+  return disposition === 'smart' ? smartToolResult(result) : jsonToolResult(result)
 }
 
 /**
@@ -83,7 +107,8 @@ function formatToolResult(action: Action, result: object | object[], context: Si
  * and - when bearer auth ran for this request - the resolved `auth`. The result
  * is formatted by the action's `toolResult` hook if present, otherwise per the
  * resolved disposition (client `_meta.disposition` > `action.disposition` >
- * `smart`).
+ * `json`); a `'structured'` action always ships schema-parsed
+ * `structuredContent` (its contract cannot be demoted per-call).
  */
 export function registerTools(
   server: McpServer,
@@ -98,7 +123,11 @@ export function registerTools(
       description: action.description,
       inputSchema: action.input,
       // Derived base (query ⇒ read-only), explicit annotations merged over.
-      annotations: { readOnlyHint: action.kind === 'query', ...action.annotations }
+      annotations: { readOnlyHint: action.kind === 'query', ...action.annotations },
+      // Only structured actions declare an outputSchema contract - the SDK
+      // enforces it server-side and SDK clients enforce it independently, so
+      // forwarding is strictly opt-in via disposition.
+      ...(action.disposition === 'structured' && action.output ? { outputSchema: action.output } : {})
     }, async (input, extra) => {
       const logger = createToolLogger(extra, stream)
       const currentAuth = authStorage.getStore()
@@ -109,7 +138,7 @@ export function registerTools(
         ...(currentAuth ? { auth: currentAuth } : {})
       })
       // Client-sent `_meta.disposition` wins; otherwise fall back to the
-      // action's configured default (`smart` when neither is set).
+      // action's configured default (`json` when neither is set).
       const disposition = extra._meta?.disposition ?? action.disposition
       try {
         const result = await runAction(action, input, actionContext, extra)

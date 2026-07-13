@@ -46,13 +46,26 @@ export interface McpMetadata {
    */
   pipes?: 'apply' | 'skip'
   /**
-   * Default MCP result format for this tool. `'json'` returns compact JSON text
-   * (`jsonToolResult`); `'smart'` (the default when unset) inlines small
-   * payloads and offloads large ones to an embedded resource (`smartToolResult`).
-   * This is only a default - a client that sends `_meta.disposition` on the tool
-   * call overrides it.
+   * MCP result format for this tool. `'json'` (the default when unset) returns
+   * compact JSON text (`jsonToolResult`); `'smart'` inlines small payloads and
+   * offloads large ones to an embedded resource (`smartToolResult`);
+   * `'structured'` declares the tool's output schema as an MCP `outputSchema`
+   * contract and ships schema-parsed `structuredContent`. `'json'`/`'smart'`
+   * are defaults a client's `_meta.disposition` overrides; `'structured'`
+   * ignores `_meta.disposition` and **requires an explicit output schema** -
+   * `@Mcp({ output })` or `@Trpc({ output })` on the same method (a reflected
+   * `@ApiOkResponse` is not accepted as a structured contract; reflection is
+   * one level deep and must not silently become a hard, call-failing schema).
    */
-  result?: 'json' | 'smart'
+  result?: 'json' | 'smart' | 'structured'
+  /**
+   * Explicit output schema backing `result: 'structured'` - a Zod type, a DTO
+   * class (flattened one level like `@ApiOkResponse` reflection), or a raw
+   * shape (wrapped in `z.object`). Wins over `@Trpc({ output })` when both are
+   * set. The parsed (extra-fields-stripped) result ships as
+   * `structuredContent`, so returning a wider object than the schema is safe.
+   */
+  output?: z.ZodType | Type | Record<string, z.ZodType>
   /**
    * MCP tool annotations (read-only/destructive/idempotent hints) merged over
    * the verb-derived defaults: `@Get` ⇒ `{ readOnlyHint: true, idempotentHint:

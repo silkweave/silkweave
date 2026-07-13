@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { AdapterFactory } from '@silkweave/core'
+import { AdapterFactory, validateActionDisposition } from '@silkweave/core'
 import { registerTools } from '../handlers/registerTools.js'
 
 export const stdio: AdapterFactory = () => {
@@ -16,6 +16,7 @@ export const stdio: AdapterFactory = () => {
     return {
       context,
       start: async (actions) => {
+        actions.forEach(validateActionDisposition)
         registerTools(server, actions, context, { logStream: false })
         const transport = new StdioServerTransport()
         await server.connect(transport)

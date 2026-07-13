@@ -23,6 +23,21 @@ export function smartToolResult(data: string | object | object[]): CallToolResul
   }
 }
 
+/**
+ * Result formatter for `disposition: 'structured'` actions: the (already
+ * schema-parsed) data ships as `structuredContent` with a compact JSON text
+ * mirror, per the spec's backwards-compat recommendation. Callers must pass
+ * the OUTPUT-SCHEMA-PARSED data, not the raw result - parsing strips extra
+ * fields, which is what keeps client-side JSON-Schema validation
+ * (`additionalProperties: false`) passing by construction.
+ */
+export function structuredToolResult(data: object): CallToolResult {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(data) }],
+    structuredContent: data as Record<string, unknown>
+  }
+}
+
 export function jsonToolResult(data: object, isError = false): CallToolResult {
   const result: CallToolResult = { content: [{ type: 'text' as const, text: JSON.stringify(data) }] }
   if (isError) { result.isError = true }

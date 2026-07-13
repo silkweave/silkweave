@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { Action, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
+import { Action, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
 import { type RequestHandler } from 'express'
 import { registerTools } from './registerTools.js'
 
@@ -35,6 +35,9 @@ export function mcpTransport(
   context: SilkweaveContext,
   actions: Action[]
 ): McpTransportHandlers {
+  // Fail at boot, not per request - the factory runs once when the app is built.
+  actions.forEach(validateActionDisposition)
+
   const post: RequestHandler = async (req, res) => {
     try {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
