@@ -10,3 +10,12 @@ packages:
   - "website"
   - "packages/*"
 linkWorkspacePackages: true
+# Force patched versions of transitively-pulled vulnerable deps (all dev/website/
+# example scope - see the deep-audit dependency triage; none is a published-runtime
+# dependency). Same-major floors to minimize blast radius.
+overrides:
+  shell-quote: ">=1.8.4"
+  ws: ">=8.21.0"
+  qs: ">=6.15.2"
+  hono: ">=4.12.25"
+  js-yaml: "^4.2.0"

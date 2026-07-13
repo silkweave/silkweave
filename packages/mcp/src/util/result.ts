@@ -1,18 +1,32 @@
 import { EmbeddedResource, type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { SilkweaveError } from '@silkweave/core'
-import { randomUUID } from 'node:crypto'
+
+// Web-standard (Node 18+ and edge/Workers) UTF-8 <-> base64 so this subpath,
+// which @silkweave/edge imports, carries no Node-only crypto/Buffer dependency.
+function utf8ToBase64(text: string): { base64: string; byteLength: number } {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (const byte of bytes) { binary += String.fromCharCode(byte) }
+  return { base64: btoa(binary), byteLength: bytes.length }
+}
+
+function base64ToUtf8(base64: string): string {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) { bytes[i] = binary.charCodeAt(i) }
+  return new TextDecoder().decode(bytes)
+}
 
 export function smartToolResult(data: string | object | object[]): CallToolResult {
   const text = typeof data === 'string' ? data : JSON.stringify(data)
   const mimeType = typeof data === 'string' ? 'text/plain' : 'application/json'
   const ext = typeof data === 'string' ? 'txt' : 'json'
   if (text.length > 4096) {
-    const uri = `mcp://toolResult/${randomUUID()}.${ext}`
-    const buffer = Buffer.from(text)
-    const blob = buffer.toString('base64')
+    const uri = `mcp://toolResult/${crypto.randomUUID()}.${ext}`
+    const { base64: blob, byteLength } = utf8ToBase64(text)
     return {
       content: [
-        { type: 'text', text: `Received resource ${uri} with ${buffer.byteLength} bytes` },
+        { type: 'text', text: `Received resource ${uri} with ${byteLength} bytes` },
         { type: 'resource', resource: { uri, mimeType, blob } }
       ]
     }
@@ -70,6 +84,6 @@ export function handleToolError(error: unknown): CallToolResult {
 }
 
 export function parseResourceMessage({ resource }: EmbeddedResource) {
-  const text = ('blob' in resource) ? Buffer.from(resource.blob, 'base64').toString('utf-8') : resource.text
+  const text = ('blob' in resource) ? base64ToUtf8(resource.blob) : resource.text
   return text
 }
