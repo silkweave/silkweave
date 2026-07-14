@@ -15,6 +15,7 @@
     "mcp": "pnpm -F @silkweave/example-mcp stdio",
     "image": "node --env-file-if-exists=.env scripts/generate-image.ts",
     "sync-releases": "tsx scripts/sync-releases.ts",
+    "indexnow": "tsx scripts/indexnow-submit.ts",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",

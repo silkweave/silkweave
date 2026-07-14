@@ -12,6 +12,7 @@ resources/
 .astro
 .DS_Store
 .env
+.publish/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

@@ -278,7 +278,7 @@ Each publishable package (`packages/*`, except the `silkweave` umbrella) resolve
 - frontend_smoke: N/A
 - co_authored_by: no (global)
 - changelog: yes - on every version bump, **prepend a new entry to `website/src/data/changelog.ts`** (the single source of truth; newest first; short user-facing highlights with commit hashes), then run `pnpm sync-releases` after the `vX.Y.Z` tag is pushed to create/update the matching GitHub release. The website `/changelog` page and GitHub releases must stay in sync - both render from that one data file.
-- extra: Update our website (landing page and docs) with new or changed features
+- extra: Update our website (landing page and docs) with new or changed features. After a deploy that meaningfully changes public pages, submit the changed URLs to IndexNow (`pnpm indexnow <paths>` - see [SEO: IndexNow](#seo-indexnow)).
 
 ## Docs Checklist
 
@@ -310,3 +310,17 @@ Key facts for maintaining the publish flow:
 - **pnpm version matters**: pnpm's OIDC publishing regressed in 11.0.8 and was fixed in **11.1.0** (drops the unresolved `${NODE_AUTH_TOKEN}` placeholder that `actions/setup-node` writes). The repo pins `pnpm@11.1.1` via `packageManager`, which `pnpm/action-setup@v4` picks up automatically - do not pin pnpm to <= 11.0.8 or trusted publishing breaks.
 - `pnpm publish -r` skips versions already on the registry, so re-running a tag is safe (idempotent).
 - A tag must point at a commit that **contains `publish.yml`** - GitHub runs a tag's workflow from the tagged commit. (When first enabling this, the pre-existing `v2.5.0` tag had to be force-moved onto the commit that introduced the workflow.)
+
+## SEO: IndexNow
+
+After every production deploy of the website that meaningfully changes public pages, submit the changed URLs to IndexNow so search engines re-crawl them promptly:
+
+```bash
+pnpm indexnow /blog/<slug> /blog          # paths are resolved against https://www.silkweave.dev
+pnpm indexnow https://www.silkweave.dev/changelog
+```
+
+- **When to run** (meaningful changes only): a new or edited blog post (submit the post URL + `/blog`), a new release/changelog entry (`/changelog`), substantive docs updates (`/docs`), or changed landing/feature pages (`/`, `/features`, `/adapters`, ...). Do NOT run for changes with no public-page effect (package code, internal refactors, CI) or trivial tweaks (typo-level edits, style-only changes).
+- **How it works**: `scripts/indexnow-submit.ts` (run via `pnpm indexnow`) POSTs the URL list to `api.indexnow.org` with the site key. IndexNow verifies ownership by fetching `https://www.silkweave.dev/<key>.txt`, served dynamically by `website/src/pages/[key].txt.ts` from the `INDEXNOW_KEY` env var (404 for any other name).
+- **Key storage**: the key is deliberately NOT committed (no key-named file in `website/public/`). It lives in `website/.env` (gitignored via the root `.env` pattern; the submit script reads it from there or from `$INDEXNOW_KEY`) and must also be set as `INDEXNOW_KEY` on the Vercel `silkweave` project (scope `silkweave`) so the deployed site can serve the key file. The website package is `private: true`, so nothing here can reach npm.
+- IndexNow keys are public by protocol (the key file is world-readable on the host) - keeping it out of git is hygiene, not secrecy. Submissions are idempotent; re-submitting an unchanged URL is harmless but pointless.
