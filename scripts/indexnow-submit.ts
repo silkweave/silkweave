@@ -6,11 +6,11 @@
  *   pnpm indexnow /blog/automate-around-the-ceremony /blog
  *   pnpm indexnow https://www.silkweave.dev/changelog
  *
- * The key is read from $INDEXNOW_KEY or website/.env (gitignored). The same key
- * must be set as INDEXNOW_KEY on the Vercel project so the site can serve it at
- * https://www.silkweave.dev/<key>.txt (see website/src/pages/[key].txt.ts).
+ * The key is read from $INDEXNOW_KEY or discovered from the committed key file
+ * website/static/<key>.txt, which the site serves at the default IndexNow key
+ * location https://www.silkweave.dev/<key>.txt (keys are public by protocol).
  */
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const HOST = 'www.silkweave.dev'
@@ -19,13 +19,17 @@ const ENDPOINT = 'https://api.indexnow.org/indexnow'
 function readKey(): string {
   if (process.env.INDEXNOW_KEY) return process.env.INDEXNOW_KEY
   try {
-    const env = readFileSync(resolve(process.cwd(), 'website/.env'), 'utf8')
-    const match = env.match(/^INDEXNOW_KEY=(.+)$/m)
-    if (match) return match[1].trim()
+    const staticDir = resolve(process.cwd(), 'website/static')
+    for (const file of readdirSync(staticDir)) {
+      const match = file.match(/^([A-Za-z0-9-]{8,128})\.txt$/)
+      if (!match) continue
+      // the key file's content is the key itself - anything else (robots.txt) won't match
+      if (readFileSync(resolve(staticDir, file), 'utf8').trim() === match[1]) return match[1]
+    }
   } catch {
     // fall through to the error below
   }
-  console.error('INDEXNOW_KEY not found (set the env var or add it to website/.env)')
+  console.error('IndexNow key not found (set $INDEXNOW_KEY or add website/static/<key>.txt)')
   return process.exit(1)
 }
 
