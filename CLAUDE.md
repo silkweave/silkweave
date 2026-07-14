@@ -276,6 +276,7 @@ Each publishable package (`packages/*`, except the `silkweave` umbrella) resolve
 - publish: yes (automated via GitHub Actions - **do not run `pnpm publish` locally**). Pushing a `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which builds, lints, and publishes every public package to npm via OIDC trusted publishing (`pnpm publish -r`). See [CI/CD](#cicd) below. The local `pnpm publish:all` script remains only as a manual fallback.
 - docs: per-package README.md + root CLAUDE.md as index + website docs page
 - frontend_smoke: N/A
+- co_authored_by: no (global)
 - changelog: yes - on every version bump, **prepend a new entry to `website/src/data/changelog.ts`** (the single source of truth; newest first; short user-facing highlights with commit hashes), then run `pnpm sync-releases` after the `vX.Y.Z` tag is pushed to create/update the matching GitHub release. The website `/changelog` page and GitHub releases must stay in sync - both render from that one data file.
 - extra: Update our website (landing page and docs) with new or changed features
 

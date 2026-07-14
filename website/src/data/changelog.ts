@@ -39,6 +39,23 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '4.0.1',
+    date: '2026-07-14',
+    summary: 'Patch: kebab-case CLI flags now map correctly onto snake_case action input keys in both CLI surfaces.',
+    changes: [
+      {
+        type: 'fix',
+        text: 'MCP CLI proxy: flag values for snake_case tool input keys (e.g. --action-id for action_id) were silently dropped - Commander stores parsed options camelized, so the read-back now goes through camelCase(key).',
+        commit: '0db2adf'
+      },
+      {
+        type: 'fix',
+        text: 'CLI adapter: the same kebab-vs-snake mismatch made snake_case action input keys fail validation; option read-back is now camelCase-aware. @silkweave/cli also gained its first Vitest regression suite.',
+        commit: '6174d5a'
+      }
+    ]
+  },
+  {
     version: '4.0.0',
     date: '2026-07-13',
     summary: 'Dependency-boundary cleanup from the post-3.2 audit: every package now installs only what it actually uses. Breaking, but the migration is mostly a few import-path and install changes.',
