@@ -2,7 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { ContentBlock, LoggingMessageNotificationSchema, ProgressNotificationSchema, ToolResultContent } from '@modelcontextprotocol/sdk/types.js'
 import { AdapterFactory, createConsoleLogger } from '@silkweave/core'
-import { kebabCase } from 'change-case'
+import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { randomUUID } from 'crypto'
 import { parseResourceMessage } from '../util/result.js'
@@ -114,7 +114,10 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = def
             }
             const input: Record<string, unknown> = {}
             for (const key of Object.keys(properties)) {
-              const value = args[key]
+              // Options register as kebab-case flags (--action-id) and Commander stores them
+              // camelized (actionId) — read back via camelCase(key) so snake_case schema keys
+              // (action_id) map too, not just single-word ones.
+              const value = args[camelCase(key)]
               if (value !== undefined) { input[key] = coerce(value, properties[key]?.type) }
             }
             const response = await client.callTool({
