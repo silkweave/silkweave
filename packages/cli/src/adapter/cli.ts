@@ -25,8 +25,16 @@ function handleCLIError(error: unknown) {
 
 function parseCLIInput(action: Action, args: any[]) {
   const tmpArgs = args.slice(0, -1)
-  const rawInput = tmpArgs.pop()
-  action.args?.forEach((k, index) => { rawInput[k] = args[index] })
+  const opts = tmpArgs.pop()
+  // Options register as kebab-case flags (--action-id) and Commander stores them
+  // camelized (actionId) - read back via camelCase(key) so snake_case schema keys
+  // (action_id) map too, not just single-word ones.
+  const rawInput: Record<string, unknown> = {}
+  for (const key of Object.keys(action.input.shape)) {
+    const value = opts[camelCase(key)]
+    if (value !== undefined) { rawInput[key] = value }
+  }
+  action.args?.forEach((k, index) => { rawInput[String(k)] = args[index] })
   const { error, data } = action.input.safeParse(rawInput)
   if (error || !data) {
     handleCLIError(error)
