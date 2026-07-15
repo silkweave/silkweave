@@ -1,6 +1,7 @@
 import sitemap from '@astrojs/sitemap'
 import vercel from "@astrojs/vercel"
 import { defineConfig } from 'astro/config'
+import rehypeExternalLinks from 'rehype-external-links'
 
 // Vite's default server conditions, inlined (vite isn't a direct dep here, so we
 // can't import `defaultServerConditions`). Kept ahead of our custom source condition.
@@ -20,6 +21,17 @@ export default defineConfig({
     format: 'file',
     assets: '_assets',
     inlineStylesheets: 'always'
+  },
+  markdown: {
+    // External links in markdown content (blog posts) open in a new tab. Same-site
+    // absolute links stay in-tab; the base Layout script covers non-markdown pages.
+    rehypePlugins: [
+      [rehypeExternalLinks, {
+        target: '_blank',
+        rel: ['noopener', 'noreferrer'],
+        test: (node) => !String(node.properties?.href ?? '').startsWith('https://www.silkweave.dev')
+      }]
+    ]
   },
   integrations: [
     // /test is a live tRPC demo with no inbound links - keep it out of the sitemap

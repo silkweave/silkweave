@@ -549,7 +549,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
   .start()`)} /></pre>
     </div>
     <p>Options: <code>host</code>, <code>port</code>, <code>auth</code> (see <a href="#authentication">Authentication</a>), <code>cors</code>, plus any <code>CreateMcpExpressAppOptions</code>.</p>
-    <p><strong>CORS:</strong> By default, CORS is enabled with <code>origin: '*'</code>. Pass <code>cors: false</code> to disable, or a <a href="https://www.npmjs.com/package/cors">CorsOptions</a> object to customize. MCP-required headers are always exposed regardless of config.</p>
+    <p><strong>CORS:</strong> By default, CORS is enabled with <code>origin: '*'</code>. Pass <code>cors: false</code> to disable, or a <a href="https://www.npmjs.com/package/cors" target="_blank" rel="noopener">CorsOptions</a> object to customize. MCP-required headers are always exposed regardless of config.</p>
     <p><strong>Streaming:</strong> <a href="#streaming">Streaming actions</a> deliver each chunk as a <code>notifications/progress</code> on the session's SSE stream when the client opts in with <code>_meta.progressToken</code>. The tool call still resolves with the buffered chunk array as the final <code>CallToolResult</code>; clients that don't opt in receive only that buffered result.</p>
   </section>
 
@@ -569,7 +569,7 @@ await silkweave({ name: 'my-api', version: '1.0.0' })
     <ul>
       <li>Zod schemas are converted to JSON Schema for OpenAPI docs</li>
       <li>Supports <code>auth</code> option for bearer token / OAuth protection</li>
-      <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults (<code>origin: '*'</code>), or a <a href="https://www.npmjs.com/package/@fastify/cors">FastifyCorsOptions</a> object</li>
+      <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults (<code>origin: '*'</code>), or a <a href="https://www.npmjs.com/package/@fastify/cors" target="_blank" rel="noopener">FastifyCorsOptions</a> object</li>
       <li>Errors are mapped to HTTP status codes automatically (see <a href="#error-handling">Error Handling</a>)</li>
       <li><a href="#streaming">Streaming actions</a>: content negotiation on <code>Accept</code> picks SSE (<code>text/event-stream</code>), NDJSON (<code>application/x-ndjson</code>), or buffered JSON</li>
     </ul>
@@ -647,7 +647,7 @@ const things = await client.listThings.query({ contains: 'saw' })
       <li>Set <code>kind: 'query'</code> on an action to expose it as a cacheable <code>.query()</code> (GET); default is <code>.mutation()</code> (POST). The literal kind is preserved through <code>createAction</code>, so calling <code>.mutate()</code> on a query is a compile-time error.</li>
       <li><a href="#streaming">Streaming actions</a> (those with a <code>chunk</code> schema + async-generator <code>run</code>) are registered as tRPC <code>.subscription()</code> procedures whose async generators yield chunks directly - client code consumes them with <code>client.foo.subscribe(input, {'{'} onData, onError, onComplete {'}'})</code></li>
       <li>Supports <code>auth</code> option for bearer token / OAuth protection (see <a href="#authentication">Authentication</a>)</li>
-      <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults, or a <a href="https://www.npmjs.com/package/cors">CorsOptions</a> object</li>
+      <li>Supports <code>cors</code> option: <code>false</code> to disable, <code>true</code>/omit for permissive defaults, or a <a href="https://www.npmjs.com/package/cors" target="_blank" rel="noopener">CorsOptions</a> object</li>
       <li>Options: <code>host</code>, <code>port</code>, <code>endpoint</code> (default <code>/trpc/</code>), <code>cors</code>, <code>auth</code></li>
       <li>Thrown <code>SilkweaveError</code> maps to the matching <code>TRPCError</code> code; Zod validation errors become <code>BAD_REQUEST</code></li>
     </ul>
@@ -729,7 +729,7 @@ export { GET, POST, DELETE }`)} /></pre>
       <li>Supports OAuth 2.1 and bearer token auth</li>
       <li><a href="#streaming">Streaming actions</a> deliver chunks as MCP <code>notifications/progress</code> just like the stateful HTTP adapter</li>
     </ul>
-    <p>The same handler runs unchanged on <strong>Cloudflare Workers</strong>. The <a href="https://github.com/silkweave/silkweave/tree/master/examples/cloudflare"><code>examples/cloudflare</code></a> example is a full Worker deployment - stateless MCP + Google Workspace OAuth 2.1 with OAuth state in <strong>Cloudflare KV</strong> (Workers have no filesystem, so it reuses <code>createRedisStore</code> over a tiny KV adapter) - with a from-scratch Cloudflare + Google setup guide.</p>
+    <p>The same handler runs unchanged on <strong>Cloudflare Workers</strong>. The <a href="https://github.com/silkweave/silkweave/tree/master/examples/cloudflare" target="_blank" rel="noopener"><code>examples/cloudflare</code></a> example is a full Worker deployment - stateless MCP + Google Workspace OAuth 2.1 with OAuth state in <strong>Cloudflare KV</strong> (Workers have no filesystem, so it reuses <code>createRedisStore</code> over a tiny KV adapter) - with a from-scratch Cloudflare + Google setup guide.</p>
   </section>
 
   <section id="web-standard-tools">
@@ -857,7 +857,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 
   <section id="integration-nestjs">
     <h3><img src="/nestjs.svg" alt="NestJS logo" class="integration-heading-logo" width="28" height="28" /> NestJS</h3>
-    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs"><code>@silkweave/nestjs</code></a> package exposes your <strong>existing NestJS controllers</strong> as MCP tools (<code>@Mcp()</code>) and end-to-end-typed <strong>tRPC procedures</strong> (<code>@Trpc()</code>). Add a decorator to a route handler and its name, description, and input schema are <strong>reflected</strong> from the route, the <code>@Param</code>/<code>@Query</code>/<code>@Body</code> decorators, and any <code>@nestjs/swagger</code> / <code>class-validator</code> metadata the method already carries. On a call the validated input is split back into the method's positional arguments and the handler is invoked directly, with <code>@UseGuards()</code> guards applied first. It is <strong>additive</strong> - controllers keep serving HTTP unchanged, and the same method can carry both <code>@Mcp()</code> (for agents) and <code>@Trpc()</code> (for your frontend).</p>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nestjs" target="_blank" rel="noopener"><code>@silkweave/nestjs</code></a> package exposes your <strong>existing NestJS controllers</strong> as MCP tools (<code>@Mcp()</code>) and end-to-end-typed <strong>tRPC procedures</strong> (<code>@Trpc()</code>). Add a decorator to a route handler and its name, description, and input schema are <strong>reflected</strong> from the route, the <code>@Param</code>/<code>@Query</code>/<code>@Body</code> decorators, and any <code>@nestjs/swagger</code> / <code>class-validator</code> metadata the method already carries. On a call the validated input is split back into the method's positional arguments and the handler is invoked directly, with <code>@UseGuards()</code> guards applied first. It is <strong>additive</strong> - controllers keep serving HTTP unchanged, and the same method can carry both <code>@Mcp()</code> (for agents) and <code>@Trpc()</code> (for your frontend).</p>
     <div class="code-block">
       <div class="code-block-header"><span>install</span></div>
       <pre><code set:html={hl(`pnpm add @silkweave/core @silkweave/nestjs @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata
@@ -966,12 +966,12 @@ export class AppModule {}`)} /></pre>
       <li><strong>No public REST.</strong> Omit the HTTP-verb decorator to serve a method over tRPC/MCP only - Nest never maps it as REST, but <code>@Trpc(&#123; kind &#125;)</code> / <code>@Mcp()</code> still pick it up.</li>
       <li><strong><code>typegen(&#123; path &#125;)</code></strong> writes the <code>AppRouter</code> type (a <code>TRPCBuiltRouter</code> over every <code>@Trpc</code> procedure) on boot - the exact contract <code>createTRPCClient&lt;AppRouter&gt;()</code> and <code>inferRouterInputs</code>/<code>inferRouterOutputs</code> consume. It sees <code>@Trpc</code> actions only, so the emitted router matches what <code>trpc()</code> serves.</li>
     </ul>
-    <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nestjs#readme"><code>@silkweave/nestjs</code> README</a>.</p>
+    <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nestjs#readme" target="_blank" rel="noopener"><code>@silkweave/nestjs</code> README</a>.</p>
   </section>
 
   <section id="integration-nextjs">
     <h3><img src="/nextjs.svg" alt="Next.js logo" class="integration-heading-logo" width="28" height="28" /> Next.js</h3>
-    <p>The <a href="https://www.npmjs.com/package/@silkweave/nextjs"><code>@silkweave/nextjs</code></a> package projects <strong>one action set</strong> onto Next.js <strong>App Router</strong> route handlers - <strong>MCP tools</strong> for agents and a typed <strong>tRPC endpoint</strong> for your frontend - from a single source of truth. It's <strong>action-first</strong> (define a Silkweave action, then mount it) and <strong>additive</strong> (it only adds route files). Under the hood it wraps <a href="#adapter-edge"><code>edge()</code></a> (MCP) and <a href="#adapter-trpc"><code>trpcFetch()</code></a>, adding catch-all path normalization and end-to-end tRPC types. App Router only; the package has no <code>next</code>/<code>react</code> dependency.</p>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/nextjs" target="_blank" rel="noopener"><code>@silkweave/nextjs</code></a> package projects <strong>one action set</strong> onto Next.js <strong>App Router</strong> route handlers - <strong>MCP tools</strong> for agents and a typed <strong>tRPC endpoint</strong> for your frontend - from a single source of truth. It's <strong>action-first</strong> (define a Silkweave action, then mount it) and <strong>additive</strong> (it only adds route files). Under the hood it wraps <a href="#adapter-edge"><code>edge()</code></a> (MCP) and <a href="#adapter-trpc"><code>trpcFetch()</code></a>, adding catch-all path normalization and end-to-end tRPC types. App Router only; the package has no <code>next</code>/<code>react</code> dependency.</p>
     <h4>Install</h4>
     <div class="code-block">
       <pre><code set:html={hl(`pnpm add @silkweave/nextjs @silkweave/core
@@ -1028,14 +1028,14 @@ const { users } = await trpc.listUsers.query({ activeOnly: true })`)} /></pre>
       <li><strong>Path normalization.</strong> The MCP handler matches absolute paths, so the catch-all route strips <code>basePath</code> from each request - one <code>[[...mcp]]</code> file covers the transport, OAuth routes, and protected-resource metadata.</li>
       <li><strong>Runtime.</strong> Use <code>runtime = 'nodejs'</code> (the MCP transport needs Node APIs) and <code>dynamic = 'force-dynamic'</code> (these handlers are never statically cached).</li>
       <li><strong>CORS.</strong> tRPC CORS is opt-in (<code>app.trpc(&#123; cors: true &#125;)</code>) - a same-origin Next.js frontend needs none. The MCP route is permissive by default.</li>
-      <li><strong>Auth.</strong> Pass <code>auth</code> to <code>app.mcp()</code> / <code>app.trpc()</code> for bearer-token / OAuth 2.1 (see <a href="https://www.npmjs.com/package/@silkweave/auth"><code>@silkweave/auth</code></a>).</li>
+      <li><strong>Auth.</strong> Pass <code>auth</code> to <code>app.mcp()</code> / <code>app.trpc()</code> for bearer-token / OAuth 2.1 (see <a href="https://www.npmjs.com/package/@silkweave/auth" target="_blank" rel="noopener"><code>@silkweave/auth</code></a>).</li>
     </ul>
-    <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nextjs#readme"><code>@silkweave/nextjs</code> README</a>.</p>
+    <p>Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/nextjs#readme" target="_blank" rel="noopener"><code>@silkweave/nextjs</code> README</a>.</p>
   </section>
 
   <section id="integration-ai-sdk">
     <h3><img src="/vercel-ai.svg" alt="Vercel AI SDK logo" class="integration-heading-logo" width="28" height="28" /> Vercel AI SDK</h3>
-    <p>The <a href="https://www.npmjs.com/package/@silkweave/ai"><code>@silkweave/ai</code></a> package wires <a href="https://ai-sdk.dev">Vercel AI SDK</a>'s <code>useChat</code> hook to a <a href="#streaming">Silkweave streaming action</a> over a tRPC subscription. No <code>/api/chat</code> route, no AI SDK Data Stream Protocol parsing - <code>useChat</code> consumes <code>UIMessageChunk</code> objects directly from your typed tRPC client.</p>
+    <p>The <a href="https://www.npmjs.com/package/@silkweave/ai" target="_blank" rel="noopener"><code>@silkweave/ai</code></a> package wires <a href="https://ai-sdk.dev" target="_blank" rel="noopener">Vercel AI SDK</a>'s <code>useChat</code> hook to a <a href="#streaming">Silkweave streaming action</a> over a tRPC subscription. No <code>/api/chat</code> route, no AI SDK Data Stream Protocol parsing - <code>useChat</code> consumes <code>UIMessageChunk</code> objects directly from your typed tRPC client.</p>
     <p>The integration is two pieces:</p>
     <ul>
       <li><strong><code>createChatAction({'{'} model, ... {'}'})</code></strong> - server-side helper. Wraps AI SDK's <code>streamText</code> in a Silkweave streaming action whose <code>chunk</code> schema is <code>UIMessageChunk</code>; the action yields chunks from <code>result.toUIMessageStream()</code>. The tRPC adapter sees it's streaming and registers it as a <code>.subscription()</code> automatically.</li>
@@ -1067,7 +1067,7 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
       </div>
       <pre><code set:html={hl(aiSdkUseChatRaw)} /></pre>
     </div>
-    <p>That's the entire integration. Type safety flows from <code>AppRouter</code> through <code>useChat</code>; AI SDK's frontend hook is none the wiser that it isn't talking to its <code>DefaultChatTransport</code> HTTP endpoint. <a href="https://elements.ai-sdk.dev">ai-elements</a> components (<code>Conversation</code>, <code>Message</code>, <code>PromptInput</code>) work as drop-in replacements for the hand-rolled UI - the data layer doesn't change.</p>
+    <p>That's the entire integration. Type safety flows from <code>AppRouter</code> through <code>useChat</code>; AI SDK's frontend hook is none the wiser that it isn't talking to its <code>DefaultChatTransport</code> HTTP endpoint. <a href="https://elements.ai-sdk.dev" target="_blank" rel="noopener">ai-elements</a> components (<code>Conversation</code>, <code>Message</code>, <code>PromptInput</code>) work as drop-in replacements for the hand-rolled UI - the data layer doesn't change.</p>
 
     <h4>Why this works</h4>
     <p>A custom <code>ChatTransport.sendMessages</code> returns <code>Promise&lt;ReadableStream&lt;UIMessageChunk&gt;&gt;</code>. The chunks in that stream are <strong>plain JS objects</strong> - <code>useChat</code> doesn't care where they came from. tRPC subscriptions yield objects. AI SDK's <code>streamText().toUIMessageStream()</code> produces objects of exactly the right shape. The three pieces compose without any wire-format translation:</p>
@@ -1081,7 +1081,7 @@ pnpm add @ai-sdk/react @trpc/client @trpc/server  # client-side`)} /></pre>
       <li><strong><code>httpSubscriptionLink</code> uses SSE (GET).</strong> Long conversations serialized into query strings will hit URL length limits. Switch to <code>wsLink</code> (WebSocket) for production or configure a custom transport that POSTs.</li>
       <li><strong><code>onData</code> is typed <code>unknown</code>.</strong> Zod's <code>z.custom&lt;UIMessageChunk&gt;()</code> doesn't preserve the exact union variance through tRPC's subscription inference, so the callback boundary is loose. Runtime is safe because <code>streamText</code> only yields valid chunks; the cast lives inside <code>silkweaveTransport</code>.</li>
     </ul>
-    <p>Full working example: <a href="https://github.com/silkweave/silkweave/tree/master/examples/ai"><code>examples/ai/</code></a> (Vite + React + Tailwind v4). Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/ai#readme"><code>@silkweave/ai</code> README</a>.</p>
+    <p>Full working example: <a href="https://github.com/silkweave/silkweave/tree/master/examples/ai" target="_blank" rel="noopener"><code>examples/ai/</code></a> (Vite + React + Tailwind v4). Full API reference: <a href="https://github.com/silkweave/silkweave/tree/master/packages/ai#readme" target="_blank" rel="noopener"><code>@silkweave/ai</code> README</a>.</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
