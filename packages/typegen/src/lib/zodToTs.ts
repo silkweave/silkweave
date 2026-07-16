@@ -1,139 +1,147 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import ts, { factory as f } from 'typescript'
 import { z } from 'zod/v4'
 
-export function zodToTs(schema: z.ZodTypeAny): ts.TypeNode {
+// Emits TypeScript type expressions as plain strings - no dependency on the
+// `typescript` compiler API. typegen only ever produced `.d.ts` *text*; it never
+// type-checked, so the AST factory + printer were pure overhead that forced a
+// `typescript` peer dependency onto every consumer at server boot.
+
+const INDENT = '  '
+const pad = (level: number) => INDENT.repeat(level)
+
+export function zodToTs(schema: z.ZodTypeAny, level = 0): string {
   const def = (schema as any)._zod.def
   const handler = typeHandlers[def.type as string]
-  return handler ? handler(def) : f.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+  return handler ? handler(def, level) : 'unknown'
 }
 
-const keyword = (kind: ts.KeywordTypeSyntaxKind) => () =>
-  f.createKeywordTypeNode(kind)
+type TypeHandler = (def: any, level: number) => string
 
-type TypeHandler = (def: any) => ts.TypeNode
+const keyword = (name: string) => () => name
 
 const typeHandlers: Record<string, TypeHandler> = {
-  string: keyword(ts.SyntaxKind.StringKeyword),
-  number: keyword(ts.SyntaxKind.NumberKeyword),
-  nan: keyword(ts.SyntaxKind.NumberKeyword),
-  bigint: keyword(ts.SyntaxKind.BigIntKeyword),
-  boolean: keyword(ts.SyntaxKind.BooleanKeyword),
-  undefined: keyword(ts.SyntaxKind.UndefinedKeyword),
-  void: keyword(ts.SyntaxKind.VoidKeyword),
-  any: keyword(ts.SyntaxKind.AnyKeyword),
-  unknown: keyword(ts.SyntaxKind.UnknownKeyword),
-  never: keyword(ts.SyntaxKind.NeverKeyword),
-  symbol: keyword(ts.SyntaxKind.SymbolKeyword),
-  date: () => f.createTypeReferenceNode('Date'),
-  null: () => f.createLiteralTypeNode(f.createNull()),
-  file: () => f.createTypeReferenceNode('File'),
+  string: keyword('string'),
+  number: keyword('number'),
+  nan: keyword('number'),
+  bigint: keyword('bigint'),
+  boolean: keyword('boolean'),
+  undefined: keyword('undefined'),
+  void: keyword('void'),
+  any: keyword('any'),
+  unknown: keyword('unknown'),
+  never: keyword('never'),
+  symbol: keyword('symbol'),
+  date: keyword('Date'),
+  null: keyword('null'),
+  file: keyword('File'),
 
-  literal: (def) => {
-    const members = def.values.map(literalToTypeNode)
-    return members.length === 1 ? members[0] : f.createUnionTypeNode(members)
+  literal: (def) => (def.values as unknown[]).map(literalToTs).join(' | '),
+
+  enum: (def) => Object.values(def.entries).map(literalToTs).join(' | '),
+
+  array: (def, level) => {
+    const inner = zodToTs(def.element, level)
+    return needsParensAsElement(def.element) ? `(${inner})[]` : `${inner}[]`
   },
 
-  enum: (def) => {
-    return f.createUnionTypeNode(Object.values(def.entries).map(literalToTypeNode))
+  object: (def, level) => {
+    const members = objectMemberLines(def, level)
+    return members.length ? `{\n${members.join('\n')}\n${pad(level)}}` : '{}'
   },
 
-  array: (def) => f.createArrayTypeNode(zodToTs(def.element)),
-
-  object: (def) => {
-    const members: ts.TypeElement[] = Object.entries(def.shape as Record<string, z.ZodTypeAny>)
-      .map(([key, memberSchema]) => {
-        const isOptional = (memberSchema as any)._zod.optout
-        return f.createPropertySignature(
-          undefined,
-          identifierOrString(key),
-          isOptional ? f.createToken(ts.SyntaxKind.QuestionToken) : undefined,
-          zodToTs(memberSchema)
-        )
-      })
-
-    if (def.catchall) {
-      members.push(indexSignature(zodToTs(def.catchall)))
-    }
-
-    return f.createTypeLiteralNode(members)
-  },
-
-  record: (def) => {
+  record: (def, level) =>
     // `Record<K, V>` rather than `{ [key: K]: V }` - an index signature whose
     // key type is a string-literal union (z.record(z.enum([...]), V)) is invalid
     // TS (TS1337), whereas Record accepts any keyof-compatible key type.
-    return f.createTypeReferenceNode('Record', [zodToTs(def.keyType), zodToTs(def.valueType)])
+    `Record<${zodToTs(def.keyType, level)}, ${zodToTs(def.valueType, level)}>`,
+
+  tuple: (def, level) => `[${(def.items as z.ZodTypeAny[]).map((i) => zodToTs(i, level)).join(', ')}]`,
+  union: (def, level) => (def.options as z.ZodTypeAny[]).map((o) => zodToTs(o, level)).join(' | '),
+  intersection: (def, level) => `${zodToTs(def.left, level)} & ${zodToTs(def.right, level)}`,
+
+  optional: (def, level) => `${zodToTs(def.innerType, level)} | undefined`,
+  nullable: (def, level) => `${zodToTs(def.innerType, level)} | null`,
+
+  default: (def, level) => zodToTs(def.innerType, level),
+  prefault: (def, level) => zodToTs(def.innerType, level),
+  catch: (def, level) => zodToTs(def.innerType, level),
+  lazy: (def, level) => zodToTs(def.getter(), level),
+  pipe: (def, level) => zodToTs(def.out, level),
+
+  readonly: (def, level) => {
+    const inner = zodToTs(def.innerType, level)
+    const innerType = def.innerType._zod.def.type
+    return innerType === 'array' || innerType === 'tuple' ? `readonly ${inner}` : inner
   },
 
-  tuple: (def) => f.createTupleTypeNode((def.items as z.ZodTypeAny[]).map(zodToTs)),
-  union: (def) => f.createUnionTypeNode((def.options as z.ZodTypeAny[]).map(zodToTs)),
-  intersection: (def) => f.createIntersectionTypeNode([zodToTs(def.left), zodToTs(def.right)]),
-
-  optional: (def) => f.createUnionTypeNode([
-    zodToTs(def.innerType),
-    f.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-  ]),
-
-  nullable: (def) => f.createUnionTypeNode([
-    zodToTs(def.innerType),
-    f.createLiteralTypeNode(f.createNull())
-  ]),
-
-  default: (def) => zodToTs(def.innerType),
-  prefault: (def) => zodToTs(def.innerType),
-  catch: (def) => zodToTs(def.innerType),
-  lazy: (def) => zodToTs(def.getter()),
-  pipe: (def) => zodToTs(def.out),
-
-  readonly: (def) => {
-    const inner = zodToTs(def.innerType)
-    if (ts.isArrayTypeNode(inner) || ts.isTupleTypeNode(inner)) {
-      return f.createTypeOperatorNode(ts.SyntaxKind.ReadonlyKeyword, inner)
-    }
-    return inner
-  },
-
-  set: (def) => f.createTypeReferenceNode('Set', [zodToTs(def.valueType)]),
-  map: (def) => f.createTypeReferenceNode('Map', [zodToTs(def.keyType), zodToTs(def.valueType)]),
-  promise: (def) => f.createTypeReferenceNode('Promise', [zodToTs(def.innerType)])
+  set: (def, level) => `Set<${zodToTs(def.valueType, level)}>`,
+  map: (def, level) => `Map<${zodToTs(def.keyType, level)}, ${zodToTs(def.valueType, level)}>`,
+  promise: (def, level) => `Promise<${zodToTs(def.innerType, level)}>`
 }
 
-export function printNode(node: ts.Node): string {
-  const sourceFile = ts.createSourceFile('typegen.d.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS)
-  const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, omitTrailingSemicolon: true })
-  return printer.printNode(ts.EmitHint.Unspecified, node, sourceFile)
+/**
+ * Member lines for an object schema, indented one level deeper than `level`,
+ * or `null` when the schema is not a Zod object (caller falls back to an index
+ * signature). Shared by the `object` type handler and `generateDts`'s interface
+ * emitter so both produce identical member formatting.
+ */
+export function objectMembers(schema: z.ZodTypeAny, level = 0): string[] | null {
+  const def = (schema as any)._zod.def
+  return def.type === 'object' ? objectMemberLines(def, level) : null
 }
 
-function indexSignature(valueType: ts.TypeNode, keyType?: ts.TypeNode): ts.IndexSignatureDeclaration {
-  return f.createIndexSignature(
-    undefined,
-    [f.createParameterDeclaration(undefined, undefined, 'key', undefined, keyType ?? f.createKeywordTypeNode(ts.SyntaxKind.StringKeyword))],
-    valueType
-  )
+function objectMemberLines(def: any, level: number): string[] {
+  const lines = Object.entries(def.shape as Record<string, z.ZodTypeAny>).map(([key, member]) => {
+    const optional = (member as any)._zod.optout
+    return `${pad(level + 1)}${identifierOrString(key)}${optional ? '?' : ''}: ${zodToTs(member, level + 1)}`
+  })
+
+  if (def.catchall) {
+    lines.push(`${pad(level + 1)}[key: string]: ${zodToTs(def.catchall, level + 1)}`)
+  }
+
+  return lines
+}
+
+// Whether a type needs wrapping in parens when used as an array element - i.e.
+// it renders as a top-level union or intersection (`A | B`, `A & B`), where
+// `A | B[]` would otherwise bind the `[]` to `B` alone. Transparent wrappers
+// (default/catch/pipe/...) are unwrapped to their effective type.
+function needsParensAsElement(schema: z.ZodTypeAny): boolean {
+  const def = (schema as any)._zod.def
+  switch (def.type) {
+    case 'union': return (def.options as unknown[]).length > 1
+    case 'intersection':
+    case 'optional':
+    case 'nullable': return true
+    case 'literal': return (def.values as unknown[]).length > 1
+    case 'enum': return Object.keys(def.entries).length > 1
+    case 'default':
+    case 'prefault':
+    case 'catch':
+    case 'readonly': return needsParensAsElement(def.innerType)
+    case 'pipe': return needsParensAsElement(def.out)
+    case 'lazy': return needsParensAsElement(def.getter())
+    default: return false
+  }
 }
 
 const identifierRE = /^[$A-Z_a-z][\w$]*$/
 
-function identifierOrString(name: string) {
-  return identifierRE.test(name)
-    ? f.createIdentifier(name)
-    : f.createStringLiteral(name)
+function identifierOrString(name: string): string {
+  return identifierRE.test(name) ? name : literalToTs(name)
 }
 
-function literalToTypeNode(value: unknown): ts.TypeNode {
+function literalToTs(value: unknown): string {
   switch (typeof value) {
     case 'string':
-      return f.createLiteralTypeNode(f.createStringLiteral(value))
+      return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`
     case 'number':
-      return value < 0
-        ? f.createLiteralTypeNode(f.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, f.createNumericLiteral(Math.abs(value))))
-        : f.createLiteralTypeNode(f.createNumericLiteral(value))
-    case 'bigint':
-      return f.createLiteralTypeNode(f.createBigIntLiteral(`${value}n`))
     case 'boolean':
-      return f.createLiteralTypeNode(value ? f.createTrue() : f.createFalse())
+      return String(value)
+    case 'bigint':
+      return `${value}n`
     default:
-      return f.createLiteralTypeNode(f.createNull())
+      return 'null'
   }
 }

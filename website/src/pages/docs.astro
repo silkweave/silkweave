@@ -749,7 +749,7 @@ import { registerTools, smartToolResult } from '@silkweave/mcp/tools'`)} /></pre
 
   <section id="adapter-typegen">
     <h3>Type Generation</h3>
-    <p>The <code>typegen()</code> adapter generates <code>.d.ts</code> interface declarations from your action Zod schemas at build time. It uses the TypeScript compiler API to produce correct, well-formatted output with zero runtime cost.</p>
+    <p>The <code>typegen()</code> adapter generates <code>.d.ts</code> interface declarations from your action Zod schemas at build time. It emits the declaration text directly, so it carries no <code>typescript</code> compiler dependency at runtime (nothing to install or link at server boot, even on the native <code>tsgo</code> / TS7 toolchain).</p>
     <div class="code-block">
       <div class="code-block-header">
         <span>typegen.ts</span>

@@ -8,7 +8,7 @@
 pnpm add @silkweave/typegen
 ```
 
-Requires `typescript` >= 5.0 as a peer dependency (already present in any TypeScript project).
+No runtime dependencies beyond `zod` and `change-case` - typegen emits `.d.ts` text directly, so it does **not** require (or link) the `typescript` compiler at server boot. This matters if you run on the native TypeScript (`tsgo` / TS7) toolchain, which does not ship the JS compiler API: nothing here pulls the classic `typescript` module into your server's runtime graph.
 
 ## Usage
 
@@ -41,11 +41,11 @@ This generates:
 ```ts
 // types/actions.d.ts
 export interface GreetInput {
-    name: string;
+  name: string
 }
 
 export interface GreetOutput {
-    message: string;
+  message: string
 }
 ```
 
@@ -73,7 +73,8 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 
 ## How it works
 
-- Uses the **TypeScript compiler API** (`ts.factory` + `ts.createPrinter`) to produce correct, well-formatted declarations
+- Emits declaration **text directly** (no `typescript` compiler dependency) - typegen only ever produced `.d.ts` strings and never type-checked, so there's nothing the compiler API was needed for
+- Output is well-formatted (2-space indent, nested type literals); run it through your project's formatter if you want a different style
 - Sets `allActions: true` on the adapter so **all** registered actions are included regardless of `isEnabled` guards
 - Generates `{PascalName}Input` and `{PascalName}Output` interfaces per action
 - Output interfaces are only generated when the action defines an `output` schema
@@ -109,4 +110,4 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 |--------|-------------|
 | `typegen(opts)` | Adapter factory - the main entry point |
 | `generateDts(actions)` | Generate `.d.ts` string from an array of actions |
-| `zodToTs(schema)` | Convert a single Zod schema to a TypeScript AST node |
+| `zodToTs(schema)` | Convert a single Zod schema to a TypeScript type-expression string |
