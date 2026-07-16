@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/fastify",
-  "version": "4.0.1",
+  "version": "4.1.0",
   "description": "Silkweave Fastify REST Adapter",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",

@@ -39,6 +39,23 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '4.1.0',
+    date: '2026-07-16',
+    summary: '@silkweave/typegen drops its typescript peer dependency - it now emits .d.ts text directly, so nothing links the TypeScript compiler at server boot (works on the native tsgo/TS7 toolchain).',
+    changes: [
+      {
+        type: 'improvement',
+        text: '@silkweave/typegen no longer requires (or links) the `typescript` compiler at runtime. It only ever produced .d.ts text and never type-checked, so the compiler-API AST factory + printer were replaced with direct string emission. This removes the `typescript` peer dependency entirely - relevant if you run on the native TypeScript (tsgo / TS7) toolchain, which does not ship the JS compiler API.',
+        commit: '6bf4b6a'
+      },
+      {
+        type: 'breaking',
+        text: 'The low-level exported helper `zodToTs(schema)` now returns a TypeScript type-expression string instead of a `ts.TypeNode`. The high-level API (the typegen() adapter, renderTypegen/generateDts/generateTrpcRouter) is unchanged, and generated output is semantically identical (reformatted to 2-space, no-semicolon style). Only direct importers of `zodToTs` are affected.',
+        commit: '6bf4b6a'
+      }
+    ]
+  },
+  {
     version: '4.0.1',
     date: '2026-07-14',
     summary: 'Patch: kebab-case CLI flags now map correctly onto snake_case action input keys in both CLI surfaces.',
