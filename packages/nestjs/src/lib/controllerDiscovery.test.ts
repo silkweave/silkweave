@@ -190,6 +190,10 @@ class ReportsController {
   @Post('explode')
   @Trpc()
   explode(): never { throw new ForbiddenException('no access') }
+
+  @Post('echo')
+  @Trpc()
+  echo(@Body('day') day: string): { day: string } { return { day } }
 }
 
 describe('ControllerDiscovery telemetry (trpc wrapper)', () => {
@@ -214,6 +218,16 @@ describe('ControllerDiscovery telemetry (trpc wrapper)', () => {
     const explode = actions.find((a) => a.name === 'Reports.explode')!
     await expect(explode.run({}, trpcCtx())).rejects.toThrow('no access')
     expect(events[0]).toMatchObject({ ok: false, transport: 'trpc', errorCode: 'http_error', errorMessage: 'no access' })
+  })
+
+  it('carries the validated procedure input as args on success and error events', async () => {
+    const { events, actions } = setup()
+    const echo = actions.find((a) => a.name === 'Reports.echo')!
+    await echo.run({ day: 'mon' }, trpcCtx())
+    expect(events[0]).toMatchObject({ ok: true, args: { day: 'mon' } })
+    const explode = actions.find((a) => a.name === 'Reports.explode')!
+    await expect(explode.run({}, trpcCtx())).rejects.toThrow('no access')
+    expect(events[1]).toMatchObject({ ok: false, args: {} })
   })
 
   it('does not emit from the MCP action (the MCP registrar owns that seam - no double-fire)', async () => {

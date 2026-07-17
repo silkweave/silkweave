@@ -366,7 +366,7 @@ Pass a `SilkweaveTelemetry` **class token** to `forRoot` and every MCP tool call
 export class ToolTelemetryService implements SilkweaveTelemetry {
   constructor(private readonly logger: MyLogger) {}
   onToolCall(event: ToolCallEvent) {
-    // { action, tool, transport: 'mcp' | 'trpc', durationMs, ok, errorCode?, errorMessage?, resultBytes?, sideloaded?, context }
+    // { action, tool, transport: 'mcp' | 'trpc', durationMs, ok, errorCode?, errorMessage?, args?, resultBytes?, sideloaded?, context }
     const auth = event.context.getOptional('auth')
     this.logger.info('tool_call', { tool: event.tool, transport: event.transport, durationMs: event.durationMs, ok: event.ok, userId: auth?.userId })
   }
@@ -381,6 +381,8 @@ SilkweaveModule.forRoot({
 
 - **Exactly one event per call.** MCP events are emitted from the MCP registrar (and carry `resultBytes`/`sideloaded` - metrics only that layer knows); tRPC events from the synthesized action wrapper. Guard denials count as failed calls (`ok: false`, `errorCode: 'http_error'`, message from the mapped `HttpException`) on either transport.
 - **Fire-and-forget.** The hook is never awaited on the call path; throws/rejections are logged and swallowed - telemetry can never fail, slow, or reorder a call.
+- **`args` is the per-call input.** The parsed (post-zod) input the method ran with - per-procedure even inside a tRPC httpBatch request (tRPC de-batches before the wrapper), so no batch-envelope noise. **Unredacted** - like `event.context`, redact and truncate before persisting.
+- **Invalid arguments emit too.** Both transports validate input *before* the handler, so those calls never reach the wrapper - instead the MCP transport pre-validates (emit-only) and the tRPC adapter emits from tRPC's `onError` seam. Either way: `ok: false`, stable `errorCode: 'INVALID_ARGUMENTS'`, `durationMs: 0`, and `args` set to the **raw offered input**. Failed-validation storms from a misbehaving agent are cheap to trigger - batch/sample in the hook rather than writing per event. (One blind spot: a controller that deliberately throws a raw `ZodError` is indistinguishable from a tRPC input-parse failure and would count twice.)
 - Subscriptions (`async *` routes) report `durationMs` across full stream consumption.
 - The event carries the tool's **wire name** (`LeadsBulkUpdate` over MCP, `leadsBulkUpdate` over tRPC) plus the action name, so one dashboard can group across transports.
 

@@ -263,11 +263,11 @@ export class ControllerDiscovery {
           const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
           const response = context.getOptional<unknown>('response')
           const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
-          emitTrpcEvent(onToolCall, name, context, started)
+          emitTrpcEvent(onToolCall, name, context, started, input)
           return result ?? {}
         } catch (error) {
           const mapped = toSilkweaveError(error)
-          emitTrpcEvent(onToolCall, name, context, started, mapped)
+          emitTrpcEvent(onToolCall, name, context, started, input, mapped)
           throw mapped
         }
       }
@@ -290,7 +290,7 @@ function camelKey(name: string): string {
  * Emit a tRPC-side telemetry event (fire-and-forget). Gated to the `trpc`
  * adapter context so a `typegen`-driven evaluation never counts as a call.
  */
-function emitTrpcEvent(hook: OnToolCall | undefined, name: string, context: SilkweaveContext, started: number, error?: unknown): void {
+function emitTrpcEvent(hook: OnToolCall | undefined, name: string, context: SilkweaveContext, started: number, args: unknown, error?: unknown): void {
   if (!hook || context.getOptional<string>('adapter') !== 'trpc') { return }
   const meta = error == null
     ? {}
@@ -306,6 +306,9 @@ function emitTrpcEvent(hook: OnToolCall | undefined, name: string, context: Silk
     durationMs: Date.now() - started,
     ok: error == null,
     ...meta,
+    // The validated (post-zod) procedure input - tRPC parses before the
+    // resolver, so this is what the method actually ran with.
+    args,
     context
   })
 }
@@ -339,10 +342,10 @@ function streamingRun(
       const response = context.getOptional<unknown>('response')
       const gen = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes) as AsyncIterable<unknown>
       for await (const chunk of gen) { yield chunk }
-      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started) }
+      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started, input) }
     } catch (error) {
       const mapped = mapErrors ? toSilkweaveError(error) : error
-      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started, mapped) }
+      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started, input, mapped) }
       throw mapped
     }
   }

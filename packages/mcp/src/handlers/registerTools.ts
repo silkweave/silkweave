@@ -177,7 +177,9 @@ export function registerTools(
       // Client-sent `_meta.disposition` wins; otherwise fall back to the
       // action's configured default (`json` when neither is set).
       const disposition = extra._meta?.disposition ?? action.disposition
-      const base = { action: action.name, tool: pascalCase(action.name), transport: 'mcp' as const, context: actionContext }
+      // `input` is the SDK-parsed (post-zod) input - defaults applied, unknown
+      // keys stripped - so telemetry `args` matches what the action ran with.
+      const base = { action: action.name, tool: pascalCase(action.name), transport: 'mcp' as const, args: input as unknown, context: actionContext }
       const started = Date.now()
       try {
         const result = await runAction(action, input, actionContext, extra)

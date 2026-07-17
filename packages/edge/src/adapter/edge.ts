@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
 import { Action, AdapterGenerator, OnToolCall, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
-import { filterErrorResponse, registerTools, rpcInfo, type FilterActions } from '@silkweave/mcp/tools'
+import { emitInvalidArguments, filterErrorResponse, registerTools, rpcInfo, type FilterActions } from '@silkweave/mcp/tools'
 
 export interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
@@ -263,6 +263,11 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
         })
       }
     }
+
+    // Emit-only: the SDK rejects an invalid-arguments tools/call before the
+    // handler (and its telemetry emit) ever runs, so surface it here. The
+    // request still proceeds to the SDK for its native rejection.
+    await emitInvalidArguments(rawBody, activeActions, requestContext, options.onToolCall)
 
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,

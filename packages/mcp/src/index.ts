@@ -4,6 +4,7 @@
 // never pulls express/cors into its graph.
 export * from './adapter/stdio.js'
 export * from './handlers/filter.js'
+export * from './handlers/prevalidate.js'
 export * from './handlers/registerTools.js'
 export * from './util/result.js'
 export * from './util/sideload.js'

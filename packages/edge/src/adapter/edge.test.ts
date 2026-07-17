@@ -1,4 +1,4 @@
-import { createContext, SilkweaveError, type Action } from '@silkweave/core'
+import { createContext, SilkweaveError, type Action, type ToolCallEvent } from '@silkweave/core'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { edge, type EdgeAdapterOptions } from './edge.js'
@@ -76,5 +76,54 @@ describe('edge filterActions', () => {
     const res = await app.handler(post(list))
     const body = await res.json() as { result: { tools: { name: string }[] } }
     expect(body.result.tools).toHaveLength(2)
+  })
+})
+
+describe('edge onToolCall telemetry', () => {
+  const strict: Action = {
+    name: 'leads.get',
+    description: 'Get a lead',
+    input: z.object({ id: z.string() }),
+    run: async ({ id }: { id: string }) => ({ id })
+  } as Action
+
+  async function startWithHook() {
+    const events: ToolCallEvent[] = []
+    const app = edge({ enableJsonResponse: true, onToolCall: (event) => { events.push(event) } })
+    const generated = app.adapter({ name: 'test', description: 'test', version: '0.0.0' }, createContext())
+    await generated.start([strict])
+    return { app, events }
+  }
+
+  const call = (args: unknown) => post({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'LeadsGet', arguments: args } })
+
+  it('emits exactly one success event carrying the parsed args', async () => {
+    const { app, events } = await startWithHook()
+    const res = await app.handler(call({ id: 'l1' }))
+    expect(res.status).toBe(200)
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ action: 'leads.get', tool: 'LeadsGet', ok: true, args: { id: 'l1' } })
+  })
+
+  it('emits an INVALID_ARGUMENTS event while the SDK still produces its native rejection', async () => {
+    const { app, events } = await startWithHook()
+    const raw = { id: 42 }
+    const res = await app.handler(call(raw))
+    // Emit-only: the wire response is the SDK's own native rejection - an
+    // isError tool result carrying the InvalidParams message (SDK >= 1.29).
+    expect(res.status).toBe(200)
+    const body = await res.json() as { result: { isError: boolean; content: { text: string }[] } }
+    expect(body.result.isError).toBe(true)
+    expect(body.result.content[0].text).toContain('Input validation error')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      action: 'leads.get',
+      tool: 'LeadsGet',
+      transport: 'mcp',
+      durationMs: 0,
+      ok: false,
+      errorCode: 'INVALID_ARGUMENTS',
+      args: raw
+    })
   })
 })

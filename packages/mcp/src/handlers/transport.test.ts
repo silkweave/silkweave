@@ -1,4 +1,4 @@
-import { createContext, SilkweaveError, type Action } from '@silkweave/core'
+import { createContext, SilkweaveError, type Action, type ToolCallEvent } from '@silkweave/core'
 import express from 'express'
 import { type Server } from 'http'
 import { type AddressInfo } from 'net'
@@ -101,5 +101,65 @@ describe('mcpTransport filterActions', () => {
     expect(res.status).toBe(400)
     const body = await res.json() as { error: { message: string } }
     expect(body.error.message).toMatch(/batch/i)
+  })
+})
+
+describe('mcpTransport onToolCall telemetry', () => {
+  let hookServer: Server
+  let hookPort: number
+  const events: ToolCallEvent[] = []
+  const strict = {
+    name: 'leads.get',
+    description: 'Get a lead',
+    input: z.object({ id: z.string() }),
+    run: async ({ id }: { id: string }) => ({ id })
+  } as Action
+
+  beforeAll(async () => {
+    const app = express()
+    const transport = mcpTransport({ name: 'test', description: 'test', version: '0.0.0' }, createContext({ adapter: 'http' }), [strict], {
+      onToolCall: (event) => { events.push(event) }
+    })
+    app.post('/mcp', express.json(), transport.post)
+    hookServer = app.listen(0)
+    hookPort = (hookServer.address() as AddressInfo).port
+  })
+
+  afterAll(() => new Promise<void>((resolve) => hookServer.close(() => resolve())))
+
+  async function callLeadsGet(args: unknown) {
+    return fetch(`http://127.0.0.1:${hookPort}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'LeadsGet', arguments: args } })
+    })
+  }
+
+  it('emits exactly one success event carrying the parsed args', async () => {
+    events.length = 0
+    const res = await callLeadsGet({ id: 'l1' })
+    expect(res.status).toBe(200)
+    await res.text()
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ action: 'leads.get', tool: 'LeadsGet', ok: true, args: { id: 'l1' } })
+  })
+
+  it('emits an INVALID_ARGUMENTS event while the SDK still produces its native rejection', async () => {
+    events.length = 0
+    const res = await callLeadsGet({ id: 42 })
+    // Emit-only: the wire response is still the SDK's own rejection (an
+    // isError tool result on SDK >= 1.29), delivered as this request's SSE.
+    const text = await res.text()
+    expect(text).toContain('Input validation error')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({
+      action: 'leads.get',
+      tool: 'LeadsGet',
+      transport: 'mcp',
+      durationMs: 0,
+      ok: false,
+      errorCode: 'INVALID_ARGUMENTS',
+      args: { id: 42 }
+    })
   })
 })

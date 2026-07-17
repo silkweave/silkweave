@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server'
 import cors, { type CorsOptions } from 'cors'
 import type { Request, RequestHandler, Response } from 'express'
 import type { NestAdapterRegisterContext, NestSilkweaveAdapter } from '../lib/types.js'
+import { buildValidationErrorEmitter } from '../lib/validationTelemetry.js'
 
 export interface TrpcAdapterOptions {
   /** URL prefix the tRPC handler mounts on. Default `'/trpc'`. */
@@ -46,7 +47,7 @@ function resolveCors(config: CorsOptions | boolean | undefined): RequestHandler 
 export function trpc(options: TrpcAdapterOptions = {}): NestSilkweaveAdapter {
   return {
     name: 'trpc',
-    register({ httpAdapter, baseContext, actions }: NestAdapterRegisterContext): void {
+    register({ httpAdapter, baseContext, actions, onToolCall }: NestAdapterRegisterContext): void {
       const basePath = (options.basePath ?? '/trpc').replace(/\/$/, '')
       if (!basePath) { throw new Error('@silkweave/nestjs trpc(): basePath cannot be empty or "/" - pick a path like "/trpc".') }
 
@@ -55,6 +56,7 @@ export function trpc(options: TrpcAdapterOptions = {}): NestSilkweaveAdapter {
 
       const middleware = createExpressMiddleware({
         router,
+        onError: buildValidationErrorEmitter(actions, baseContext, onToolCall),
         createContext: async ({ req, res }: { req: Request; res: Response }): Promise<TrpcHandlerContext> => {
           const resolved = await resolveAuth(options.auth, req.headers.authorization, baseContext.fork({ request: req }))
           if (resolved.kind === 'error') {

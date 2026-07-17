@@ -18,10 +18,27 @@ export interface ToolCallEvent {
    * `false` when the action threw or the formatted result is an MCP
    * `isError` tool result. `errorCode`/`errorMessage` are set for thrown
    * errors (a `SilkweaveError`'s `code`, else the error's `name`).
+   *
+   * Input-validation failures also emit an event (the handler never runs):
+   * `ok: false` with the stable `errorCode: 'INVALID_ARGUMENTS'`, `args` set
+   * to the raw offered input, and `durationMs: 0`. Emitted by the stateless
+   * MCP HTTP transports (`http()`/`edge()`; `stdio` is not covered) and the
+   * `@silkweave/nestjs` tRPC adapter. These are cheap for a client to trigger
+   * at high rate - batch/sample in the hook rather than writing per event.
    */
   ok: boolean
   errorCode?: string
   errorMessage?: string
+  /**
+   * The call's input. On success (and handler-thrown-error) events this is the
+   * parsed (post-zod) input the action ran with - defaults applied, unknown
+   * keys stripped. On `INVALID_ARGUMENTS` events it is the raw offered input
+   * exactly as the client sent it (attacker-controlled, may be any shape or
+   * `undefined`). UNREDACTED either way - like `context` (which already
+   * carries the raw request incl. `Authorization` headers), consumers must
+   * redact/truncate before persisting.
+   */
+  args?: unknown
   /** Serialized (JSON) size of the raw result - MCP-layer events only. */
   resultBytes?: number
   /** Whether `smartToolResult` offloaded the payload to an embedded resource - MCP-layer events only. */

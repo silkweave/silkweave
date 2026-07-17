@@ -4,6 +4,7 @@ import { Action, OnToolCall, SilkweaveContext, SilkweaveOptions, validateActionD
 import { type RequestHandler } from 'express'
 import { authFromRequest } from './auth.js'
 import { filterErrorResponse, rpcInfo, type FilterActions } from './filter.js'
+import { emitInvalidArguments } from './prevalidate.js'
 import { registerTools } from './registerTools.js'
 
 function createMcpServer(options: SilkweaveOptions, actions: Action[], context: SilkweaveContext, onToolCall?: OnToolCall): McpServer {
@@ -79,6 +80,10 @@ export function mcpTransport(
       // per-request context; registerTools' tool-call fork inherits it.
       const auth = authFromRequest(req)
       const reqContext = auth ? context.fork({ auth }) : context
+      // Emit-only: the SDK rejects an invalid-arguments tools/call before the
+      // handler (and its telemetry emit) ever runs, so surface it here. The
+      // request still proceeds to the SDK for its native rejection.
+      await emitInvalidArguments(req.body, active, reqContext, options.onToolCall)
       const server = createMcpServer(silkweaveOptions, active, reqContext, options.onToolCall)
       res.on('close', () => { void transport.close(); void server.close() })
       await server.connect(transport)

@@ -160,6 +160,25 @@ describe('registerTools onToolCall telemetry', () => {
     expect(events[0].context.getOptional('logger')).toBeDefined()
   })
 
+  it('carries the parsed (post-zod) input as args - defaults applied', async () => {
+    const { events, onToolCall } = collect()
+    const withDefault = action({
+      input: z.object({ name: z.string(), limit: z.number().default(10) }),
+      run: async () => ({ ok: true })
+    })
+    const client = await connect([withDefault], { onToolCall })
+    await client.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
+    expect(events[0].args).toEqual({ name: 'Ada', limit: 10 })
+  })
+
+  it('carries args on thrown-error events too', async () => {
+    const { events, onToolCall } = collect()
+    const failing = action({ run: async () => { throw new SilkweaveError('nope', 'forbidden', 403) } })
+    const client = await connect([failing], { onToolCall })
+    await client.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
+    expect(events[0]).toMatchObject({ ok: false, args: { name: 'Ada' } })
+  })
+
   it('reports sideloaded: true when smartToolResult offloads a large payload', async () => {
     const { events, onToolCall } = collect()
     const big = { blob: 'x'.repeat(5000) }

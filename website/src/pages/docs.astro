@@ -1236,12 +1236,13 @@ if (auth) {
       <pre><code set:html={hl(`http({
   host: 'localhost', port: 8080,
   onToolCall: (event) => {
-    // { action, tool, transport, durationMs, ok, errorCode?, errorMessage?, resultBytes?, sideloaded?, context }
+    // { action, tool, transport, durationMs, ok, errorCode?, errorMessage?, args?, resultBytes?, sideloaded?, context }
     console.log(JSON.stringify({ event: 'tool_call', tool: event.tool, ms: event.durationMs, ok: event.ok }))
   }
 })`)} /></pre>
     </div>
-    <p>Events fire after result formatting, so they carry <code>resultBytes</code> (serialized result size) and <code>sideloaded</code> (whether <code>smartToolResult</code> offloaded to an embedded resource); <code>event.context</code> gives access to the resolved <code>auth</code> for per-key/per-user attribution. In <a href="#integration-nestjs">NestJS</a>, pass a class token instead - <code>SilkweaveModule.forRoot(&#123; telemetry: MyTelemetryService &#125;)</code> resolves a <code>SilkweaveTelemetry</code> provider through DI and covers MCP <em>and</em> tRPC calls (guard denials included), exactly one event per call.</p>
+    <p>Events fire after result formatting, so they carry <code>resultBytes</code> (serialized result size) and <code>sideloaded</code> (whether <code>smartToolResult</code> offloaded to an embedded resource); <code>event.context</code> gives access to the resolved <code>auth</code> for per-key/per-user attribution. <code>event.args</code> carries the call's input: the parsed (post-zod) input the action ran with. It is <strong>unredacted</strong> - like <code>event.context</code>, redact and truncate before persisting. In <a href="#integration-nestjs">NestJS</a>, pass a class token instead - <code>SilkweaveModule.forRoot(&#123; telemetry: MyTelemetryService &#125;)</code> resolves a <code>SilkweaveTelemetry</code> provider through DI and covers MCP <em>and</em> tRPC calls (guard denials included), exactly one event per call.</p>
+    <p><strong>Invalid arguments emit too.</strong> A <code>tools/call</code> that fails input-schema validation is rejected by the MCP SDK <em>before</em> the handler runs, so the HTTP transports (<code>http()</code>, <code>mcpTransport()</code>, <code>edge()</code>) pre-validate emit-only - the SDK still produces its native rejection on the wire - and report <code>ok: false</code> with the stable <code>errorCode: 'INVALID_ARGUMENTS'</code>, <code>durationMs: 0</code>, and <code>args</code> set to the raw offered input exactly as the client sent it. The NestJS tRPC adapter does the same from tRPC's <code>onError</code> seam. A misbehaving agent hammering wrong schemas becomes visible in your metrics; these events are cheap to trigger at high rate, so batch or sample in the hook rather than writing per event. (<code>stdio()</code> does not emit validation-failure events.)</p>
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════ -->
