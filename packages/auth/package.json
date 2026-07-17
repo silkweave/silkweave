@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/auth",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "description": "Silkweave Auth - Bearer token and OAuth 2.1 support for MCP servers",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",

@@ -39,6 +39,23 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '4.2.0',
+    date: '2026-07-17',
+    summary: 'Telemetry: every ToolCallEvent now carries the call\'s input (args), and argument-validation failures - previously invisible - emit events too.',
+    changes: [
+      {
+        type: 'feature',
+        text: 'ToolCallEvent.args: the per-call input on every transport - the parsed (post-zod) input the action ran with, per-procedure even inside a tRPC httpBatch request. Unredacted by contract: redact/truncate in your hook before persisting.',
+        commit: '3e4a88a'
+      },
+      {
+        type: 'feature',
+        text: 'Argument-validation failures now emit telemetry (ok: false, stable errorCode INVALID_ARGUMENTS, args = the raw offered input). The MCP SDK rejects an invalid tools/call before the handler runs, so http()/mcpTransport()/edge() pre-validate emit-only (the wire response is unchanged - the SDK still produces its native rejection); the NestJS trpc() adapter emits the same events from tRPC\'s onError seam. A misbehaving agent hammering wrong schemas is now visible in metrics.',
+        commit: '3e4a88a'
+      }
+    ]
+  },
+  {
     version: '4.1.0',
     date: '2026-07-16',
     summary: '@silkweave/typegen drops its typescript peer dependency - it now emits .d.ts text directly, so nothing links the TypeScript compiler at server boot (works on the native tsgo/TS7 toolchain).',
