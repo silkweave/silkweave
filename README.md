@@ -48,6 +48,7 @@ Silkweave is a TypeScript toolkit that lets you define application logic as port
   - [NestJS](#nestjs)
   - [Next.js](#nextjs)
   - [Vercel AI SDK](#vercel-ai-sdk)
+- [Agent Skills over MCP](#agent-skills-over-mcp)
 - [Authentication](#authentication)
   - [Resource-Server Core](#resource-server-core)
   - [Opt-in OAuth 2.1](#opt-in-oauth-21)
@@ -98,7 +99,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - wrap `streamText` as a streaming action and feed `useChat` over a tRPC subscription |
 | `@silkweave/typegen` | [![npm](https://img.shields.io/npm/v/@silkweave/typegen)](https://www.npmjs.com/package/@silkweave/typegen) | Type generator - emit `.d.ts` interfaces from action Zod schemas |
 | `@silkweave/skills` | [![npm](https://img.shields.io/npm/v/@silkweave/skills)](https://www.npmjs.com/package/@silkweave/skills) | Serve [Agent Skills](https://agentskills.io/specification) (`SKILL.md`) over MCP - versioned, digest-verified, SEP-2640-aligned |
-| `silkweave` | [![npm](https://img.shields.io/npm/v/silkweave)](https://www.npmjs.com/package/silkweave) | The Silkweave CLI - `npx silkweave skills sync` (install/update skills from a server) and `npx silkweave proxy <url>` (any MCP server as a CLI) |
+| `silkweave` | [![npm](https://img.shields.io/npm/v/silkweave)](https://www.npmjs.com/package/silkweave) | The Silkweave CLI - `npx silkweave skills sync` (install/update skills from a server), `skills pack` (publish a skill as a Claude Code plugin), and `npx silkweave proxy <url>` (any MCP server as a CLI). **5.0 breaking:** previously an umbrella of re-exports (`silkweave/core`, ...) - depend on the scoped `@silkweave/*` packages instead |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
 
@@ -327,7 +328,7 @@ MCP logging notifications are wired automatically - `logger.info("message")` in 
 
 ### MCP Streamable HTTP
 
-A session-based MCP transport over HTTP with Server-Sent Events (SSE) for streaming. Supports multiple concurrent sessions, resumability via `Last-Event-ID`, and session termination.
+A **stateless** MCP transport over HTTP (per the 2026 spec direction): each `POST /mcp` mints a fresh transport and server, handles exactly that request - streaming progress over SSE when the call carries a progress token - and tears down when the response closes. No session IDs, no session map; any request can hit any instance, so the same adapter works behind load balancers and in multi-replica deployments.
 
 ```typescript
 import { silkweave } from '@silkweave/core'
@@ -347,21 +348,24 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `POST` | `/mcp` | Initialize session or invoke tools |
-| `GET` | `/mcp` | Establish SSE stream for a session |
-| `DELETE` | `/mcp` | Terminate a session |
+| `POST` | `/mcp` | Handle a single MCP request (per-request SSE response) |
+| `GET` | `/resource/:id` | Sideloaded embedded resources (`disposition: 'smart'`) |
+| various | OAuth + `/.well-known/*` | When `auth` is configured |
+| `GET` | `/.claude-plugin/marketplace.json` | When `skillsMarketplace` is configured |
 
-The adapter manages session lifecycle automatically - each new `initialize` request creates a new `StreamableHTTPServerTransport` with a UUID session ID. Sessions are cleaned up when the transport closes.
+CORS is configured out of the box.
 
-CORS is configured out of the box, exposing MCP-specific headers (`Mcp-Session-Id`, `Mcp-Protocol-Version`, `Last-Event-Id`).
-
-**`HttpAdapterOptions`:**
+**`StartMcpHttpOptions`** (selected):
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `host` | `string` | Bind address |
-| `port` | `number` | Listen port |
-| `allowedHosts` | `string[]` | Hosts allowed to connect (passed to Express MCP app) |
+| `host` / `port` | `string` / `number` | Bind address and listen port |
+| `allowedHosts` | `string[]` | DNS-rebinding protection allow-list |
+| `auth` | `AuthConfig` | Bearer-token validation and/or OAuth 2.1 routes |
+| `filterActions` | `FilterActions` | Per-request tool filtering (see [MCP Tool Quality](#mcp-tool-quality)) |
+| `onToolCall` | `OnToolCall` | Fire-and-forget per-call telemetry |
+| `skills` | `(Skill \| SkillDefinition)[]` | Serve [Agent Skills](#agent-skills-over-mcp) |
+| `skillsMarketplace` | `SkillsMarketplaceOptions` | Claude Code plugin marketplace for npm-published skills |
 
 ### tRPC
 
@@ -588,6 +592,41 @@ export const { GET, POST, OPTIONS } = app.trpc({ endpoint: '/api/trpc' })
 ### Vercel AI SDK
 
 [`@silkweave/ai`](https://www.npmjs.com/package/@silkweave/ai) bridges the [Vercel AI SDK](https://ai-sdk.dev)'s `useChat` hook to a Silkweave **streaming action** over a tRPC subscription - no `/api/chat` route, no Data Stream Protocol parsing. `createChatAction()` wraps `streamText()` into a streaming action; `silkweaveTransport()` is a custom `ChatTransport` that turns a subscribe-style function into the `ReadableStream<UIMessageChunk>` `useChat` consumes directly.
+
+---
+
+## Agent Skills over MCP
+
+Silkweave servers can serve [Agent Skills](https://agentskills.io/specification) - the `SKILL.md` directories Claude Code and other agents use - **versioned, digest-verified, and installable with one command**. This is what the `silkweave` npm package is: the CLI that installs and updates skills from any Silkweave (or SEP-2640-conforming) MCP server.
+
+```typescript
+import { defineSkill, silkweave } from '@silkweave/core'
+import { http } from '@silkweave/mcp/server'
+
+await silkweave({ name: 'team-skills', description: 'Team skills server', version: '1.0.0' })
+  .adapter(http({
+    host: 'localhost',
+    port: 8080,
+    skills: [
+      defineSkill({ dir: './skills/commit-message', npmPackage: 'commit-message-skill' }),
+      defineSkill({ dir: './skills/release-checklist', tags: ['internal'] })
+    ],
+    skillsMarketplace: { owner: { name: 'Your Team' } }  // optional: Claude Code plugin marketplace
+  }))
+  .start()
+```
+
+```bash
+# every machine on the team converges on one server
+npx silkweave skills sync --url https://skills.example.com/mcp --token $TOKEN
+```
+
+- **Serving** - the `skills` option (on `stdio()`, `http()`, `mcpTransport()`, `edge()`) serves each skill three ways at once: `skill://` file resources (the SEP-2640 baseline), `ListSkills`/`GetSkill` tools (work with every MCP client today), and a server-instructions pointer that activates the skills in hosts. An experimental `skillsExtension: true` additionally serves the draft SEP-2640 `skills/list`/`skills/get` methods.
+- **Installing** - `silkweave skills sync|install|list|outdated|pin|unpin` maintain a lockfile with per-file sha256 digests; every install is re-verified client-side, so a server can never write outside the target directory.
+- **Private and mixed sharing** - put the server behind bearer/OAuth auth; a per-request `filterActions` that hides the skill tools also hides the resources and instructions.
+- **Public skills** - `silkweave skills pack` wraps a skill into a skills-only Claude Code plugin package for `npm publish`; the `skillsMarketplace` option serves `/.claude-plugin/marketplace.json` so users get native `/plugin install` + `/plugin update`.
+
+See [`@silkweave/skills`](./packages/skills) (serving) and the [`silkweave` CLI](./packages/silkweave) (installing, packing, universal MCP proxy).
 
 ---
 
@@ -1034,6 +1073,7 @@ pnpm -F @silkweave/example-cli dev         # CLI mode
 pnpm -F @silkweave/example-cloudflare dev  # Stateless edge MCP on Cloudflare Workers (Web Standard)
 pnpm -F @silkweave/example-nestjs dev      # NestJS controllers as MCP tools on :8080
 pnpm -F @silkweave/example-nextjs dev      # Next.js App Router: MCP (/api/mcp) + tRPC (/api/trpc) on :8080
+pnpm -F @silkweave/example-skills dev      # MCP server serving two Agent Skills on :8080
 ```
 
 Requires Node.js >= 18.

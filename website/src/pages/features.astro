@@ -8,7 +8,7 @@ const title = 'Features: Built for Production'
 const eyebrow = 'Features'
 const heading = 'Everything you need. <span class="grad">Nothing you don\'t.</span>'
 const description =
-  'Zod-powered schemas, built-in OAuth 2.1, auto-generated Swagger, typed context, streaming actions, Vercel AI SDK support, and build-time type generation.'
+  'Zod-powered schemas, built-in OAuth 2.1, auto-generated Swagger, typed context, streaming actions, Agent Skills over MCP, Vercel AI SDK support, and build-time type generation.'
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -81,6 +81,31 @@ const jsonLd = {
       <div class="dd-card-title">Binary resources</div>
       <p>Return a screenshot, PDF, or JSON artifact from one action: an MCP image block the model can see, raw bytes over REST, a typed envelope over tRPC, a file from the CLI.</p>
       <a class="dd-card-link" href="/docs#resources">Resource results &rarr;</a>
+    </li>
+  </ul>
+
+  <h2 id="skills">Skills, served from your server</h2>
+  <p>
+    Silkweave MCP servers can serve <strong>Agent Skills</strong> - the <code>SKILL.md</code> directories
+    Claude Code and other agents use - versioned, digest-verified, and installable with one command.
+    Your team points every machine at one server; public skills can additionally ship as native
+    Claude Code plugins via npm.
+  </p>
+  <ul class="dd-cards">
+    <li class="dd-card">
+      <div class="dd-card-title">Serve skills over MCP</div>
+      <p>One <code>skills</code> option serves each skill as <code>skill://</code> resources, install tools, and server instructions - aligned with the MCP working group's SEP-2640 direction.</p>
+      <a class="dd-card-link" href="/docs#skills">Skills over MCP &rarr;</a>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Sync with a lockfile</div>
+      <p><code>npx silkweave skills sync</code> installs and updates skills with per-file sha256 verification, version pinning, and pruning - private servers just add auth.</p>
+      <a class="dd-card-link" href="/docs#skills">The silkweave CLI &rarr;</a>
+    </li>
+    <li class="dd-card">
+      <div class="dd-card-title">Claude Code plugin bridge</div>
+      <p><code>skills pack</code> publishes a skill as a skills-only plugin on npm, and your server emits the marketplace - users get native <code>/plugin install</code> and <code>/plugin update</code>.</p>
+      <a class="dd-card-link" href="/docs#skills">Public skills &rarr;</a>
     </li>
   </ul>
 
