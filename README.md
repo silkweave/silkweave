@@ -97,6 +97,8 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/nextjs` | [![npm](https://img.shields.io/npm/v/@silkweave/nextjs)](https://www.npmjs.com/package/@silkweave/nextjs) | Next.js App Router adapter - `defineSilkweave({ actions })` projects one action set onto MCP + tRPC route handlers |
 | `@silkweave/ai` | [![npm](https://img.shields.io/npm/v/@silkweave/ai)](https://www.npmjs.com/package/@silkweave/ai) | Vercel AI SDK bridge - wrap `streamText` as a streaming action and feed `useChat` over a tRPC subscription |
 | `@silkweave/typegen` | [![npm](https://img.shields.io/npm/v/@silkweave/typegen)](https://www.npmjs.com/package/@silkweave/typegen) | Type generator - emit `.d.ts` interfaces from action Zod schemas |
+| `@silkweave/skills` | [![npm](https://img.shields.io/npm/v/@silkweave/skills)](https://www.npmjs.com/package/@silkweave/skills) | Serve [Agent Skills](https://agentskills.io/specification) (`SKILL.md`) over MCP - versioned, digest-verified, SEP-2640-aligned |
+| `silkweave` | [![npm](https://img.shields.io/npm/v/silkweave)](https://www.npmjs.com/package/silkweave) | The Silkweave CLI - `npx silkweave skills sync` (install/update skills from a server) and `npx silkweave proxy <url>` (any MCP server as a CLI) |
 
 **`@silkweave/core`** is always required. Then add the adapter packages for the transports you need:
 
@@ -121,6 +123,9 @@ pnpm add @silkweave/core @silkweave/nestjs
 
 # Next.js App Router (MCP + tRPC)
 pnpm add @silkweave/core @silkweave/nextjs
+
+# Serve Agent Skills from an MCP server (then: npx silkweave skills sync)
+pnpm add @silkweave/core @silkweave/mcp @silkweave/skills
 ```
 
 ### Express-Optional MCP

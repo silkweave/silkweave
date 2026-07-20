@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --conditions=@silkweave/source src/cli.ts",
-    "umbrella": "tsx --conditions=@silkweave/source src/umbrella.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "check": "pnpm lint && pnpm typecheck"
@@ -14,7 +13,6 @@
   "dependencies": {
     "@silkweave/cli": "workspace:*",
     "@silkweave/core": "workspace:*",
-    "silkweave": "workspace:*",
     "zod": "^3.25.0"
   },
   "devDependencies": {

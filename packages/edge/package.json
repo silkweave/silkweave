@@ -42,8 +42,17 @@
     "@silkweave/mcp": "workspace:*",
     "zod": "^3.25.0"
   },
+  "peerDependencies": {
+    "@silkweave/skills": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@silkweave/skills": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@silkweave/skills": "workspace:*",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^22.0.0",
     "eslint": "^10.4.0",

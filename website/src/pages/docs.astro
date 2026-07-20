@@ -219,6 +219,35 @@ export function Chat() {
   // ... your UI (ai-elements works as-is)
 }`
 
+const skillsServerRaw = `import { defineSkill, silkweave } from '@silkweave/core'
+import { http } from '@silkweave/mcp/server'
+
+await silkweave({ name: 'team-skills', description: 'Team skills server', version: '1.0.0' })
+  .adapter(http({
+    host: 'localhost',
+    port: 8080,
+    skills: [
+      defineSkill({ dir: './skills/commit-message' }),
+      defineSkill({ dir: './skills/release-checklist', tags: ['internal'] })
+    ]
+  }))
+  .start()`
+
+const skillsCliRaw = `# Install/update everything the server offers into ~/.claude/skills
+npx silkweave skills sync --url https://skills.example.com/mcp --token $TOKEN
+
+# See what's available / what changed (outdated exits 1 when updates exist)
+npx silkweave skills list --url https://skills.example.com/mcp
+npx silkweave skills outdated --url https://skills.example.com/mcp
+
+# Cherry-pick, hold, prune
+npx silkweave skills install commit-message --url ...
+npx silkweave skills pin commit-message
+npx silkweave skills sync --prune --url ...
+
+# Bonus: any MCP server as a CLI, built from tools/list at invocation
+npx silkweave proxy http://localhost:8080/mcp hello Tobias`
+
 const resourceActionRaw = `import { binary, createAction, resource } from '@silkweave/core'
 import z from 'zod/v4'
 
@@ -554,6 +583,34 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
       </tbody>
     </table>
     <p>Resources are <strong>embedded-only</strong> (no hosted resource links), and are incompatible with <code>disposition: 'structured'</code> and with streaming actions - both rejected at registration. A <code>toolResult</code> hook still wins over the built-in mapping when you need full control.</p>
+  </section>
+
+  <section id="skills">
+    <h3>Skills over MCP</h3>
+    <p>Silkweave MCP servers can serve <a href="https://agentskills.io/specification" target="_blank" rel="noopener">Agent Skills</a> - the <code>SKILL.md</code> directories Claude Code and other agents use - versioned, digest-verified, and installable with one command. Point the <code>skills</code> option (available on <code>stdio()</code>, <code>http()</code>, <code>mcpTransport()</code>, and <code>edge()</code>) at your skill directories:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={skillsServerRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(skillsServerRaw)} /></pre>
+    </div>
+    <p>Each skill is served three ways at once, so every client works today while tracking the MCP Skills working group's direction (SEP-2640):</p>
+    <ul>
+      <li><strong><code>skill://</code> resources</strong> - every skill file is an MCP resource (<code>skill://&lt;name&gt;/&lt;path&gt;</code>), readable via plain <code>resources/list</code>/<code>resources/read</code> - the SEP-2640 baseline.</li>
+      <li><strong><code>ListSkills</code> / <code>GetSkill</code> tools</strong> - ordinary actions returning the digest-carrying manifest and per-file content, so any current MCP client (and agents themselves) can discover and install skills. Filters, auth, and telemetry apply like for any other tool.</li>
+      <li><strong>Server instructions</strong> - the <code>initialize</code> response announces the skills, so hosts that surface instructions activate them with no protocol support needed.</li>
+    </ul>
+    <p>Team members (and CI, and a fleet of machines) install and stay current with the <code>silkweave</code> CLI:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>terminal</span>
+        <button class="copy-btn" data-copy-raw={skillsCliRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(skillsCliRaw)} /></pre>
+    </div>
+    <p>Installs land in <code>~/.claude/skills</code> (or <code>--target</code>) with a <code>.silkweave-lock.json</code> recording server, versions, and per-file sha256 digests. Every file is re-verified against its digest client-side and names/paths are revalidated, so a server can never write outside the target. <code>pin</code> holds a skill across syncs; <code>sync --prune</code> removes skills the server dropped. Versioning comes from the conventional <code>metadata.version</code> frontmatter entry (or <code>defineSkill({'{ version }'})</code>).</p>
+    <p><strong>Private and mixed sharing:</strong> combine with bearer/OAuth auth for private skill servers, or serve public and private skills from one endpoint - when a per-request <code>filterActions</code> drops the skill tools, the <code>skill://</code> resources and instructions are hidden for that request too, so filtered clients can't read the files through the back door. On filesystem-less runtimes (Cloudflare Workers), use <code>defineSkill({'{ files }'})</code> with inline content. Digests bind approval to content but are not signatures - install skills only from servers you trust.</p>
   </section>
 
   <section id="action-linter">

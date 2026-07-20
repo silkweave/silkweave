@@ -186,7 +186,7 @@ async function writeBinaryPayloads(binaries: BinaryPayload[], outputPath: string
 }
 
 /** Bridge the server's log + progress notifications onto the console. */
-function attachNotificationLogging(client: Client) {
+export function attachNotificationLogging(client: Client) {
   const logger = createConsoleLogger()
   client.setNotificationHandler(LoggingMessageNotificationSchema, ({ params: { level, data } }) => {
     logger[level](data)
@@ -197,7 +197,7 @@ function attachNotificationLogging(client: Client) {
 }
 
 /** Register one remote tool as a commander subcommand. */
-function registerToolCommand(program: Command, client: Client, tool: Tool, formatter: CLIFormatterFn, cliName: string) {
+export function registerToolCommand(program: Command, client: Client, tool: Tool, formatter: CLIFormatterFn, cliName: string) {
   const command = program.command(kebabCase(tool.name))
   if (tool.description) { command.description(tool.description) }
   const schema = tool.inputSchema as JsonSchemaObject
@@ -253,7 +253,7 @@ function registerToolCommand(program: Command, client: Client, tool: Tool, forma
 }
 
 /** Merge resolved silkweave `headers` over the caller's `requestInit.headers`. */
-function mergeRequestInit(requestInit?: RequestInit, headers?: Record<string, string>): RequestInit | undefined {
+export function mergeRequestInit(requestInit?: RequestInit, headers?: Record<string, string>): RequestInit | undefined {
   if (!headers) { return requestInit }
   const merged = new Headers(requestInit?.headers)
   for (const [key, value] of Object.entries(headers)) { merged.set(key, value) }
@@ -261,14 +261,14 @@ function mergeRequestInit(requestInit?: RequestInit, headers?: Record<string, st
 }
 
 /** A short, legible message for a failed connect - auth failures called out explicitly. */
-function connectErrorMessage(error: unknown, url: URL): string {
+export function connectErrorMessage(error: unknown, url: URL): string {
   if (error instanceof UnauthorizedError || (error instanceof StreamableHTTPError && (error.code === 401 || error.code === 403))) {
     return `authentication failed for ${url.origin} - check your token`
   }
   return `cannot reach MCP server at ${url}: ${error instanceof Error ? error.message : String(error)}`
 }
 
-const defaultFormatter: CLIFormatterFn = (message) => {
+export const defaultFormatter: CLIFormatterFn = (message) => {
   if (message.type === 'text' && !message.text.includes('mcp://toolResult/')) {
     return `${message.text}`
   } else if (message.type === 'resource') {

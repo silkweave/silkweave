@@ -1,6 +1,6 @@
 import { createMcpExpressApp, type CreateMcpExpressAppOptions } from '@modelcontextprotocol/sdk/server/express.js'
 import { AuthConfig } from '@silkweave/auth'
-import { Action, AdapterFactory, createContext, OnToolCall, SilkweaveContext, SilkweaveOptions } from '@silkweave/core'
+import { Action, AdapterFactory, createContext, OnToolCall, SilkweaveContext, SilkweaveOptions, Skill, SkillDefinition } from '@silkweave/core'
 import { CorsOptions } from 'cors'
 import express, { type Express } from 'express'
 import { Server } from 'http'
@@ -33,6 +33,12 @@ export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
   filterActions?: FilterActions
   /** Telemetry hook invoked once per tool call (fire-and-forget). */
   onToolCall?: OnToolCall
+  /**
+   * Agent skills to serve: `skill://` file resources + `ListSkills`/`GetSkill`
+   * tools + a server-instructions pointer. Requires `@silkweave/skills`
+   * (optional peer); resolved once at start.
+   */
+  skills?: (Skill | SkillDefinition)[]
 }
 
 /**
@@ -48,7 +54,7 @@ export function buildMcpExpressApp(
   actions: Action[],
   options: StartMcpHttpOptions
 ): Express {
-  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, ...mcpAppOptions } = options
+  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, ...mcpAppOptions } = options
   const app = createMcpExpressApp({ ...mcpAppOptions, host })
 
   const corsHandler = mcpCors(corsConfig ?? true)
@@ -81,8 +87,11 @@ export function buildMcpExpressApp(
     app.get('/resource/:id', sideloadResource({ resourceDir }))
   }
 
-  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall })
+  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall, skills })
   app.post('/mcp', express.json(), transport.post)
+  // Surface a skill boot failure (bad SKILL.md, missing @silkweave/skills) at
+  // start rather than as per-request 500s.
+  app.locals.mcpReady = transport.ready
 
   return app
 }
@@ -122,6 +131,7 @@ export const http: AdapterFactory<StartMcpHttpOptions> = (options) => {
       context,
       start: async (actions) => {
         const app = buildMcpExpressApp(silkweaveOptions, context, actions, options)
+        await (app.locals.mcpReady as Promise<void>)
         httpServer = await new Promise<Server>((resolve, reject) => {
           const s = app.listen(options.port, options.host, (error) => {
             if (error) { reject(error); return }

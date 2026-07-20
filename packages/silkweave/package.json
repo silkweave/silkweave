@@ -1,7 +1,7 @@
 {
   "name": "silkweave",
   "version": "4.4.0",
-  "description": "Silkweave Umbrella Package",
+  "description": "Silkweave CLI - install and sync agent skills from silkweave MCP servers, proxy any silkweave server as a CLI",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
   "bugs": {
@@ -13,55 +13,12 @@
     "directory": "packages/silkweave"
   },
   "type": "module",
+  "bin": {
+    "silkweave": "./build/cli.mjs"
+  },
   "files": [
     "build"
   ],
-  "exports": {
-    "./auth": {
-      "types": "./build/auth.d.mts",
-      "default": "./build/auth.mjs"
-    },
-    "./auth/oauth": {
-      "types": "./build/auth-oauth.d.mts",
-      "default": "./build/auth-oauth.mjs"
-    },
-    "./cli": {
-      "types": "./build/cli.d.mts",
-      "default": "./build/cli.mjs"
-    },
-    "./core": {
-      "types": "./build/core.d.mts",
-      "default": "./build/core.mjs"
-    },
-    "./fastify": {
-      "types": "./build/fastify.d.mts",
-      "default": "./build/fastify.mjs"
-    },
-    "./logger": {
-      "types": "./build/logger.d.mts",
-      "default": "./build/logger.mjs"
-    },
-    "./mcp": {
-      "types": "./build/mcp.d.mts",
-      "default": "./build/mcp.mjs"
-    },
-    "./mcp/server": {
-      "types": "./build/mcp-server.d.mts",
-      "default": "./build/mcp-server.mjs"
-    },
-    "./mcp/cli-proxy": {
-      "types": "./build/mcp-cli-proxy.d.mts",
-      "default": "./build/mcp-cli-proxy.mjs"
-    },
-    "./typegen": {
-      "types": "./build/typegen.d.mts",
-      "default": "./build/typegen.mjs"
-    },
-    "./edge": {
-      "types": "./build/edge.d.mts",
-      "default": "./build/edge.mjs"
-    }
-  },
   "scripts": {
     "clean": "rimraf build",
     "build": "tsdown",
@@ -69,16 +26,17 @@
     "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "check": "pnpm lint && pnpm typecheck"
+    "check": "pnpm lint && pnpm typecheck",
+    "test": "vitest run",
+    "dev": "tsx --conditions=@silkweave/source src/cli.ts"
   },
   "dependencies": {
-    "@silkweave/auth": "workspace:*",
-    "@silkweave/cli": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@silkweave/core": "workspace:*",
-    "@silkweave/fastify": "workspace:*",
     "@silkweave/mcp": "workspace:*",
-    "@silkweave/edge": "workspace:*",
-    "@silkweave/typegen": "workspace:*"
+    "@silkweave/skills": "workspace:*",
+    "commander": "^13.1.0",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -89,6 +47,7 @@
     "tsdown": "^0.21.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.1.9"
   }
 }

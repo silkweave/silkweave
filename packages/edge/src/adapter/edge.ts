@@ -1,8 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, AdapterGenerator, OnToolCall, SilkweaveContext, SilkweaveOptions, validateActionDisposition } from '@silkweave/core'
-import { emitInvalidArguments, filterErrorResponse, registerTools, rpcInfo, type FilterActions } from '@silkweave/mcp/tools'
+import { Action, AdapterGenerator, OnToolCall, SilkweaveContext, SilkweaveOptions, Skill, SkillDefinition, validateActionDisposition } from '@silkweave/core'
+import { emitInvalidArguments, filterErrorResponse, prepareSkills, registerTools, rpcInfo, type FilterActions, type SkillServing } from '@silkweave/mcp/tools'
 
 export interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
@@ -31,6 +31,13 @@ export interface EdgeAdapterOptions {
   filterActions?: FilterActions
   /** Telemetry hook invoked once per tool call (fire-and-forget). */
   onToolCall?: OnToolCall
+  /**
+   * Agent skills to serve: `skill://` file resources + `ListSkills`/`GetSkill`
+   * tools + a server-instructions pointer. Requires `@silkweave/skills`
+   * (optional peer). On a filesystem-less runtime (Workers) use
+   * `defineSkill({ files })` with inline content.
+   */
+  skills?: (Skill | SkillDefinition)[]
 }
 
 export interface EdgeAdapter {
@@ -141,6 +148,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   const CORS_HEADERS = buildCorsHeaders(options.corsOrigin ?? '*')
 
   let _actions: Action[] = []
+  let _serving: SkillServing | undefined
   let _options: SilkweaveOptions | null = null
   let _context: SilkweaveContext | null = null
   let _readyResolve: () => void
@@ -247,10 +255,11 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       }
     }
 
-    let activeActions = _actions
+    const combined = _serving ? [..._actions, ..._serving.actions] : _actions
+    let activeActions = combined
     if (options.filterActions) {
       try {
-        activeActions = await options.filterActions(_actions, {
+        activeActions = await options.filterActions(combined, {
           headers: Object.fromEntries(request.headers.entries()),
           url: request.url,
           ...rpcInfo(rawBody)
@@ -275,15 +284,20 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       ...dnsRebindingOptions(options)
     })
 
+    // Gate the skill surface (resources + instructions) on the skill actions
+    // having survived the per-request filter - see SkillServing.visible.
+    const skillsVisible = _serving?.visible(activeActions) ?? false
     const server = new McpServer({
       name: _options!.name,
       description: _options!.description,
       version: _options!.version
     }, {
-      capabilities: { tools: {}, logging: {} }
+      capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
+      ...(skillsVisible && _serving ? { instructions: _serving.instructions } : {})
     })
 
     registerTools(server, activeActions, requestContext, { onToolCall: options.onToolCall })
+    if (skillsVisible) { _serving?.register(server) }
 
     await server.connect(transport)
     return transport.handleRequest(request)
@@ -309,6 +323,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
         try {
           actions.forEach(validateActionDisposition)
           _actions = actions
+          _serving = await prepareSkills(options.skills)
           _readyResolve()
         } catch (error) {
           // Reject `_ready` so awaiting handlers get a 500 instead of hanging

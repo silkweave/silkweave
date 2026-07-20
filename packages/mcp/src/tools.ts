@@ -6,4 +6,5 @@
 export * from './handlers/filter.js'
 export * from './handlers/prevalidate.js'
 export * from './handlers/registerTools.js'
+export * from './handlers/skills.js'
 export * from './util/result.js'

@@ -61,6 +61,7 @@ Exposes a single stateless `POST /mcp` (each call mints a fresh transport with `
 | `cors` | `CorsOptions \| boolean` | CORS config. `false` to disable, `true`/omit for permissive defaults (`origin: '*'`), or a [cors](https://www.npmjs.com/package/cors) options object. MCP-required headers are always exposed. |
 | `filterActions` | `FilterActions` | Per-request tool filter - see [Per-request tool filtering](#per-request-tool-filtering-filteractions) |
 | `onToolCall` | `OnToolCall` | Telemetry hook - see [Telemetry](#telemetry-ontoolcall) |
+| `skills` | `(Skill \| SkillDefinition)[]` | Agent Skills to serve: `skill://` file resources + `ListSkills`/`GetSkill` tools + a server-instructions pointer. Requires the optional peer [`@silkweave/skills`](../skills); install/update client-side with `npx silkweave skills sync` |
 
 #### Per-request tool filtering (`filterActions`)
 

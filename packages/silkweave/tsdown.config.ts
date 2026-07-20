@@ -3,17 +3,5 @@ import { defineConfig } from 'tsdown'
 export default defineConfig({
   outDir: 'build',
   dts: true,
-  entry: [
-    'src/auth.ts',
-    'src/auth-oauth.ts',
-    'src/cli.ts',
-    'src/core.ts',
-    'src/edge.ts',
-    'src/fastify.ts',
-    'src/logger.ts',
-    'src/mcp.ts',
-    'src/mcp-cli-proxy.ts',
-    'src/mcp-server.ts',
-    'src/typegen.ts'
-  ]
+  entry: ['./src/cli.ts']
 })

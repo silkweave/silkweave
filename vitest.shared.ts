@@ -36,7 +36,7 @@ export const sharedConfig = defineConfig({
         // router -> is-promise resolving to the ESM build under require).
         inline: [
           '@silkweave/core', '@silkweave/auth', '@silkweave/mcp', '@silkweave/cli',
-          '@silkweave/fastify', '@silkweave/trpc', '@silkweave/edge',
+          '@silkweave/fastify', '@silkweave/trpc', '@silkweave/edge', '@silkweave/skills',
           '@silkweave/nextjs', '@silkweave/nestjs', '@silkweave/typegen', '@silkweave/ai'
         ],
         external: [/node_modules/]
