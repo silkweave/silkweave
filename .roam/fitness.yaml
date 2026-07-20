@@ -38,6 +38,9 @@ rules:
   #   - @silkweave/nextjs <-> example-nextjs: symbolic same-name edges across
   #     the package/example boundary (e.g. AppRouter / SilkweaveApp). The
   #     package is a strict import DAG - nothing imports it back.
+  #   - nestjs metadata.ts <-> rebind.ts: `McpMetadata.args` name-collides
+  #     with `args` locals in rebind.ts (since 4.3) - a symbolic same-name
+  #     edge, not an import; metadata.ts imports nothing from rebind.ts.
   - name: "No new import cycles"
     type: metric
     metric: cycles
