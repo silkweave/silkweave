@@ -39,6 +39,28 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '4.3.0',
+    date: '2026-07-20',
+    summary: 'cliProxy grows up: authenticate against gated MCP servers without monkey-patching fetch, and let tools declare CLI positional arguments that cross the wire.',
+    changes: [
+      {
+        type: 'feature',
+        text: 'cliProxy auth passthrough: headers (a record or a lazy sync/async thunk resolved once per invocation), requestInit, fetch, and authProvider are forwarded to the SDK\'s StreamableHTTPClientTransport - no more globalThis.fetch monkey-patching to send a bearer token.',
+        commit: 'dbaf296'
+      },
+      {
+        type: 'feature',
+        text: 'Positional CLI arguments over the wire: Action.args is published in the MCP tool\'s _meta as silkweave/args (spec-legal, ignored by other clients) and cliProxy renders those fields as positionals in declared order - required as <arg>, optional as [arg]. @silkweave/nestjs gains the matching @Mcp({ args }) option, boot-validated against the reflected input shape.',
+        commit: 'dbaf296'
+      },
+      {
+        type: 'improvement',
+        text: 'cliProxy failures are legible: a 401/403 prints "authentication failed - check your token" instead of an SDK stack trace, and root --help/--version work without a reachable server.',
+        commit: 'dbaf296'
+      }
+    ]
+  },
+  {
     version: '4.2.0',
     date: '2026-07-17',
     summary: 'Telemetry: every ToolCallEvent now carries the call\'s input (args), and argument-validation failures - previously invisible - emit events too.',
