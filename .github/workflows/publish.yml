@@ -54,5 +54,7 @@ jobs:
       # pnpm publish -r walks every public workspace package, runs its prepack
       # (clean + build), and skips versions already on the registry, so re-running a
       # tag is safe. --no-git-checks is required on a detached tag checkout.
+      # Prerelease tags (v5.0.0-rc.1, v5.0.0-beta.2, ...) publish under the `next`
+      # dist-tag so an RC never becomes npm's `latest`; stable tags stay `latest`.
       - name: Publish
-        run: pnpm publish -r --access public --no-git-checks
+        run: pnpm publish -r --access public --no-git-checks ${{ contains(github.ref_name, '-') && '--tag next' || '' }}
