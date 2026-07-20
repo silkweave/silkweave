@@ -153,15 +153,16 @@ export function registerSkillsCommands(program: Command): void {
     })
 
   skills.command('pack')
-    .description('Pack a skill directory into a skills-only Claude Code plugin, ready for npm publish')
-    .argument('<dir>', 'skill directory containing SKILL.md')
-    .option('-p, --package <name>', 'npm package name (default: frontmatter metadata.npmPackage, else <skill-name>-skill)')
-    .option('-o, --out <dir>', 'output directory (default: dist/<skill-name>-plugin)')
+    .description('Pack skill directories into a skills-only Claude Code plugin, ready for npm publish')
+    .argument('<dirs...>', 'skill directories containing SKILL.md (multiple dirs pack into one multi-skill plugin)')
+    .option('-p, --package <name>', 'npm package name (single-skill default: frontmatter metadata.npmPackage, else <skill-name>-skill; required for multiple skills)')
+    .option('-d, --description <text>', 'plugin description (defaults to the skill description, or a derived listing)')
+    .option('-o, --out <dir>', 'output directory (default: dist/<skill-name>-plugin, or dist/<plugin-name> for multiple skills)')
     .option('--registry <url>', 'npm registry for the already-published check', DEFAULT_REGISTRY)
     .option('--force', 'pack even when this version is already published', false)
-    .action(async (dir: string, options: { package?: string; out?: string; registry: string; force: boolean }) => {
+    .action(async (dirs: string[], options: { package?: string; description?: string; out?: string; registry: string; force: boolean }) => {
       try {
-        const result = await packSkill({ dir, packageName: options.package, out: options.out, registry: options.registry, force: options.force })
+        const result = await packSkill({ dirs, packageName: options.package, description: options.description, out: options.out, registry: options.registry, force: options.force })
         for (const warning of result.warnings) { console.warn(`warning: ${warning}`) }
         console.log(`packed      ${result.packageName}@${result.version} -> ${result.outDir}`)
         console.log(`publish:    npm publish ${result.outDir} --access public`)

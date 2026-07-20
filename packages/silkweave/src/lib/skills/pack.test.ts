@@ -38,7 +38,7 @@ afterAll(() => rm(root, { recursive: true, force: true }))
 describe('packSkill', () => {
   it('lays out a publishable plugin package', async () => {
     const out = join(root, 'out')
-    const result = await packSkill({ dir: skillDir, out, fetch: registry([]) })
+    const result = await packSkill({ dirs: [skillDir], out, fetch: registry([]) })
     expect(result).toMatchObject({ packageName: 'deploy-checklist-skill', version: '1.0.0', warnings: [] })
 
     const packageJson = JSON.parse(await readFile(join(out, 'package.json'), 'utf-8')) as Record<string, unknown>
@@ -51,10 +51,10 @@ describe('packSkill', () => {
 
   it('re-packs over its own previous output', async () => {
     const out = join(root, 'repack')
-    await packSkill({ dir: skillDir, out, fetch: registry([]) })
+    await packSkill({ dirs: [skillDir], out, fetch: registry([]) })
     // A stale file from a previous layout must not survive the re-pack.
     await writeFile(join(out, 'skills', 'deploy-checklist', 'stale.md'), 'old\n')
-    await packSkill({ dir: skillDir, out, fetch: registry([]) })
+    await packSkill({ dirs: [skillDir], out, fetch: registry([]) })
     await expect(readFile(join(out, 'skills', 'deploy-checklist', 'stale.md'), 'utf-8')).rejects.toThrow()
   })
 
@@ -62,27 +62,59 @@ describe('packSkill', () => {
     const out = join(root, 'occupied')
     await mkdir(out, { recursive: true })
     await writeFile(join(out, 'precious.txt'), 'do not delete\n')
-    await expect(packSkill({ dir: skillDir, out, fetch: registry([]) })).rejects.toThrow(/refusing to overwrite/)
+    await expect(packSkill({ dirs: [skillDir], out, fetch: registry([]) })).rejects.toThrow(/refusing to overwrite/)
     expect(await readFile(join(out, 'precious.txt'), 'utf-8')).toBe('do not delete\n')
   })
 
   it('refuses an already-published version unless forced', async () => {
     const out = join(root, 'published')
-    await expect(packSkill({ dir: skillDir, out, fetch: registry(['1.0.0']) })).rejects.toThrow(/already published/)
-    const forced = await packSkill({ dir: skillDir, out, fetch: registry(['1.0.0']), force: true })
+    await expect(packSkill({ dirs: [skillDir], out, fetch: registry(['1.0.0']) })).rejects.toThrow(/already published/)
+    const forced = await packSkill({ dirs: [skillDir], out, fetch: registry(['1.0.0']), force: true })
     expect(forced.warnings[0]).toContain('already published')
   })
 
   it('warns but packs when the registry is unreachable', async () => {
     const out = join(root, 'offline')
-    const result = await packSkill({ dir: skillDir, out, fetch: registry(undefined) })
+    const result = await packSkill({ dirs: [skillDir], out, fetch: registry(undefined) })
     expect(result.warnings[0]).toContain('could not reach')
   })
 
   it('honors an explicit package name and rejects invalid ones', async () => {
     const out = join(root, 'named')
-    const result = await packSkill({ dir: skillDir, out, packageName: '@atomic/skill-deploy', fetch: registry([]) })
+    const result = await packSkill({ dirs: [skillDir], out, packageName: '@atomic/skill-deploy', fetch: registry([]) })
     expect(result.packageName).toBe('@atomic/skill-deploy')
-    await expect(packSkill({ dir: skillDir, out, packageName: 'Not Valid!', fetch: registry([]) })).rejects.toThrow(/not a valid npm package name/)
+    await expect(packSkill({ dirs: [skillDir], out, packageName: 'Not Valid!', fetch: registry([]) })).rejects.toThrow(/not a valid npm package name/)
+  })
+
+  it('packs multiple skills into one multi-skill plugin', async () => {
+    const secondDir = join(root, 'greet')
+    await mkdir(secondDir, { recursive: true })
+    await writeFile(join(secondDir, 'SKILL.md'), `---
+name: greet
+description: Greet politely
+metadata:
+  version: "1.0.0"
+---
+Body
+`)
+    const out = join(root, 'multi')
+    // No --package: multi-skill packs cannot derive a name.
+    await expect(packSkill({ dirs: [skillDir, secondDir], out, fetch: registry([]) })).rejects.toThrow(/--package/)
+
+    const result = await packSkill({
+      dirs: [skillDir, secondDir],
+      out,
+      packageName: '@atomic/example-plugin',
+      fetch: registry([])
+    })
+    expect(result).toMatchObject({ packageName: '@atomic/example-plugin', version: '1.0.0' })
+    const pluginJson = JSON.parse(await readFile(join(out, '.claude-plugin', 'plugin.json'), 'utf-8')) as Record<string, unknown>
+    expect(pluginJson).toEqual({
+      name: 'example-plugin',
+      version: '1.0.0',
+      description: 'Agent skills: deploy-checklist, greet'
+    })
+    expect(await readFile(join(out, 'skills', 'deploy-checklist', 'SKILL.md'), 'utf-8')).toContain('Deploy checklist')
+    expect(await readFile(join(out, 'skills', 'greet', 'SKILL.md'), 'utf-8')).toContain('Greet politely')
   })
 })

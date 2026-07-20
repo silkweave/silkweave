@@ -43,6 +43,7 @@ npm publish dist/commit-message-plugin --access public
 ```
 
 - **Package name**: `--package <name>`, else the frontmatter `metadata.npmPackage`, else `<skill-name>-skill`.
+- **Multi-skill plugins**: pass several directories (`skills pack ./skills/a ./skills/b --package @org/team-plugin`) to bundle them into ONE plugin. The plugin is named after the package basename (`team-plugin`), all skills must agree on a version, and `--package` is required.
 - **Version**: from the frontmatter `metadata.version` (required - the plugin version is what drives `/plugin update`). Packing **refuses a version already on the registry** so changed content always ships under a new version; `--force` overrides, `--registry <url>` points the check at a private registry.
 - **Distribution**: serve a marketplace from the same server via the `http()`/`edge()` adapters' `skillsMarketplace` option (see [`@silkweave/skills`](https://github.com/silkweave/silkweave/tree/master/packages/skills)). Consumers then run `/plugin marketplace add https://<host>/.claude-plugin/marketplace.json` and `/plugin install <skill>@<marketplace>`.
 
@@ -69,8 +70,9 @@ This is the packaged [`cliProxy`](https://github.com/silkweave/silkweave/tree/ma
 | `-H, --header <key=value>` | all remote | Extra request header, repeatable |
 | `--target <dir>` | `skills *` | Install directory (default `~/.claude/skills`) |
 | `--prune` | `skills sync` | Remove installed skills the server no longer offers |
-| `-p, --package <name>` | `skills pack` | npm package name (default: `metadata.npmPackage`, else `<skill-name>-skill`) |
-| `-o, --out <dir>` | `skills pack` | Output directory (default `dist/<skill-name>-plugin`) |
+| `-p, --package <name>` | `skills pack` | npm package name (default: `metadata.npmPackage`, else `<skill-name>-skill`; required for multiple skills) |
+| `-d, --description <text>` | `skills pack` | Plugin description override |
+| `-o, --out <dir>` | `skills pack` | Output directory (default `dist/<skill-name>-plugin`, or `dist/<plugin-name>` for multiple skills) |
 | `--registry <url>` | `skills pack` | npm registry for the already-published check |
 | `--force` | `skills pack` | Pack even when this version is already published |
 | `-s, --silent` | `proxy` | Suppress log messages |

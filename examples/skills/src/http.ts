@@ -22,27 +22,27 @@ async function main() {
       port: 8080,
       allowedHosts: ['localhost'],
       skills: [
-        defineSkill({ dir: skillDir('commit-message') }),
-        defineSkill({ dir: skillDir('release-checklist') })
+        // Both skills share one npmPackage, so the marketplace lists them as
+        // ONE multi-skill plugin ("example-plugin"). The package is published
+        // (via `silkweave skills pack <dir...> --package @silkweave/example-plugin`);
+        // a marketplace only POINTS at npm - unpublished entries 404 on install.
+        defineSkill({ dir: skillDir('commit-message'), npmPackage: '@silkweave/example-plugin' }),
+        defineSkill({ dir: skillDir('release-checklist'), npmPackage: '@silkweave/example-plugin' })
       ],
       // Experimental: also serve the SEP-2640 draft extension
       // (skills/list + skills/get + capability declaration).
-      skillsExtension: true
-      // Claude Code plugin marketplace: the marketplace only POINTS at npm, so
-      // enable this after actually publishing the packed skill - otherwise
-      // `/plugin install` 404s. To try it:
-      //   npx silkweave skills pack examples/skills/skills/commit-message
-      //   npm publish dist/commit-message-plugin --access public
-      // then add `npmPackage: 'commit-message-skill'` to the defineSkill above,
-      // uncomment the line below, and:
+      skillsExtension: true,
+      // Claude Code plugin marketplace:
       //   /plugin marketplace add http://localhost:8080/.claude-plugin/marketplace.json
-      // skillsMarketplace: { owner: { name: 'Silkweave Example' } }
+      //   /plugin install example-plugin@team-skills
+      skillsMarketplace: { owner: { name: 'Silkweave Example' } }
     }))
     .action(HelloAction)
     .start()
 
   console.log('Skills MCP server on http://localhost:8080/mcp')
   console.log('Try: npx silkweave skills list --url http://localhost:8080/mcp')
+  console.log('Marketplace: http://localhost:8080/.claude-plugin/marketplace.json')
 }
 
 void main()

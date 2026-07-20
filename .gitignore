@@ -17,3 +17,4 @@ resources/
 .dev.vars.*
 !.dev.vars.example
 store.json
+dist/

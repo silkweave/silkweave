@@ -80,7 +80,7 @@ http({
 })
 ```
 
-The server then answers `GET /.claude-plugin/marketplace.json` with npm-sourced plugin entries for every served skill that carries an `npmPackage` (from `defineSkill({ npmPackage })` or the `metadata.npmPackage` frontmatter entry; entries pin the skill's version, and `skillsMarketplace.registry` targets a private registry). Consumers run:
+The server then answers `GET /.claude-plugin/marketplace.json` with npm-sourced plugin entries for every served skill that carries an `npmPackage` (from `defineSkill({ npmPackage })` or the `metadata.npmPackage` frontmatter entry; entries pin the skill's version, and `skillsMarketplace.registry` targets a private registry). Skills **sharing** an `npmPackage` collapse into one multi-skill plugin entry, named after the package basename - the same name `skills pack <dir...>` writes into the packed `plugin.json`, so the marketplace and the installed plugin always agree. Consumers run:
 
 ```
 /plugin marketplace add https://skills.example.com/.claude-plugin/marketplace.json
