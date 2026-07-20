@@ -40,9 +40,8 @@ export interface Release {
 export const releases: Release[] = [
   {
     version: '5.0.0',
-    date: '2026-07-20',
+    date: '2026-07-21',
     summary: 'Skills over MCP: serve Agent Skills (SKILL.md) from any Silkweave MCP server - versioned, digest-verified, installable with one command - and the silkweave package becomes the CLI that installs them.',
-    unreleased: true,
     changes: [
       {
         type: 'breaking',
@@ -63,6 +62,11 @@ export const releases: Release[] = [
         type: 'feature',
         text: 'Claude Code plugin bridge for public skills: silkweave skills pack wraps a skill into a skills-only plugin package for npm (refusing versions already on the registry), and the skillsMarketplace option serves /.claude-plugin/marketplace.json with npm-sourced entries - consumers get native /plugin install and /plugin update.',
         commit: 'ecc1fc9'
+      },
+      {
+        type: 'feature',
+        text: 'Multi-skill plugins: skills pack <dir...> bundles several skills into one plugin package, and skills served with a shared npmPackage collapse into a single marketplace entry named after the package - the published @silkweave/example-plugin (both demo skills from examples/skills) is the live demo.',
+        commit: '3758eb4'
       },
       {
         type: 'feature',

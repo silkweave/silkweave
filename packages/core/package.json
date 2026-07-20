@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/core",
-  "version": "5.0.0-rc.1",
+  "version": "5.0.0",
   "description": "Silkweave Core",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",

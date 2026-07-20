@@ -1,6 +1,6 @@
 {
   "name": "silkweave",
-  "version": "5.0.0-rc.1",
+  "version": "5.0.0",
   "description": "Silkweave CLI - install and sync agent skills from silkweave MCP servers, proxy any silkweave server as a CLI",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
