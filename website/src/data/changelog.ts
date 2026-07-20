@@ -39,6 +39,38 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '4.4.0',
+    date: '2026-07-20',
+    summary: 'Binary resources: one action can now return a screenshot, PDF, or JSON artifact - delivered as an MCP image block the model can see, raw bytes over REST, a typed envelope over tRPC, and a file (or clean pipe) from the CLI.',
+    changes: [
+      {
+        type: 'feature',
+        text: 'Resource results: declare output: binary({ mimeType, name?, description? }) and return resource(bytes, ...), a Web-Standard File/Blob, or bare Uint8Array/ArrayBuffer bytes - every adapter detects the resource and delivers it transport-appropriately. Everything is Web-Standard (no Buffer), so resource actions run on edge runtimes.',
+        commit: 'd3d75e8'
+      },
+      {
+        type: 'feature',
+        text: 'MCP mime-driven content blocks: the resource description ships first as a text block, raster image/* becomes an image block multimodal hosts surface to the model (agents literally see the screenshot), audio/* an audio block, text media (JSON, markdown, SVG) an embedded resource with text, and other binary an embedded base64 blob. A client _meta.disposition cannot demote a resource result.',
+        commit: 'd3d75e8'
+      },
+      {
+        type: 'feature',
+        text: 'REST + CLI delivery: the Fastify adapter responds with raw bytes (Content-Type, Content-Disposition filename, Content-Description) and documents format: binary in OpenAPI; cli()/cliProxy pipe raw bytes on stdout, add an -o/--output flag, and never dump binary onto an interactive terminal.',
+        commit: 'd3d75e8'
+      },
+      {
+        type: 'feature',
+        text: 'tRPC + typegen envelope: JSON-only transports ship a SerializedResource envelope ({ kind, mimeType, name?, description?, text? | base64? }), typed end-to-end through InferTrpcRouter and the generated .d.ts/AppRouter.',
+        commit: 'd3d75e8'
+      },
+      {
+        type: 'feature',
+        text: '@silkweave/nestjs resource routes: @Mcp({ resource })/@Trpc({ resource }) declare a controller route\'s result a resource; a reflected non-JSON @Header(\'Content-Type\', ...) flips an existing endpoint automatically with a bare @Mcp(), and returned StreamableFiles are collected to bytes (explicit type/disposition wins as a named resource).',
+        commit: 'd3d75e8'
+      }
+    ]
+  },
+  {
     version: '4.3.0',
     date: '2026-07-20',
     summary: 'cliProxy grows up: authenticate against gated MCP servers without monkey-patching fetch, and let tools declare CLI positional arguments that cross the wire.',
