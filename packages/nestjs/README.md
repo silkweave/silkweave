@@ -137,6 +137,25 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 | `annotations` | `ToolAnnotations` | verb-derived | MCP tool annotations merged over the verb-derived defaults: `@Get` ⇒ `{ readOnlyHint: true, idempotentHint: true }`, `@Put` ⇒ `{ readOnlyHint: false, idempotentHint: true }`, `@Delete` ⇒ `{ readOnlyHint: false, destructiveHint: true, idempotentHint: true }`, else `{ readOnlyHint: false }`. Set a field to override its derived value (e.g. `{ destructiveHint: true }` on a POST that deletes) |
 | `tags` | `string[]` | - | Free-form grouping labels carried on the synthesized action (e.g. `['leads', 'write']`) for the `mcp({ filterActions })` per-request filter to match on |
 | `args` | `string[]` | - | Input fields exposed as CLI **positional arguments**, in order (e.g. `['sessionId']` so a `cliProxy` CLI reads `my-cli get-session abc123` instead of `--session-id abc123`). Published in the tool's `_meta` as `silkweave/args`; other MCP clients ignore it. Each entry must be a reflected (or `input`-overridden) field - validated at boot |
+| `resource` | `ResourceMetadata` | header-reflected | Declare the route's result a **binary/text resource** (`{ mimeType?, name?, description? }`) - see [Resource routes](#resource-routes-binary-results) |
+
+### Resource routes (binary results)
+
+A route that returns binary data (a screenshot, PDF, rendered chart) or a non-JSON text artifact is declared a **resource route** - the synthesized action gets a core `binary()` output schema, so MCP delivers mime-mapped content blocks (raster images as an `image` block the model can see, audio as `audio`, text media as an embedded resource, everything else as a base64 blob - with `description` as a leading text block) and tRPC ships the `SerializedResource` JSON envelope:
+
+```ts
+@Get('chart')
+@Mcp({ resource: { mimeType: 'image/png', name: 'chart.png', description: 'Rendered sales chart' } })
+chart(): Buffer { return renderChart() }
+```
+
+Three ways a route becomes a resource route, in order of authority:
+
+1. **The returned value** - a `resource()` from `@silkweave/core`, a Web-Standard `File`/`Blob`, or a `StreamableFile` with explicit `type`/`disposition` options is self-describing and always wins (a `resource()` also allows a per-call description, e.g. `` `Screenshot of ${url}` ``).
+2. **`@Mcp({ resource })` / `@Trpc({ resource })`** - declares the route a resource and provides defaults (`mimeType`/`name`/`description`) for what the returned value doesn't carry. A bare `Buffer` return then gets wrapped with these.
+3. **A reflected `@Header('Content-Type', ...)`** - an existing REST endpoint that already declares a non-JSON Content-Type flips to resource delivery with a bare `@Mcp()` (a JSON Content-Type does not; never auto-applied to `async *` routes).
+
+Returned `StreamableFile`s are collected into bytes (adapters can't consume Node streams); a `StreamableFile` without explicit options yields bare bytes so the declared defaults apply. `resource` is incompatible with `result: 'structured'` and with streaming (`async *`) routes - both boot-error - and wins over `output` when both are set.
 
 ### Result format
 
@@ -247,6 +266,7 @@ export class UsersController {
 | `chunk` | `z.ZodType \| DtoClass` | `unknown` | Element type for a subscription's `async *` stream |
 | `kind` | `'query' \| 'mutation' \| 'subscription'` | inferred | `@Get` ⇒ query, others ⇒ mutation, `async *` ⇒ subscription |
 | `pipes` | `'apply' \| 'skip'` | `'apply'` | Whether to run parameter-bound pipes when re-binding |
+| `resource` | `ResourceMetadata` | header-reflected | Declare the route's result a binary/text resource - the procedure then returns core's `SerializedResource` JSON envelope. Same semantics as [`@Mcp({ resource })`](#resource-routes-binary-results); wins over `output`, incompatible with subscriptions |
 
 ### Naming & kind
 

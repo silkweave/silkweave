@@ -2,9 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
-import { Action, ActionRun, createLogger, emitToolCall, isStreamingAction, OnToolCall, runStreamingAction, SilkweaveContext, SilkweaveError, ToolCallEvent } from '@silkweave/core'
+import { Action, ActionRun, binarySchemaMeta, createLogger, emitToolCall, isStreamingAction, OnToolCall, resourceBytes, runStreamingAction, SilkweaveContext, SilkweaveError, toActionResource, ToolCallEvent, type ActionResource } from '@silkweave/core'
 import { capitalCase, pascalCase } from 'change-case'
-import { errorToolResult, handleToolError, jsonToolResult, smartToolResult, structuredToolResult } from '../util/result.js'
+import { errorToolResult, handleToolError, jsonToolResult, resourceToolResult, smartToolResult, structuredToolResult } from '../util/result.js'
 
 type LogStream = NonNullable<Parameters<typeof createLogger>[0]>['stream']
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>
@@ -107,12 +107,15 @@ function structuredResult(action: Action, result: object | object[]) {
 }
 
 /** MCP-only telemetry fields, computed only when a hook is registered. */
-function resultMeta(result: object | object[], formatted: { content?: { type: string }[] }): Pick<ToolCallEvent, 'resultBytes' | 'sideloaded'> {
+function resultMeta(result: object | object[], formatted: { content?: { type: string }[] }, res?: ActionResource): Pick<ToolCallEvent, 'resultBytes' | 'sideloaded'> {
   return {
     // Actual UTF-8 byte count (String.length counts UTF-16 code units, which
-    // understates multibyte payloads). TextEncoder keeps this edge-safe.
-    resultBytes: new TextEncoder().encode(JSON.stringify(result)).length,
-    sideloaded: (formatted.content ?? []).some((block) => block.type === 'resource')
+    // understates multibyte payloads). TextEncoder keeps this edge-safe. A
+    // resource result's size is its payload, not a JSON stringification of it.
+    resultBytes: res ? resourceBytes(res).length : new TextEncoder().encode(JSON.stringify(result)).length,
+    // `sideloaded` means smart-disposition offload; a deliberate resource
+    // result rendering as an embedded-resource block is not an offload.
+    sideloaded: !res && (formatted.content ?? []).some((block) => block.type === 'resource')
   }
 }
 
@@ -123,8 +126,8 @@ function errorMeta(error: unknown): Pick<ToolCallEvent, 'errorCode' | 'errorMess
   return { errorCode: 'unknown' }
 }
 
-/** Format via the action's `toolResult` hook, else the resolved disposition. */
-function formatToolResult(action: Action, result: object | object[], context: SilkweaveContext, disposition: unknown) {
+/** Format via the action's `toolResult` hook, else resource mapping, else the resolved disposition. */
+function formatToolResult(action: Action, result: object | object[], context: SilkweaveContext, disposition: unknown, res: ActionResource | undefined) {
   if (action.toolResult) {
     // core's dependency-free ToolResult is structurally the SDK CallToolResult;
     // narrow it back at the SDK boundary.
@@ -134,6 +137,10 @@ function formatToolResult(action: Action, result: object | object[], context: Si
   // A structured action's output schema is a contract fixed at tools/list
   // time - a client's `_meta.disposition` cannot demote it.
   if (action.disposition === 'structured') { return structuredResult(action, result) }
+  // A resource result (resource()/File/Blob/bytes) has its own mime-driven
+  // mapping; `_meta.disposition` has nothing to demote it to - json/smart
+  // would stringify bytes into garbage - so it always wins over both.
+  if (res) { return resourceToolResult(res) }
   return disposition === 'smart' ? smartToolResult(result) : jsonToolResult(result)
 }
 
@@ -187,12 +194,13 @@ export function registerTools(
       const started = Date.now()
       try {
         const result = await runAction(action, input, actionContext, extra)
-        const formatted = formatToolResult(action, result, actionContext, disposition)
+        const res = await toActionResource(result, binarySchemaMeta(action.output))
+        const formatted = formatToolResult(action, result, actionContext, disposition, res)
         emitToolCall(options.onToolCall, {
           ...base,
           durationMs: Date.now() - started,
           ok: formatted.isError !== true,
-          ...(options.onToolCall ? resultMeta(result, formatted) : {})
+          ...(options.onToolCall ? resultMeta(result, formatted, res) : {})
         })
         return formatted
       } catch (error) {

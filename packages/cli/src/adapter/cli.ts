@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Action, ActionRun, ActionStreamRun, AdapterFactory, createConsoleLogger, isStreamingAction, SilkweaveContext, SilkweaveError, SilkweaveOptions, unwrap } from '@silkweave/core'
+import { Action, ActionRun, ActionStreamRun, AdapterFactory, binarySchemaMeta, createConsoleLogger, isBinarySchema, isStreamingAction, resourceBytes, SilkweaveContext, SilkweaveError, SilkweaveOptions, toActionResource, unwrap, type ActionResource } from '@silkweave/core'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { once } from 'events'
+import { writeFile } from 'fs/promises'
 import z from 'zod/v4'
 
 function handleCLIError(error: unknown) {
@@ -86,6 +87,30 @@ function addCliOption(command: Command, key: string, type: z.ZodType, defaultVal
   }
 }
 
+/** File extension derived from a media type's subtype (`image/png` -> `png`). */
+function extensionFromMime(mimeType: string): string {
+  const subtype = mimeType.split(';')[0].split('/')[1]?.split('+')[0]?.trim()
+  return subtype || 'bin'
+}
+
+/**
+ * Deliver a resource result terminal-appropriately: raw bytes to stdout when
+ * piped (`my-cli screenshot > shot.png`), otherwise written to `--output` or a
+ * file named after the resource - binary is never dumped onto an interactive
+ * terminal. Status lines go to stderr so a piped stdout stays byte-clean.
+ */
+async function writeResourceResult(res: ActionResource, outputPath: string | undefined) {
+  const bytes = resourceBytes(res)
+  if (res.description) { console.error(res.description) }
+  if (!outputPath && !process.stdout.isTTY) {
+    if (!process.stdout.write(bytes)) { await once(process.stdout, 'drain') }
+    return
+  }
+  const target = outputPath ?? res.name ?? `resource.${extensionFromMime(res.mimeType)}`
+  await writeFile(target, bytes)
+  console.error(`Wrote ${bytes.length} bytes (${res.mimeType}) to ${target}`)
+}
+
 async function runStreamingCommand(action: Action, input: object, context: SilkweaveContext) {
   const streamRun = action.run as ActionStreamRun<object, unknown>
   const iter = streamRun(input, context)
@@ -102,6 +127,12 @@ function registerCommand(program: Command, action: Action, options: SilkweaveOpt
   const shape = action.input.shape
   const argKeys = action.args ?? []
   const argSet = new Set(argKeys)
+  // Binary actions get an --output flag - unless the input schema claims the
+  // name, in which case the schema field wins and only pipe/TTY behavior applies.
+  const binaryOutput = isBinarySchema(action.output) && !('output' in shape)
+  if (binaryOutput) {
+    command.option('-o, --output <path>', 'Write the resource to this file (default: the resource name)')
+  }
   // Options first (order irrelevant), then positional arguments in `action.args`
   // order - not input-shape key order - so commander's positional slots line up
   // with how parseCLIInput reads them back (else the values are cross-assigned).
@@ -123,9 +154,20 @@ function registerCommand(program: Command, action: Action, options: SilkweaveOpt
       runStreamingCommand(action, input, actionContext).catch(handleCLIError)
       return
     }
-    console.info(`${options.name} - ${action.name}`)
+    // Binary actions keep stdout byte-clean (a piped stdout carries the
+    // payload), so the banner goes to stderr for them.
+    if (binaryOutput) {
+      console.error(`${options.name} - ${action.name}`)
+    } else {
+      console.info(`${options.name} - ${action.name}`)
+    }
     const runFn = action.run as ActionRun<object, object>
-    runFn(input, actionContext).then((result) => {
+    runFn(input, actionContext).then(async (result) => {
+      const res = await toActionResource(result, binarySchemaMeta(action.output))
+      if (res) {
+        await writeResourceResult(res, binaryOutput ? command.opts<{ output?: string }>().output : undefined)
+        return
+      }
       logger.info(JSON.stringify(result, null, 2))
     }).catch(handleCLIError)
   })

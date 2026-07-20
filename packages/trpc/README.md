@@ -109,6 +109,19 @@ createAction({
 
 The literal `'query'` is preserved through `createAction` (generic over `K extends 'query' | 'mutation'`), so `InferTrpcRouter` produces the correct `TRPCQueryProcedure` type - calling `.mutate()` on a query (or vice-versa) is a compile-time error.
 
+## Resource Results (binary)
+
+tRPC is JSON-only on the wire, so an action with a `binary()` output (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) - or any action returning a `resource()`, `File`/`Blob`, or bare bytes - ships as core's **`SerializedResource`** envelope:
+
+```typescript
+const shot = await client.screenshot.query({ url: 'https://example.com' })
+// { kind: 'resource', mimeType: 'image/png', name: 'screenshot.png',
+//   description: 'Screenshot of https://example.com', base64: '...' }
+const img = `data:${shot.mimeType};base64,${shot.base64}`  // e.g. straight into <img src>
+```
+
+Text-based media types (JSON, markdown, SVG, `text/*`) carry `text` instead of `base64`. `InferTrpcRouter` maps resource-like `run` return types to `SerializedResource`, so the client sees the envelope type end-to-end; `deserializeResource()` from `@silkweave/core` decodes it back to bytes when needed. Mind the JSON size overhead for large payloads - for big files, prefer the REST adapter's raw-byte responses.
+
 ## Name Conversion
 
 Action names are converted to tRPC procedure keys using `camelCase` from `change-case`:

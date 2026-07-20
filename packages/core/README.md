@@ -62,7 +62,7 @@ Returns a builder with `.adapter()`, `.action()`, `.actions()`, `.set()`, and `.
 | `name` | `string` | Unique action identifier |
 | `description` | `string` | Human-readable description |
 | `input` | `z.ZodObject` | Zod schema for input validation |
-| `output` | `z.ZodObject` | Optional Zod schema for the return type (used by typegen, Fastify OpenAPI, and as the MCP `outputSchema` contract when `disposition: 'structured'`). Mutually exclusive with `chunk`. |
+| `output` | `z.ZodObject` | Optional Zod schema for the return type (used by typegen, Fastify OpenAPI, and as the MCP `outputSchema` contract when `disposition: 'structured'`). Pass `binary({ mimeType, ... })` to declare a binary/text resource result - see [Resource Results](#resource-results-binary). Mutually exclusive with `chunk`. |
 | `chunk` | `z.ZodType` | Optional Zod schema for individual chunks yielded by a streaming `run`. Required (and `run` must be an `async function*`) to make this a streaming action. See [Streaming Actions](#streaming-actions). |
 | `kind` | `'query' \| 'mutation'` | Optional. Defaults to `'mutation'`. Marks the action as a cacheable read for tRPC. |
 | `method` | `'GET' \| 'POST' \| 'PUT' \| 'DELETE'` | Optional REST verb for `@silkweave/fastify` / `@silkweave/nestjs` `rest`. Defaults to `POST`, or `GET` when `kind: 'query'`. See [REST routing](#rest-routing). |
@@ -103,6 +103,40 @@ Two utilities are exported for adapter authors:
 |----------|-------------|
 | `isStreamingAction(action)` | Returns `true` when `action.run.constructor.name === 'AsyncGeneratorFunction'`. |
 | `runStreamingAction(action, input, context, onChunk?)` | Drives the generator, awaiting `onChunk` per yielded chunk so transport-level backpressure (SSE drain, MCP notification ack) flows back into the action. Returns the buffered array of all chunks; pass no `onChunk` to use this as a buffered fallback. |
+
+### Resource Results (binary)
+
+An action can return a **binary or text artifact** - a screenshot, PDF, JSON/markdown artifact, audio clip - instead of a JSON object. Declare the output with `binary()` and return a `resource()`:
+
+```typescript
+import { binary, createAction, resource } from '@silkweave/core'
+import z from 'zod/v4'
+
+export const ScreenshotAction = createAction({
+  name: 'screenshot',
+  description: 'Capture a screenshot of a URL',
+  kind: 'query',
+  input: z.object({ url: z.string() }),
+  output: binary({ mimeType: 'image/png' }),
+  run: async ({ url }) => resource(await capture(url), {
+    mimeType: 'image/png',
+    name: 'screenshot.png',
+    description: `Screenshot of ${url}`
+  })
+})
+```
+
+The `run` may return an `ActionResource` (via `resource()`), a Web-Standard `File`/`Blob`, or bare `Uint8Array`/`ArrayBuffer` bytes - adapters normalize with `toActionResource()`, using the `binary()` metadata as defaults for whatever the value doesn't carry (last resort: `application/octet-stream`). Each adapter then delivers the resource transport-appropriately: MCP maps mime-driven content blocks (raster images ⇒ `image` block the model can see, audio ⇒ `audio` block, text media ⇒ embedded resource `text`, else base64 `blob`, with `description` as a leading text block), REST sends raw bytes with `Content-Type`/`Content-Disposition` headers, the CLI pipes bytes or writes a file, and tRPC ships the `SerializedResource` JSON envelope.
+
+| Export | Description |
+|--------|-------------|
+| `resource(data, { mimeType, name?, description? })` | Wrap bytes (`Uint8Array`/`ArrayBuffer`) or a string as an `ActionResource`. |
+| `binary(meta?)` | Zod output schema over resource-like values; `meta` (`mimeType?`/`name?`/`description?`) are defaults for bare-byte returns. Incompatible with `disposition: 'structured'` and with `chunk` (validated at registration). |
+| `toActionResource(value, defaults?)` | Async normalization: `ActionResource`/`File`/`Blob`/bytes ⇒ `ActionResource`, anything else ⇒ `undefined`. |
+| `isActionResource` / `isResourceLike` / `isBinarySchema` / `binarySchemaMeta` | Detection helpers. |
+| `serializeResource` / `deserializeResource` | The `SerializedResource` JSON envelope (`{ kind: 'resource', mimeType, name?, description?, text? \| base64? }`) used on JSON-only transports; text media types carry `text`, others `base64`. |
+| `isTextMimeType(mimeType)` | `text/*`, JSON, XML/SVG, JavaScript, and `+json`/`+xml` suffixes. |
+| `resourceBytes` / `resourceText` / `bytesToBase64` / `base64ToBytes` | Payload conversions (all Web-Standard - no Buffer, edge-safe). |
 
 ### Adapter Interfaces
 

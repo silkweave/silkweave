@@ -1,4 +1,4 @@
-import { Action, Silkweave } from '@silkweave/core'
+import { Action, ActionResource, SerializedResource, Silkweave } from '@silkweave/core'
 import type { AnyTRPCRootTypes, TRPCBuiltRouter, TRPCMutationProcedure, TRPCQueryProcedure, TRPCSubscriptionProcedure } from '@trpc/server'
 import type { z } from 'zod/v4'
 
@@ -17,6 +17,13 @@ type ChunkOf<A extends Action> = A['run'] extends (...args: any[]) => AsyncGener
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type IsStreaming<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<unknown, unknown, unknown> ? true : false
 
+// A resource result crosses tRPC's JSON wire as its SerializedResource
+// envelope (buildRouter serializes at runtime), so the inferred output type
+// must say so too. Blob covers File (File extends Blob) without depending on
+// the DOM/Node File global at the type level. The conditional distributes over
+// unions, matching the per-call runtime detection.
+type SerializeOutput<R> = R extends ActionResource | Blob | Uint8Array | ArrayBuffer ? SerializedResource : R
+
 type ActionToProcedure<A extends Action> = IsStreaming<A> extends true
   ? TRPCSubscriptionProcedure<{
     meta: object
@@ -27,12 +34,12 @@ type ActionToProcedure<A extends Action> = IsStreaming<A> extends true
     ? TRPCQueryProcedure<{
       meta: object
       input: z.infer<A['input']>
-      output: Awaited<ReturnType<A['run']>>
+      output: SerializeOutput<Awaited<ReturnType<A['run']>>>
     }>
     : TRPCMutationProcedure<{
       meta: object
       input: z.infer<A['input']>
-      output: Awaited<ReturnType<A['run']>>
+      output: SerializeOutput<Awaited<ReturnType<A['run']>>>
     }>)
 
 type ActionsToRouterRecord<Actions extends Record<string, Action>> = {

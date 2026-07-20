@@ -1,6 +1,22 @@
 import { cli } from '@silkweave/cli'
-import { createAction, Logger, silkweave } from '@silkweave/core'
+import { base64ToBytes, binary, createAction, Logger, resource, silkweave } from '@silkweave/core'
 import z from 'zod/v4'
+
+// An 8x8 checkerboard PNG, pre-encoded so the example stays dependency-free.
+const DEMO_PNG = base64ToBytes('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAI0lEQVR42mNINvuYbPbx48vkjy+TkdkMOCUwhSBs3BJ0sAMAOwl44TYCiXQAAAAASUVORK5CYII=')
+
+const RenderBadgeAction = createAction({
+  name: 'render-badge',
+  description: 'Render a small demo PNG badge and return it as a binary resource.',
+  kind: 'query',
+  input: z.object({ label: z.string().default('badge').describe('File name label for the rendered badge.') }),
+  output: binary({ mimeType: 'image/png' }),
+  run: async ({ label }) => resource(DEMO_PNG, {
+    mimeType: 'image/png',
+    name: `${label}.png`,
+    description: `Demo badge '${label}' (8x8 PNG checkerboard)`
+  })
+})
 
 const HelloAction = createAction({
   name: 'hello',
@@ -46,6 +62,7 @@ async function main() {
     .adapter(cli())
     .action(HelloAction)
     .action(GenerateMessagesAction)
+    .action(RenderBadgeAction)
     .start()
 }
 

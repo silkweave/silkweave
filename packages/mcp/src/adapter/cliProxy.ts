@@ -3,10 +3,12 @@ import { UnauthorizedError, type OAuthClientProvider } from '@modelcontextprotoc
 import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { ContentBlock, LoggingMessageNotificationSchema, ProgressNotificationSchema, Tool, ToolResultContent } from '@modelcontextprotocol/sdk/types.js'
-import { AdapterFactory, createConsoleLogger } from '@silkweave/core'
+import { AdapterFactory, base64ToBytes, createConsoleLogger, isTextMimeType } from '@silkweave/core'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { randomUUID } from 'crypto'
+import { once } from 'events'
+import { writeFile } from 'fs/promises'
 import { parseResourceMessage } from '../util/result.js'
 
 export type CLIFormatterFn = (message: ContentBlock, index: number, messages: ContentBlock[]) => string | undefined
@@ -124,6 +126,65 @@ function buildToolInput(properties: Record<string, JsonSchemaProperty>, argKeys:
   return input
 }
 
+interface BinaryPayload {
+  bytes: Uint8Array
+  mimeType: string
+  name?: string
+}
+
+/**
+ * The decodable binary payload of a content block: `image`/`audio` blocks, and
+ * embedded resources whose `blob` carries a non-text media type. Text
+ * resources (including smart-disposition offloads) stay on the text path and
+ * print as before.
+ */
+function binaryPayload(block: ContentBlock): BinaryPayload | undefined {
+  if (block.type === 'image' || block.type === 'audio') {
+    return { bytes: base64ToBytes(block.data), mimeType: block.mimeType }
+  }
+  if (block.type === 'resource' && 'blob' in block.resource) {
+    const mimeType = block.resource.mimeType ?? 'application/octet-stream'
+    if (isTextMimeType(mimeType)) { return undefined }
+    // Server-side resource URIs end in `/<name>` when the action named the
+    // artifact (`mcp://toolResult/<uuid>/shot.png`); a bare uuid tail is not a
+    // usable file name.
+    const tail = block.resource.uri.split('/').pop()
+    return {
+      bytes: base64ToBytes(block.resource.blob),
+      mimeType,
+      ...(tail?.includes('.') ? { name: tail } : {})
+    }
+  }
+  return undefined
+}
+
+/** File extension derived from a media type's subtype (`image/png` -> `png`). */
+function extensionFromMime(mimeType: string): string {
+  const subtype = mimeType.split(';')[0].split('/')[1]?.split('+')[0]?.trim()
+  return subtype || 'bin'
+}
+
+/**
+ * Deliver decoded binary payloads terminal-appropriately: raw bytes to stdout
+ * when piped, otherwise written to `--output` or a file named after the
+ * resource - binary is never dumped onto an interactive terminal. Status lines
+ * go to stderr so a piped stdout stays byte-clean.
+ */
+async function writeBinaryPayloads(binaries: BinaryPayload[], outputPath: string | undefined) {
+  if (!outputPath && !process.stdout.isTTY) {
+    if (binaries.length > 1) { console.error(`(${binaries.length} binary parts - writing the first to stdout)`) }
+    if (!process.stdout.write(binaries[0].bytes)) { await once(process.stdout, 'drain') }
+    return
+  }
+  for (const [index, bin] of binaries.entries()) {
+    const target = (index === 0 ? outputPath : undefined)
+      ?? bin.name
+      ?? `resource${index ? `-${index}` : ''}.${extensionFromMime(bin.mimeType)}`
+    await writeFile(target, bin.bytes)
+    console.error(`Wrote ${bin.bytes.length} bytes (${bin.mimeType}) to ${target}`)
+  }
+}
+
 /** Bridge the server's log + progress notifications onto the console. */
 function attachNotificationLogging(client: Client) {
   const logger = createConsoleLogger()
@@ -155,6 +216,12 @@ function registerToolCommand(program: Command, client: Client, tool: Tool, forma
   for (const key of argKeys) {
     addCliArgument(command, key, properties[key], requiredKeys.has(key))
   }
+  // Every proxied tool may return binary content; --output routes it to a file.
+  // A schema field named `output` wins the flag - pipe/TTY behavior still applies.
+  const hasOutputOption = !('output' in properties)
+  if (hasOutputOption) {
+    command.option('-o, --output <path>', 'Write a binary result to this file (default: the resource name)')
+  }
   command.action(async (...cliArgs: unknown[]) => {
     // commander passes positionals first, then the options object (the
     // Command instance trails and is ignored).
@@ -170,10 +237,18 @@ function registerToolCommand(program: Command, client: Client, tool: Tool, forma
       arguments: buildToolInput(properties, argKeys, positionals, opts),
       _meta: { progressToken: randomUUID(), disposition: 'json' }
     }) as ToolResultContent
-    response.content.forEach((message, index, messages) => {
+    const decoded = response.content.map((block) => ({ block, binary: binaryPayload(block) }))
+    const binaries = decoded.flatMap(({ binary }) => binary ? [binary] : [])
+    const textContent = decoded.filter(({ binary }) => !binary).map(({ block }) => block)
+    const outputPath = hasOutputOption ? (opts['output'] as string | undefined) : undefined
+    // When the payload is piped through stdout, companion text (descriptions)
+    // moves to stderr so the byte stream stays clean.
+    const textStream = binaries.length && !outputPath && !process.stdout.isTTY ? process.stderr : process.stdout
+    textContent.forEach((message, index, messages) => {
       const text = formatter(message, index, messages)
-      process.stdout.write(`${text}\n`)
+      textStream.write(`${text}\n`)
     })
+    if (binaries.length) { await writeBinaryPayloads(binaries, outputPath) }
   })
 }
 

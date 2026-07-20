@@ -2,6 +2,7 @@
 import z from 'zod/v4'
 import { SilkweaveContext } from './context.js'
 import { SilkweaveError } from './error.js'
+import { isBinarySchema } from './resource.js'
 
 /**
  * The shape an action's `toolResult` hook returns - a structural, dependency-free
@@ -186,7 +187,19 @@ export function isStreamingAction(action: Action): boolean {
  * the handler is built).
  */
 export function validateActionDisposition(action: Action): void {
+  if (action.chunk && isBinarySchema(action.chunk)) {
+    throw new SilkweaveError(
+      `Action '${action.name}': binary() cannot be a chunk schema - streaming binary resources is not supported; return a single resource from a non-streaming action instead`,
+      'invalid_action'
+    )
+  }
   if (action.disposition !== 'structured') { return }
+  if (isBinarySchema(action.output)) {
+    throw new SilkweaveError(
+      `Action '${action.name}': disposition 'structured' cannot back a binary() output - there is no JSON outputSchema contract for binary data; use the default disposition instead`,
+      'invalid_action'
+    )
+  }
   if (isStreamingAction(action) || action.chunk) {
     throw new SilkweaveError(
       `Action '${action.name}': disposition 'structured' is not supported on a streaming action - there is no single result to validate against an output schema`,

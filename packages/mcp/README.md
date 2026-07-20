@@ -294,6 +294,34 @@ Important semantics (the MCP SDK enforces output schemas on **both** sides - the
 - `'structured'` requires a non-streaming action with an `output` schema - validated at registration (`validateActionDisposition()`), so misconfiguration fails at boot.
 - Fields that can be `null` at runtime must be declared `.nullable()` (zod's `.optional()` does not accept `null`).
 
+### Resource results (binary)
+
+An action that returns a resource (declared with core's `binary()` output schema and returning `resource()`, a `File`/`Blob`, or bare bytes) bypasses `disposition` formatting entirely - `resourceToolResult()` maps it to mime-driven content blocks:
+
+| Media type | Content block |
+|------------|---------------|
+| `description` set on the resource | Leading `text` block, so the model knows what the artifact is |
+| Raster `image/*` (png/jpeg/gif/webp) | `image` block (base64) - multimodal hosts surface it to the model directly |
+| `audio/*` | `audio` block (base64) |
+| Text-based media (`text/*`, JSON, XML/SVG, `+json`/`+xml`) | Embedded `resource` with `text` |
+| Anything else (PDF, zip, ...) | Embedded `resource` with a base64 `blob` |
+
+```typescript
+createAction({
+  name: 'screenshot',
+  description: 'Capture a screenshot of a URL',
+  input: z.object({ url: z.string() }),
+  output: binary({ mimeType: 'image/png' }),
+  run: async ({ url }) => resource(await capture(url), {
+    mimeType: 'image/png', name: 'screenshot.png', description: `Screenshot of ${url}`
+  })
+})
+```
+
+A `toolResult` hook still wins over the resource mapping, and a client's `_meta.disposition` cannot demote a resource result (json/smart would stringify bytes into garbage). `disposition: 'structured'` is incompatible with `binary()` and rejected at registration. Telemetry events report the payload byte length as `resultBytes` and `sideloaded: false` (a deliberate resource is not a smart offload).
+
+The **cliProxy** decodes resource results client-side: `image`/`audio` blocks and non-text `blob` resources are written as raw bytes to a piped stdout (`my-cli screenshot > shot.png`, description on stderr), to `--output <path>`, or to a file named after the resource on an interactive TTY. Text resources (including smart-disposition offloads) keep printing as text.
+
 ### Tool annotations
 
 Every tool is registered with MCP `annotations` - behavior hints clients use to group and permission-gate tools. The registrar derives `readOnlyHint` from the action's `kind` (`'query'` ⇒ `true`, otherwise `false`) and merges the action's explicit `annotations` over that base:
@@ -319,6 +347,7 @@ All result utilities are exported from `@silkweave/mcp`:
 | `smartToolResult(data)` | Formatter with automatic embedded resource splitting at 4096 chars (`disposition: 'smart'`) |
 | `jsonToolResult(data, isError?)` | Simple inline `TextContent` JSON (no splitting) - the default formatter |
 | `structuredToolResult(data)` | `structuredContent` + JSON text mirror for `disposition: 'structured'` actions. Pass output-schema-**parsed** data, never the raw result |
+| `resourceToolResult(res)` | Mime-driven content blocks for an `ActionResource` (image/audio blocks, embedded text/blob resources, leading description text block) |
 | `errorToolResult(error)` | Format a `SilkweaveError` as an error result |
 | `handleToolError(error)` | Catch-all error handler used by all MCP adapters |
 

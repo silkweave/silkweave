@@ -103,6 +103,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
 | `z.map(z.string(), z.number())` | `Map<string, number>` |
 | `z.promise(z.string())` | `Promise<string>` |
 | `z.string().readonly()` | `readonly string[]` (arrays/tuples) |
+| `binary({...})` (core resource output) | The `SerializedResource` envelope interface (`{ kind: 'resource', mimeType, name?, description?, text?, base64? }`) - the shape a resource result takes on JSON transports |
 
 ## Exports
 

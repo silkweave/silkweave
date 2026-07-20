@@ -90,6 +90,37 @@ export interface McpMetadata {
    * input field - validated at boot.
    */
   args?: string[]
+  /**
+   * Declare the route's result a binary/text resource (see `ResourceMetadata`).
+   * When unset, a reflected non-JSON `@Header('Content-Type', ...)` on the
+   * method also flips the route to resource delivery. Incompatible with
+   * `result: 'structured'` (a resource has no JSON outputSchema contract) and
+   * with `async *` streaming routes; wins over `output` when both are set.
+   */
+  resource?: ResourceMetadata
+}
+
+/**
+ * Resource (binary/text artifact) metadata for a decorated route - the NestJS
+ * face of core's `binary()` output. Setting `resource` (even `{}`) declares
+ * the route's result a resource: the synthesized action gets a `binary()`
+ * output schema, so MCP delivers mime-mapped content blocks (image/audio/
+ * embedded resource), tRPC a `SerializedResource` envelope, and typegen the
+ * envelope type. All fields are defaults for what the returned value itself
+ * does not carry - a returned `resource()`/`File` (or a `StreamableFile` with
+ * explicit `type`/`disposition`) always wins.
+ */
+export interface ResourceMetadata {
+  /**
+   * Media type of the result, e.g. `image/png`. Falls back to a reflected
+   * `@Header('Content-Type', ...)` on the method, then
+   * `application/octet-stream`.
+   */
+  mimeType?: string
+  /** File name hint (`Content-Disposition`, CLI output file, MCP resource URI). */
+  name?: string
+  /** Human-readable description; over MCP it ships as a leading text block. */
+  description?: string
 }
 
 /** tRPC procedure kind for a `@Trpc`-decorated route. */
@@ -151,4 +182,12 @@ export interface TrpcMetadata {
    * Default `'apply'`. Same semantics as `@Mcp({ pipes })`.
    */
   pipes?: 'apply' | 'skip'
+  /**
+   * Declare the route's result a binary/text resource (see `ResourceMetadata`).
+   * The procedure then returns core's `SerializedResource` JSON envelope.
+   * When unset, a reflected non-JSON `@Header('Content-Type', ...)` on the
+   * method also flips the route to resource delivery. Incompatible with
+   * subscriptions (`async *` routes); wins over `output` when both are set.
+   */
+  resource?: ResourceMetadata
 }

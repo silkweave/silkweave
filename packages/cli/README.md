@@ -79,6 +79,21 @@ Message 2 about weather
 
 Backpressure is honoured: each chunk write awaits `stdout`'s `drain` event when the buffer is full, so the action throttles itself if a downstream pipe is slow.
 
+## Resource Results (binary)
+
+An action with a `binary()` output (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) - or any action returning a `resource()`, `File`/`Blob`, or bare bytes - delivers its payload terminal-appropriately; binary is **never dumped onto an interactive terminal**:
+
+```bash
+# Piped: raw bytes on stdout (description + status go to stderr)
+$ mytool screenshot --url https://example.com > shot.png
+
+# Interactive: written to --output, or a file named after the resource
+$ mytool screenshot --url https://example.com --output shot.png
+Wrote 48213 bytes (image/png) to shot.png
+```
+
+The `-o, --output <path>` flag is added automatically for `binary()` actions (unless the input schema already has an `output` field, which then wins). The command banner moves to stderr for binary actions so a piped stdout stays byte-clean.
+
 ## See Also
 
 - [Silkweave README](https://github.com/silkweave/silkweave) - Full documentation

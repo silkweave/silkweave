@@ -80,6 +80,17 @@ const typeHandlers: Record<string, TypeHandler> = {
 }
 
 /**
+ * The TypeScript literal of core's `SerializedResource` - the JSON wire shape
+ * of a `binary()` action output on JSON transports (tRPC). Emitted inline so
+ * generated `.d.ts` files stay dependency-free.
+ */
+export function serializedResourceType(level = 0): string {
+  const p = pad(level + 1)
+  const members = ['kind: \'resource\'', 'mimeType: string', 'name?: string', 'description?: string', 'text?: string', 'base64?: string']
+  return `{\n${members.map((member) => `${p}${member}`).join('\n')}\n${pad(level)}}`
+}
+
+/**
  * Member lines for an object schema, indented one level deeper than `level`,
  * or `null` when the schema is not a Zod object (caller falls back to an index
  * signature). Shared by the `object` type handler and `generateDts`'s interface

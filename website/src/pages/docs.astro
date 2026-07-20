@@ -219,6 +219,22 @@ export function Chat() {
   // ... your UI (ai-elements works as-is)
 }`
 
+const resourceActionRaw = `import { binary, createAction, resource } from '@silkweave/core'
+import z from 'zod/v4'
+
+export const ScreenshotAction = createAction({
+  name: 'screenshot',
+  description: 'Capture a screenshot of a URL',
+  kind: 'query',
+  input: z.object({ url: z.string().describe('The URL to capture.') }),
+  output: binary({ mimeType: 'image/png' }),
+  run: async ({ url }) => resource(await capture(url), {
+    mimeType: 'image/png',
+    name: 'screenshot.png',
+    description: 'Screenshot of ' + url
+  })
+})`
+
 const streamingActionRaw = `import { createAction } from '@silkweave/core'
 import z from 'zod/v4'
 
@@ -493,6 +509,51 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
       <li><strong>tRPC subscriptions</strong> - typed async-iterable client-side; trivial to fan out chunk-by-chunk</li>
       <li><strong>CLI NDJSON</strong> - <code>your-tool generate-messages | jq</code> processes each line as it arrives</li>
     </ul>
+  </section>
+
+  <section id="resources">
+    <h3>Resource Results (binary)</h3>
+    <p>An action can return a <strong>binary or text artifact</strong> - a screenshot, PDF, rendered chart, audio clip, or a JSON/markdown artifact meant to travel as a file rather than inline JSON. Declare the output with <code>binary()</code> and return a <code>resource()</code>:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>actions/screenshot.ts</span>
+        <button class="copy-btn" data-copy-raw={resourceActionRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(resourceActionRaw)} /></pre>
+    </div>
+    <p>The <code>run</code> may return a <code>resource()</code>, a Web-Standard <code>File</code>/<code>Blob</code>, or bare <code>Uint8Array</code>/<code>ArrayBuffer</code> bytes - adapters normalize the value, using the <code>binary()</code> metadata as defaults for whatever the value doesn't carry (last resort: <code>application/octet-stream</code>). The optional <code>description</code> travels with the artifact so agents know what it is without decoding it. Everything is Web-Standard (no Buffer), so resource actions run on edge runtimes too.</p>
+
+    <h4>How each adapter delivers a resource</h4>
+    <table class="docs-table">
+      <thead><tr><th>Adapter</th><th>Delivery</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>MCP (<code>stdio</code>, <code>http</code>, <code>edge</code>)</td>
+          <td>Mime-driven content blocks: the <code>description</code> ships first as a <code>text</code> block, then raster <code>image/*</code> (png/jpeg/gif/webp) becomes an <code>image</code> block - multimodal hosts show it to the model, so an agent can literally <em>see</em> a screenshot - <code>audio/*</code> an <code>audio</code> block, text-based media (JSON, markdown, SVG) an embedded resource with <code>text</code>, and any other binary an embedded resource with a base64 <code>blob</code>. A client's <code>_meta.disposition</code> cannot demote a resource result.</td>
+        </tr>
+        <tr>
+          <td>Fastify REST</td>
+          <td>The raw payload: <code>Content-Type</code> from the media type, <code>Content-Disposition: inline; filename=</code> from <code>name</code>, <code>Content-Description</code> from <code>description</code>. OpenAPI documents the response as <code>type: string, format: binary</code>. <code>curl .../screenshot?url=… &gt; shot.png</code> just works.</td>
+        </tr>
+        <tr>
+          <td>tRPC (<code>trpc</code>, <code>trpcFetch</code>)</td>
+          <td>The <code>SerializedResource</code> JSON envelope: <code>{'{ kind: \'resource\', mimeType, name?, description?, text? | base64? }'}</code> - text media carries <code>text</code>, binary carries <code>base64</code> (handy as a data URL in a frontend). <code>InferTrpcRouter</code> types the envelope end-to-end.</td>
+        </tr>
+        <tr>
+          <td>CLI / cliProxy</td>
+          <td>Terminal-appropriate: piped stdout gets the raw bytes (<code>my-cli screenshot &gt; shot.png</code>, description on stderr); an interactive TTY writes to <code>--output &lt;path&gt;</code> or a file named after the resource - binary is never dumped onto a terminal.</td>
+        </tr>
+        <tr>
+          <td>NestJS</td>
+          <td><code>@Mcp({'{ resource: { mimeType, name?, description? } }'})</code> / <code>@Trpc({'{ resource }'})</code> declare a controller route's result a resource; a reflected non-JSON <code>@Header('Content-Type', …)</code> flips the route automatically, and returned <code>StreamableFile</code>s are collected to bytes. An existing REST screenshot endpoint gets correct MCP behavior with a bare <code>@Mcp()</code>.</td>
+        </tr>
+        <tr>
+          <td>typegen</td>
+          <td><code>binary()</code> outputs emit the <code>SerializedResource</code> interface in the generated <code>.d.ts</code> and <code>AppRouter</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Resources are <strong>embedded-only</strong> (no hosted resource links), and are incompatible with <code>disposition: 'structured'</code> and with streaming actions - both rejected at registration. A <code>toolResult</code> hook still wins over the built-in mapping when you need full control.</p>
   </section>
 
   <section id="action-linter">

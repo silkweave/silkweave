@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
-import { Action, ActionRun, ActionStreamRun, isStreamingAction, SilkweaveContext } from '@silkweave/core'
+import { Action, ActionRun, ActionStreamRun, binarySchemaMeta, isStreamingAction, serializeResource, SilkweaveContext, toActionResource } from '@silkweave/core'
 import { initTRPC } from '@trpc/server'
 import { camelCase } from 'change-case'
 import { mapError } from './errors.js'
@@ -28,7 +28,13 @@ function bufferedProcedure(base: any, action: Action) {
   const runFn = action.run as ActionRun<object, object>
   const handler = async ({ input, ctx }: { input: object; ctx: TrpcHandlerContext }) => {
     try {
-      return await runFn(input, ctx.silkweaveContext)
+      const result = await runFn(input, ctx.silkweaveContext)
+      // tRPC is JSON-only on the wire, so a resource result (resource()/File/
+      // Blob/bytes) ships as its SerializedResource envelope - text media
+      // types carry `text`, binary ones `base64`. `InferTrpcRouter` mirrors
+      // this at the type level.
+      const res = await toActionResource(result, binarySchemaMeta(action.output))
+      return res ? serializeResource(res) : result
     } catch (error) {
       throw mapError(error)
     }

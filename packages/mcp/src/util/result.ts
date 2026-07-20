@@ -1,5 +1,5 @@
 import { EmbeddedResource, type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { SilkweaveError } from '@silkweave/core'
+import { bytesToBase64, isTextMimeType, resourceBytes, resourceText, SilkweaveError, type ActionResource } from '@silkweave/core'
 
 // Web-standard (Node 18+ and edge/Workers) UTF-8 <-> base64 so this subpath,
 // which @silkweave/edge imports, carries no Node-only crypto/Buffer dependency.
@@ -35,6 +35,51 @@ export function smartToolResult(data: string | object | object[]): CallToolResul
       content: [{ type: 'text' as const, text }]
     }
   }
+}
+
+// Raster formats multimodal hosts (and the Claude API) actually render as
+// images. Non-raster image/* (notably image/svg+xml) would break hosts that
+// forward image blocks to a vision model, so SVG ships as a text resource.
+const RASTER_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
+
+function normalizedMimeType(mimeType: string): string {
+  return mimeType.split(';')[0].trim().toLowerCase()
+}
+
+/**
+ * Result formatter for resource results (an action returning `resource()`, a
+ * `File`/`Blob`, or bare bytes - normalized by the caller via
+ * `toActionResource()`). The mapping is mime-driven:
+ *
+ * - `description` (when set) ships first as a `text` content block, so the
+ *   model knows what the artifact is without decoding it,
+ * - raster `image/*` (png/jpeg/gif/webp) ⇒ an `image` block - multimodal
+ *   hosts surface it to the model directly,
+ * - `audio/*` ⇒ an `audio` block,
+ * - text-based media types (JSON, markdown, XML/SVG, `text/*`) ⇒ an embedded
+ *   resource with `text`,
+ * - anything else (PDF, zip, ...) ⇒ an embedded resource with a base64 `blob`.
+ */
+export function resourceToolResult(res: ActionResource): CallToolResult {
+  const content: CallToolResult['content'] = []
+  if (res.description) {
+    content.push({ type: 'text', text: res.description })
+  }
+  const mimeType = normalizedMimeType(res.mimeType)
+  if (RASTER_IMAGE_TYPES.has(mimeType)) {
+    content.push({ type: 'image', data: bytesToBase64(resourceBytes(res)), mimeType })
+  } else if (mimeType.startsWith('audio/')) {
+    content.push({ type: 'audio', data: bytesToBase64(resourceBytes(res)), mimeType })
+  } else {
+    const uri = `mcp://toolResult/${crypto.randomUUID()}${res.name ? `/${res.name}` : ''}`
+    content.push({
+      type: 'resource',
+      resource: isTextMimeType(mimeType)
+        ? { uri, mimeType: res.mimeType, text: resourceText(res) }
+        : { uri, mimeType: res.mimeType, blob: bytesToBase64(resourceBytes(res)) }
+    })
+  }
+  return { content }
 }
 
 /**

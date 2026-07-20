@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { HttpException, Injectable, Logger, type CanActivate, type Type } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { emitToolCall, SilkweaveError, type Action, type ActionKind, type OnToolCall, type SilkweaveContext, type ToolAnnotations } from '@silkweave/core'
+import { binary, emitToolCall, SilkweaveError, type Action, type ActionKind, type OnToolCall, type SilkweaveContext, type ToolAnnotations } from '@silkweave/core'
 import { camelCase } from 'change-case'
 import { z } from 'zod/v4'
 import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
@@ -10,6 +10,7 @@ import { invokeRebound, specialBinding, type Binding } from './rebind.js'
 import { populateRequestSlots, requestSlotFields, type RequestSlots } from './requestSlots.js'
 import { buildOpenApiLookup, openApiFields, type OpenApiDocument, type OpenApiLookup } from './reflect/openapi.js'
 import { PARAMTYPE, type ParamSlot, readParamSlots } from './reflect/params.js'
+import { normalizeControllerResult, resolveResourceMeta } from './resource.js'
 import { reflectDtoSchema, reflectResponseFields, reflectResponseSchema } from './reflect/response.js'
 import { reflectRoute, type RouteInfo } from './reflect/route.js'
 import { type FieldDesc, fieldToZod, mergeField, reflectDtoFields, unreflectedFields } from './reflect/schema.js'
@@ -168,6 +169,22 @@ export class ControllerDiscovery {
     // (one level deep, null-vs-optional gaps) are deliberately NOT accepted.
     const disposition = meta.result ?? defaultResult
     const output = resolveSchema(meta.output) ?? resolveSchema(d.trpc?.output)
+    // Resource routes: explicit @Mcp({ resource }) or a reflected non-JSON
+    // Content-Type header. Never auto-detected on streaming routes (an SSE
+    // route's Content-Type header must not flip its chunks to binary).
+    if (streaming && meta.resource) {
+      throw new SilkweaveError(
+        `${d.classRef.name}.${d.methodName}: @Mcp({ resource }) is not supported on a streaming (async *) route - there is no single result to deliver as a resource`,
+        'invalid_action'
+      )
+    }
+    const resourceMeta = streaming ? undefined : resolveResourceMeta(meta.resource, d.method)
+    if (disposition === 'structured' && resourceMeta) {
+      throw new SilkweaveError(
+        `${d.classRef.name}.${d.methodName}: @Mcp({ result: 'structured' }) cannot be combined with a resource route - a resource has no JSON outputSchema contract`,
+        'invalid_action'
+      )
+    }
     if (disposition === 'structured') {
       if (streaming) {
         throw new SilkweaveError(
@@ -198,7 +215,9 @@ export class ControllerDiscovery {
       description,
       input: z.object(shape),
       ...(disposition ? { disposition } : {}),
-      ...(disposition === 'structured' && output ? { output } : {}),
+      ...(resourceMeta
+        ? { output: binary(resourceMeta) }
+        : disposition === 'structured' && output ? { output } : {}),
       ...(meta.tags ? { tags: meta.tags } : {}),
       ...(meta.args ? { args: meta.args } : {}),
       annotations: { ...verbAnnotations(shared.route.method), ...meta.annotations },
@@ -211,7 +230,8 @@ export class ControllerDiscovery {
             const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
             const response = context.getOptional<unknown>('response')
             const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
-            return result ?? {}
+            const normalized = await normalizeControllerResult(result) as object | undefined
+            return normalized ?? {}
           }
         })
     } as Action
@@ -235,6 +255,12 @@ export class ControllerDiscovery {
     }
 
     if (streaming) {
+      if (meta.resource) {
+        throw new SilkweaveError(
+          `${d.classRef.name}.${d.methodName}: @Trpc({ resource }) is not supported on a streaming (async *) route - there is no single result to deliver as a resource`,
+          'invalid_action'
+        )
+      }
       return {
         name,
         description,
@@ -248,11 +274,14 @@ export class ControllerDiscovery {
     const kind: ActionKind = meta.kind === 'query' || meta.kind === 'mutation'
       ? meta.kind
       : (shared.route.method === 'GET' ? 'query' : 'mutation')
-    const output = resolveOutput(meta, method)
+    // A resource route's output is core's binary() schema - the procedure
+    // returns the SerializedResource envelope; it wins over `output`.
+    const resourceMeta = resolveResourceMeta(meta.resource, d.method)
+    const output = resourceMeta ? binary(resourceMeta) : resolveOutput(meta, method)
 
     // Reflection is one level deep, so a nested DTO or `Dto[]` output property
     // degrades to `unknown`/`unknown[]`. Surface it - the fix is `@Trpc({ output })`.
-    const degraded = outputDegradedFields(meta, method)
+    const degraded = resourceMeta ? [] : outputDegradedFields(meta, method)
     if (output && degraded.length > 0) {
       logger.warn(
         `${d.classRef.name}.${d.methodName}: tRPC output field(s) ${degraded.join(', ')} reflected to 'unknown' ` +
@@ -274,8 +303,9 @@ export class ControllerDiscovery {
           const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
           const response = context.getOptional<unknown>('response')
           const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
+          const normalized = await normalizeControllerResult(result) as object | undefined
           emitTrpcEvent(onToolCall, name, context, started, input)
-          return result ?? {}
+          return normalized ?? {}
         } catch (error) {
           const mapped = toSilkweaveError(error)
           emitTrpcEvent(onToolCall, name, context, started, input, mapped)

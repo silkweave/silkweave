@@ -1,7 +1,7 @@
 import 'reflect-metadata'
-import { Body, Controller, Delete, ForbiddenException, Get, Injectable, Param, Post, Put, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common'
+import { Body, Controller, Delete, ForbiddenException, Get, Header, Injectable, Param, Post, Put, StreamableFile, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { createContext, type Action, type SilkweaveContext, type ToolCallEvent } from '@silkweave/core'
+import { binarySchemaMeta, createContext, isActionResource, isBinarySchema, type Action, type ActionResource, type SilkweaveContext, type ToolCallEvent } from '@silkweave/core'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { Mcp } from '../decorator/mcp.js'
@@ -242,5 +242,99 @@ describe('ControllerDiscovery telemetry (trpc wrapper)', () => {
     const trpcList = actions.find((a) => a.name === 'Reports.list' && a.isEnabled?.(trpcCtx()))!
     await trpcList.run({}, createContext({ adapter: 'typegen' }))
     expect(events).toHaveLength(0)
+  })
+})
+
+@Controller('exports')
+class ExportsController {
+  @Get('chart')
+  @Mcp({ resource: { mimeType: 'image/png', name: 'chart.png', description: 'Rendered chart' } })
+  @Trpc({ resource: { mimeType: 'image/png' } })
+  chart(): Uint8Array { return new Uint8Array([1, 2, 3]) }
+
+  @Get('report')
+  @Header('Content-Type', 'application/pdf')
+  @Mcp()
+  report(): Uint8Array { return new Uint8Array([4]) }
+
+  @Get('data')
+  @Header('Content-Type', 'application/json')
+  @Mcp()
+  data(): { ok: boolean } { return { ok: true } }
+
+  @Get('stream')
+  @Mcp({ resource: { mimeType: 'image/png' } })
+  stream(): StreamableFile { return new StreamableFile(Buffer.from([9, 8])) }
+
+  @Get('streamTyped')
+  @Mcp()
+  streamTyped(): StreamableFile {
+    return new StreamableFile(Buffer.from([7]), { type: 'application/pdf', disposition: 'attachment; filename="doc.pdf"' })
+  }
+}
+
+describe('ControllerDiscovery resource routes', () => {
+  const byName = (actions: Action[], name: string): Action => actions.find((a) => a.name === name)!
+  const actions = () => discoverController(new ExportsController())
+
+  it('@Mcp({ resource }) yields a binary() output carrying the declared metadata', () => {
+    const action = byName(actions(), 'Exports.chart')
+    expect(isBinarySchema(action.output)).toBe(true)
+    expect(binarySchemaMeta(action.output)).toEqual({ mimeType: 'image/png', name: 'chart.png', description: 'Rendered chart' })
+  })
+
+  it('@Trpc({ resource }) also yields a binary() output on the trpc action', () => {
+    const all = actions().filter((a) => a.isEnabled?.(createContext({ adapter: 'trpc' })))
+    const action = byName(all, 'Exports.chart')
+    expect(isBinarySchema(action.output)).toBe(true)
+  })
+
+  it('a reflected non-JSON @Header Content-Type flips the route to a resource', () => {
+    const action = byName(actions(), 'Exports.report')
+    expect(isBinarySchema(action.output)).toBe(true)
+    expect(binarySchemaMeta(action.output)).toEqual({ mimeType: 'application/pdf' })
+  })
+
+  it('a JSON @Header Content-Type stays on the JSON result path', () => {
+    const action = byName(actions(), 'Exports.data')
+    expect(isBinarySchema(action.output)).toBe(false)
+    expect(action.output).toBeUndefined()
+  })
+
+  it('collects an untyped StreamableFile to bytes so schema defaults apply downstream', async () => {
+    const action = byName(actions(), 'Exports.stream')
+    const result: unknown = await action.run({}, createContext({ adapter: 'mcp' }))
+    expect(result).toBeInstanceOf(Uint8Array)
+    expect([...(result as Uint8Array)]).toEqual([9, 8])
+  })
+
+  it('a StreamableFile with explicit type/disposition becomes a named resource', async () => {
+    const action = byName(actions(), 'Exports.streamTyped')
+    const result: unknown = await action.run({}, createContext({ adapter: 'mcp' }))
+    expect(isActionResource(result)).toBe(true)
+    const res = result as ActionResource
+    expect(res.mimeType).toBe('application/pdf')
+    expect(res.name).toBe('doc.pdf')
+    expect([...(res.data as Uint8Array)]).toEqual([7])
+  })
+
+  it('boot-errors on result: structured combined with a resource route', () => {
+    @Controller('bad')
+    class BadController {
+      @Get()
+      @Mcp({ result: 'structured', resource: { mimeType: 'image/png' }, output: { x: z.string() } })
+      broken(): Uint8Array { return new Uint8Array(0) }
+    }
+    expect(() => discoverController(new BadController())).toThrow(/resource route/)
+  })
+
+  it('boot-errors on @Mcp({ resource }) applied to a streaming route', () => {
+    @Controller('badStream')
+    class BadStreamController {
+      @Get()
+      @Mcp({ resource: { mimeType: 'image/png' } })
+      async *broken(): AsyncGenerator<number> { yield 1 }
+    }
+    expect(() => discoverController(new BadStreamController())).toThrow(/streaming/)
   })
 })

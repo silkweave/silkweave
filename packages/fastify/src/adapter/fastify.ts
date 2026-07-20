@@ -1,6 +1,6 @@
 import type { FastifyCorsOptions } from '@fastify/cors'
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
-import { Action, actionMethod, ActionStreamRun, AdapterFactory, buildLogLevels, HttpMethod, isStreamingAction, Logger, LogLevel, methodHasBody, pathParamNames, resolveActionInput, runStreamingAction, SilkweaveContext, SilkweaveError, validateActionRouting } from '@silkweave/core'
+import { Action, actionMethod, ActionStreamRun, AdapterFactory, binarySchemaMeta, buildLogLevels, HttpMethod, isBinarySchema, isStreamingAction, Logger, LogLevel, methodHasBody, pathParamNames, resolveActionInput, resourceBytes, runStreamingAction, SilkweaveContext, SilkweaveError, toActionResource, validateActionRouting, type ActionResource } from '@silkweave/core'
 import { once } from 'events'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { Server } from 'http'
@@ -212,6 +212,42 @@ function splitInputSchema(action: Action, method: HttpMethod): {
   }
 }
 
+/** Strip characters that would break (or smuggle headers into) an HTTP header value. */
+function headerSafe(value: string): string {
+  return value.replace(/["\r\n]/g, ' ').trim()
+}
+
+/**
+ * Send a resource result as a raw HTTP body: bytes with `Content-Type` from
+ * the resource's media type, a `Content-Disposition` filename when the
+ * resource carries a name, and the description (if any) as
+ * `Content-Description` - over REST the binary itself IS the response, so the
+ * metadata rides in headers.
+ */
+function sendResource(reply: FastifyReply, res: ActionResource) {
+  reply.header('Content-Type', res.mimeType)
+  if (res.name) { reply.header('Content-Disposition', `inline; filename="${headerSafe(res.name)}"`) }
+  if (res.description) { reply.header('Content-Description', headerSafe(res.description)) }
+  return reply.send(Buffer.from(resourceBytes(res)))
+}
+
+/**
+ * OpenAPI response schema: binary actions document their payload as
+ * `type: string, format: binary` under the declared media type.
+ */
+function responseSchema(action: Action) {
+  if (!isBinarySchema(action.output)) {
+    return { 200: { description: 'Successful response' } }
+  }
+  const mimeType = binarySchemaMeta(action.output).mimeType ?? 'application/octet-stream'
+  return {
+    200: {
+      description: 'Successful response',
+      content: { [mimeType]: { schema: { type: 'string', format: 'binary' } } }
+    }
+  }
+}
+
 /**
  * Register the Scalar API-reference UI. It's an optional peer, so a missing
  * module is skipped with a hint rather than crashing a headless deployment.
@@ -230,6 +266,72 @@ async function registerScalarDocs(instance: FastifyInstance): Promise<void> {
   if (scalar) {
     await instance.register(scalar.default, { routePrefix: '/' })
   }
+}
+
+/** The instance-wide error handler: Silkweave/Zod/AJV failures map to legible statuses. */
+function errorHandler(instance: FastifyInstance) {
+  return (error: Error, _request: FastifyRequest, reply: FastifyReply) => {
+    if (error instanceof SilkweaveError) {
+      return reply.status(error.statusCode).send({ error: error.code, message: error.message })
+    }
+    if (error instanceof z.ZodError) {
+      return reply.status(400).send({ error: 'validation_error', issues: error.issues })
+    }
+    // Fastify's schema (AJV) validation failures for body/querystring/params.
+    const validation = (error as { validation?: unknown }).validation
+    if (validation) {
+      return reply.status(400).send({ error: 'validation_error', issues: validation })
+    }
+    instance.log.error(error)
+    return reply.status(500).send({ error: 'internal', message: 'Internal server error' })
+  }
+}
+
+/** Register one action as a Fastify route (validation, streaming, resource, and JSON paths). */
+function registerActionRoute(instance: FastifyInstance, action: Action, context: SilkweaveContext, logger: Logger, hasAuth: boolean) {
+  validateActionRouting(action)
+  const method = actionMethod(action)
+  const url = action.path ? `/${action.path.replace(/^\//, '')}` : `/${action.name}`
+  const { params, querystring, body } = splitInputSchema(action, method)
+  const streaming = isStreamingAction(action)
+  instance.route({
+    method,
+    url,
+    schema: {
+      description: action.description,
+      ...(params ? { params } : {}),
+      ...(querystring ? { querystring } : {}),
+      ...(body ? { body } : {}),
+      response: responseSchema(action)
+    },
+    handler: async (request, reply) => {
+      const authInfo = hasAuth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
+      const actionContext = context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) })
+      // Fastify's AJV only validates the JSON-Schema projection, which
+      // cannot express Zod refinements/transforms. Parse the merged input
+      // so .refine()/.email()/.transform() are enforced here as they are
+      // over MCP/tRPC/CLI (a ZodError becomes a 400 via setErrorHandler).
+      const input = action.input.parse(resolveActionInput(action, {
+        params: request.params as Record<string, string | undefined>,
+        query: request.query as Record<string, unknown>,
+        body: request.body
+      }))
+      if (streaming) {
+        const format = pickStreamFormat(request.headers.accept)
+        if (format) {
+          await streamAction(reply, format, action, input, actionContext)
+          return reply
+        }
+        return runStreamingAction(action, input, actionContext)
+      }
+      const result = await (action.run as (input: object, context: SilkweaveContext) => Promise<object>)(input, actionContext)
+      // A resource result (resource()/File/Blob/bytes) leaves as raw
+      // bytes with mime headers instead of JSON.
+      const res = await toActionResource(result, binarySchemaMeta(action.output))
+      if (res) { return sendResource(reply, res) }
+      return result
+    }
+  })
 }
 
 export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, auth, cors: corsConfig, ...fastifyOptions }) => {
@@ -267,65 +369,12 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
           mountAuthMiddleware(instance, auth, oauthPaths, context)
         }
 
-        instance.setErrorHandler((error, _request, reply) => {
-          if (error instanceof SilkweaveError) {
-            return reply.status(error.statusCode).send({ error: error.code, message: error.message })
-          }
-          if (error instanceof z.ZodError) {
-            return reply.status(400).send({ error: 'validation_error', issues: error.issues })
-          }
-          // Fastify's schema (AJV) validation failures for body/querystring/params.
-          const validation = (error as { validation?: unknown }).validation
-          if (validation) {
-            return reply.status(400).send({ error: 'validation_error', issues: validation })
-          }
-          instance.log.error(error)
-          return reply.status(500).send({ error: 'internal', message: 'Internal server error' })
-        })
+        instance.setErrorHandler(errorHandler(instance))
 
         const logger = createActionLogger(instance)
 
         for (const action of actions) {
-          validateActionRouting(action)
-          const method = actionMethod(action)
-          const url = action.path ? `/${action.path.replace(/^\//, '')}` : `/${action.name}`
-          const { params, querystring, body } = splitInputSchema(action, method)
-          const streaming = isStreamingAction(action)
-          instance.route({
-            method,
-            url,
-            schema: {
-              description: action.description,
-              ...(params ? { params } : {}),
-              ...(querystring ? { querystring } : {}),
-              ...(body ? { body } : {}),
-              response: {
-                200: { description: 'Successful response' }
-              }
-            },
-            handler: async (request, reply) => {
-              const authInfo = auth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
-              const actionContext = context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) })
-              // Fastify's AJV only validates the JSON-Schema projection, which
-              // cannot express Zod refinements/transforms. Parse the merged input
-              // so .refine()/.email()/.transform() are enforced here as they are
-              // over MCP/tRPC/CLI (a ZodError becomes a 400 via setErrorHandler).
-              const input = action.input.parse(resolveActionInput(action, {
-                params: request.params as Record<string, string | undefined>,
-                query: request.query as Record<string, unknown>,
-                body: request.body
-              }))
-              if (streaming) {
-                const format = pickStreamFormat(request.headers.accept)
-                if (format) {
-                  await streamAction(reply, format, action, input, actionContext)
-                  return reply
-                }
-                return runStreamingAction(action, input, actionContext)
-              }
-              return action.run(input, actionContext)
-            }
-          })
+          registerActionRoute(instance, action, context, logger, Boolean(auth))
         }
         await instance.listen({ host, port })
       },

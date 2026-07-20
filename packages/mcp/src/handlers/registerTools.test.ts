@@ -1,7 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { createContext, SilkweaveError, type Action, type ToolCallEvent } from '@silkweave/core'
+import { binary, createContext, resource, SilkweaveError, type Action, type ToolCallEvent } from '@silkweave/core'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod/v4'
 import { registerTools, type RegisterToolsOptions } from './registerTools.js'
@@ -148,6 +148,74 @@ describe('registerTools default disposition (json)', () => {
     const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
     const content = result.content as { type: string }[]
     expect(content.some((block) => block.type === 'resource')).toBe(true)
+  })
+})
+
+describe('registerTools resource results', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+  const screenshot = (overrides: Partial<Action> = {}) => action({
+    name: 'take.screenshot',
+    output: binary({ mimeType: 'image/png' }),
+    run: async () => resource(png, { mimeType: 'image/png', description: 'Screenshot of example.com' }),
+    ...overrides
+  })
+
+  it('delivers a resource() image as text description + image block', async () => {
+    const client = await connect([screenshot()])
+    const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
+    const content = result.content as { type: string; text?: string; mimeType?: string; data?: string }[]
+    expect(content).toHaveLength(2)
+    expect(content[0]).toEqual({ type: 'text', text: 'Screenshot of example.com' })
+    expect(content[1]).toMatchObject({ type: 'image', mimeType: 'image/png' })
+    expect(Buffer.from(content[1].data!, 'base64')).toEqual(Buffer.from(png))
+  })
+
+  it('normalizes a bare Uint8Array return using the binary() schema mime type', async () => {
+    const client = await connect([screenshot({ run: async () => png })])
+    const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
+    const content = result.content as { type: string; mimeType?: string }[]
+    expect(content[0]).toMatchObject({ type: 'image', mimeType: 'image/png' })
+  })
+
+  it('normalizes a returned File - its own name and type win', async () => {
+    const client = await connect([screenshot({
+      run: async () => new File(['{"report":true}'], 'report.json', { type: 'application/json' })
+    })])
+    const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
+    const [block] = result.content as [{ type: string; resource: { uri: string; text: string } }]
+    expect(block.type).toBe('resource')
+    expect(block.resource.text).toBe('{"report":true}')
+    expect(block.resource.uri).toContain('report.json')
+  })
+
+  it('handles resource-like results on actions with no binary() declaration', async () => {
+    const client = await connect([action({ run: async () => resource('# hi', { mimeType: 'text/markdown' }) })])
+    const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
+    expect((result.content as { type: string }[])[0].type).toBe('resource')
+  })
+
+  it('a client _meta.disposition cannot demote a resource result', async () => {
+    const client = await connect([screenshot()])
+    const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' }, _meta: { disposition: 'smart' } })
+    const content = result.content as { type: string }[]
+    expect(content.some((block) => block.type === 'image')).toBe(true)
+  })
+
+  it('a toolResult hook still wins over resource mapping', async () => {
+    const client = await connect([screenshot({
+      toolResult: () => ({ content: [{ type: 'text', text: 'hooked' }] })
+    })])
+    const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
+    expect(result.content).toEqual([{ type: 'text', text: 'hooked' }])
+  })
+
+  it('telemetry counts payload bytes and does not report sideloaded', async () => {
+    const events: ToolCallEvent[] = []
+    const client = await connect([screenshot({
+      run: async () => resource(png, { mimeType: 'application/pdf' })
+    })], { onToolCall: (event) => { events.push(event) } })
+    await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
+    expect(events[0]).toMatchObject({ ok: true, resultBytes: png.length, sideloaded: false })
   })
 })
 

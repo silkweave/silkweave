@@ -62,6 +62,20 @@ curl 'http://localhost:8080/spaces/acme/users?offset=20&limit=10'
 
 The input is merged from path + query + body (precedence: body → query → path) and validated per-source with the generated JSON Schema. The path placeholders, query params, and body each get their own OpenAPI parameters/requestBody, and validation failures return `400 { "error": "validation_error", "issues": [...] }`. A `:param` or `queryParams` entry that isn't in the input schema throws at startup.
 
+## Resource Results (binary)
+
+An action with a `binary()` output (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) - or any action returning a `resource()`, `File`/`Blob`, or bare bytes - responds with the **raw payload** instead of JSON:
+
+- `Content-Type` from the resource's media type
+- `Content-Disposition: inline; filename="..."` when the resource carries a `name`
+- `Content-Description` when it carries a `description`
+
+```bash
+curl 'http://localhost:8080/screenshot?url=https://example.com' > shot.png
+```
+
+The route's OpenAPI response documents the payload as `type: string, format: binary` under the declared media type.
+
 ## Streaming Actions
 
 Actions defined with a `chunk` schema and an `async function*` `run` (see [`@silkweave/core`](https://www.npmjs.com/package/@silkweave/core)) are exposed on the same `POST /{action.name}` route, but the response shape depends on the request's `Accept` header:

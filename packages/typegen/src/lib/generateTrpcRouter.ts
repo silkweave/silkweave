@@ -1,6 +1,6 @@
-import { type Action, isStreamingAction } from '@silkweave/core'
+import { type Action, isBinarySchema, isStreamingAction } from '@silkweave/core'
 import { camelCase } from 'change-case'
-import { zodToTs } from './zodToTs.js'
+import { serializedResourceType, zodToTs } from './zodToTs.js'
 
 const TRPC_PROCEDURE_TYPES = ['AnyTRPCRootTypes', 'TRPCBuiltRouter', 'TRPCMutationProcedure', 'TRPCQueryProcedure', 'TRPCSubscriptionProcedure'] as const
 
@@ -30,7 +30,10 @@ export function generateTrpcRouter(actions: Action[]): string {
     // Nested two levels deep inside `TRPCBuiltRouter<_, { key: Type<{ ... }> }>`.
     const outputType = streaming
       ? (action.chunk ? zodToTs(action.chunk, 2) : 'unknown')
-      : (action.output ? zodToTs(action.output, 2) : 'unknown')
+      : isBinarySchema(action.output)
+        // A binary() output crosses tRPC's JSON wire as SerializedResource.
+        ? serializedResourceType(2)
+        : (action.output ? zodToTs(action.output, 2) : 'unknown')
     return `  ${camelCase(action.name)}: ${procedureType}<{
     meta: object
     input: ${zodToTs(action.input, 2)}

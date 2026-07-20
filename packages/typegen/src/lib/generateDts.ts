@@ -1,7 +1,7 @@
-import { type Action, isStreamingAction } from '@silkweave/core'
+import { type Action, isBinarySchema, isStreamingAction } from '@silkweave/core'
 import type { z } from 'zod/v4'
 import { pascalCase } from 'change-case'
-import { objectMembers, zodToTs } from './zodToTs.js'
+import { objectMembers, serializedResourceType, zodToTs } from './zodToTs.js'
 
 export function generateDts(actions: Action[]): string {
   const blocks: string[] = []
@@ -15,6 +15,9 @@ export function generateDts(actions: Action[]): string {
       // Streaming action: emit `${name}Chunk` and `${name}Output = Chunk[]`.
       blocks.push(`export type ${name}Chunk = ${zodToTs(action.chunk)}`)
       blocks.push(`export type ${name}Output = ${name}Chunk[]`)
+    } else if (isBinarySchema(action.output)) {
+      // Binary output: the JSON-transport wire shape (SerializedResource).
+      blocks.push(`export interface ${name}Output ${serializedResourceType()}`)
     } else if (action.output) {
       blocks.push(interfaceBlock(`${name}Output`, action.output))
     }
