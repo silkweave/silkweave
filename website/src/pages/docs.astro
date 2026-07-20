@@ -233,6 +233,21 @@ await silkweave({ name: 'team-skills', description: 'Team skills server', versio
   }))
   .start()`
 
+const skillsMarketplaceRaw = `# 1. Pack the skill as a skills-only Claude Code plugin, publish to npm
+npx silkweave skills pack ./skills/commit-message
+npm publish dist/commit-message-plugin --access public
+
+# 2. Serve the marketplace next to the skills (server.ts)
+http({
+  port: 8080,
+  skills: [defineSkill({ dir: './skills/commit-message', npmPackage: 'commit-message-skill' })],
+  skillsMarketplace: { owner: { name: 'Your Team' } }
+})
+
+# 3. Consumers add it in Claude Code
+/plugin marketplace add https://skills.example.com/.claude-plugin/marketplace.json
+/plugin install commit-message@team-skills`
+
 const skillsCliRaw = `# Install/update everything the server offers into ~/.claude/skills
 npx silkweave skills sync --url https://skills.example.com/mcp --token $TOKEN
 
@@ -611,6 +626,16 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
     </div>
     <p>Installs land in <code>~/.claude/skills</code> (or <code>--target</code>) with a <code>.silkweave-lock.json</code> recording server, versions, and per-file sha256 digests. Every file is re-verified against its digest client-side and names/paths are revalidated, so a server can never write outside the target. <code>pin</code> holds a skill across syncs; <code>sync --prune</code> removes skills the server dropped. Versioning comes from the conventional <code>metadata.version</code> frontmatter entry (or <code>defineSkill({'{ version }'})</code>).</p>
     <p><strong>Private and mixed sharing:</strong> combine with bearer/OAuth auth for private skill servers, or serve public and private skills from one endpoint - when a per-request <code>filterActions</code> drops the skill tools, the <code>skill://</code> resources and instructions are hidden for that request too, so filtered clients can't read the files through the back door. On filesystem-less runtimes (Cloudflare Workers), use <code>defineSkill({'{ files }'})</code> with inline content. Digests bind approval to content but are not signatures - install skills only from servers you trust.</p>
+    <h4>Public skills: the Claude Code plugin bridge</h4>
+    <p>Public skills can additionally get the native Claude Code <code>/plugin</code> experience - real versioning and <code>/plugin update</code> - without exposing a repo or running a registry. Pack and publish a skill as a skills-only plugin npm package, then serve a marketplace from the same server:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>terminal + server.ts</span>
+        <button class="copy-btn" data-copy-raw={skillsMarketplaceRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(skillsMarketplaceRaw)} /></pre>
+    </div>
+    <p><code>skills pack</code> reads the version from the frontmatter <code>metadata.version</code> and refuses a version already on the registry, so changed content always ships under a new version. The <code>skillsMarketplace</code> option (on <code>http()</code> and <code>edge()</code>) answers <code>GET /.claude-plugin/marketplace.json</code> with npm-sourced plugin entries for every served skill carrying an <code>npmPackage</code> (from <code>defineSkill({'{ npmPackage }'})</code> or frontmatter <code>metadata.npmPackage</code>). The document is served unauthenticated, like <code>/.well-known/</code> - it only points at npm packages that are public anyway; skills without an <code>npmPackage</code> stay private to the MCP surface. Consumers run <code>/plugin marketplace add https://&lt;host&gt;/.claude-plugin/marketplace.json</code>, then <code>/plugin install &lt;skill&gt;@&lt;marketplace&gt;</code>.</p>
   </section>
 
   <section id="action-linter">

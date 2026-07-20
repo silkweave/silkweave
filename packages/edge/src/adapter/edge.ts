@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
 import { Action, AdapterGenerator, OnToolCall, SilkweaveContext, SilkweaveOptions, Skill, SkillDefinition, validateActionDisposition } from '@silkweave/core'
-import { emitInvalidArguments, filterErrorResponse, prepareSkills, registerTools, rpcInfo, type FilterActions, type SkillServing } from '@silkweave/mcp/tools'
+import { emitInvalidArguments, filterErrorResponse, MARKETPLACE_PATH, prepareSkills, registerTools, rpcInfo, type FilterActions, type SkillServing, type SkillsMarketplaceOptions } from '@silkweave/mcp/tools'
 
 export interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
@@ -40,6 +40,13 @@ export interface EdgeAdapterOptions {
   skills?: (Skill | SkillDefinition)[]
   /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
   skillsExtension?: boolean
+  /**
+   * Serve a Claude Code plugin marketplace at `/.claude-plugin/marketplace.json`
+   * listing every served skill that carries an `npmPackage` (packed with
+   * `silkweave skills pack`, published to npm). Served unauthenticated - the
+   * document only points at already-public npm packages. Requires `skills`.
+   */
+  skillsMarketplace?: SkillsMarketplaceOptions
 }
 
 export interface EdgeAdapter {
@@ -144,6 +151,101 @@ async function routeOAuth(
   return oauthResponseToResponse(oauthRes)
 }
 
+/**
+ * `GET /.claude-plugin/marketplace.json` - the Claude Code plugin marketplace.
+ * Public by construction (it only points at npm-published packages), so it is
+ * served before the auth check, like `/.well-known/`.
+ */
+function marketplaceResponse(request: Request, serving: SkillServing | undefined, corsHeaders: Record<string, string>): Response {
+  if (request.method !== 'GET') {
+    return new Response('Method Not Allowed', { status: 405, headers: { ...corsHeaders, Allow: 'GET' } })
+  }
+  return new Response(serving?.marketplace, {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=300' }
+  })
+}
+
+/** `GET /.well-known/oauth-protected-resource` - protected resource metadata (RFC 9728). */
+function protectedResourceResponse(auth: AuthConfig, corsHeaders: Record<string, string>): Response {
+  const metadata = generateProtectedResourceMetadata(auth.resourceUrl!, auth.authorizationServers!, auth.requiredScopes)
+  return new Response(JSON.stringify(metadata), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' }
+  })
+}
+
+/** Validate the bearer token; an error becomes the Response, success forks `auth` into the context. */
+async function authenticateRequest(
+  request: Request,
+  auth: AuthConfig | undefined,
+  context: SilkweaveContext
+): Promise<{ response: Response } | { context: SilkweaveContext }> {
+  if (!auth) { return { context } }
+  const result = await validateToken(request.headers.get('authorization'), auth, context.fork({ request }))
+  if (result.error) {
+    return {
+      response: new Response(JSON.stringify(result.error.body), {
+        status: result.error.statusCode,
+        headers: result.error.headers
+      })
+    }
+  }
+  return { context: result.auth ? context.fork({ auth: result.auth }) : context }
+}
+
+/** Apply the per-request `filterActions`; a throw maps to its statusCode/500, never an empty tool list. */
+async function applyActionFilter(
+  filter: FilterActions | undefined,
+  combined: Action[],
+  request: Request,
+  rawBody: unknown,
+  corsHeaders: Record<string, string>
+): Promise<{ response: Response } | { actions: Action[] }> {
+  if (!filter) { return { actions: combined } }
+  try {
+    return {
+      actions: await filter(combined, {
+        headers: Object.fromEntries(request.headers.entries()),
+        url: request.url,
+        ...rpcInfo(rawBody)
+      })
+    }
+  } catch (error) {
+    const mapped = filterErrorResponse(error, rawBody)
+    return {
+      response: new Response(JSON.stringify(mapped.body), {
+        status: mapped.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+  }
+}
+
+/**
+ * Mint the per-request server, gating the skill surface (resources +
+ * instructions) on the skill actions having survived the per-request filter -
+ * see SkillServing.visible.
+ */
+function createEdgeMcpServer(
+  options: SilkweaveOptions,
+  actions: Action[],
+  context: SilkweaveContext,
+  onToolCall: OnToolCall | undefined,
+  serving: SkillServing | undefined
+): McpServer {
+  const skillsVisible = serving?.visible(actions) ?? false
+  const server = new McpServer({
+    name: options.name,
+    description: options.description,
+    version: options.version
+  }, {
+    capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
+    ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
+  })
+  registerTools(server, actions, context, { onToolCall })
+  if (skillsVisible) { serving?.register(server) }
+  return server
+}
+
 export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   const mcpPath = options.path ?? '/mcp'
   const callbackPath = options.auth?.callbackPath ?? '/auth/callback'
@@ -159,9 +261,16 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     _readyResolve = resolve
     _readyReject = reject
   })
+  // A boot failure is surfaced through start() and every awaiting handler; the
+  // bare rejection must not double as an unhandled rejection when no request
+  // is in flight.
+  _ready.catch(() => { /* surfaced via start() / per-request await */ })
 
   // Pre-compute valid paths for fast rejection of bogus requests
   const validPaths = new Set<string>([mcpPath])
+  if (options.skillsMarketplace) {
+    validPaths.add(MARKETPLACE_PATH)
+  }
   if (options.auth?.authorizationServers?.length && options.auth.resourceUrl) {
     validPaths.add('/.well-known/oauth-protected-resource')
   }
@@ -197,12 +306,15 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       return new Response(null, { status: 200, headers: CORS_HEADERS })
     }
 
+    // Claude Code plugin marketplace - public, so it sits before the auth check.
+    if (options.skillsMarketplace && url.pathname === MARKETPLACE_PATH) {
+      await _ready
+      return marketplaceResponse(request, _serving, CORS_HEADERS)
+    }
+
     // Protected resource metadata (RFC 9728)
     if (url.pathname === '/.well-known/oauth-protected-resource') {
-      const metadata = generateProtectedResourceMetadata(options.auth!.resourceUrl!, options.auth!.authorizationServers!, options.auth!.requiredScopes)
-      return new Response(JSON.stringify(metadata), {
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' }
-      })
+      return protectedResourceResponse(options.auth!, CORS_HEADERS)
     }
 
     // OAuth provider routes
@@ -243,37 +355,14 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       )
     }
 
-    let requestContext = _context!
-    if (options.auth) {
-      const result = await validateToken(request.headers.get('authorization'), options.auth, _context!.fork({ request }))
-      if (result.error) {
-        return new Response(JSON.stringify(result.error.body), {
-          status: result.error.statusCode,
-          headers: result.error.headers
-        })
-      }
-      if (result.auth) {
-        requestContext = _context!.fork({ auth: result.auth })
-      }
-    }
+    const authed = await authenticateRequest(request, options.auth, _context!)
+    if ('response' in authed) { return authed.response }
+    const requestContext = authed.context
 
     const combined = _serving ? [..._actions, ..._serving.actions] : _actions
-    let activeActions = combined
-    if (options.filterActions) {
-      try {
-        activeActions = await options.filterActions(combined, {
-          headers: Object.fromEntries(request.headers.entries()),
-          url: request.url,
-          ...rpcInfo(rawBody)
-        })
-      } catch (error) {
-        const mapped = filterErrorResponse(error, rawBody)
-        return new Response(JSON.stringify(mapped.body), {
-          status: mapped.status,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
-        })
-      }
-    }
+    const filtered = await applyActionFilter(options.filterActions, combined, request, rawBody, CORS_HEADERS)
+    if ('response' in filtered) { return filtered.response }
+    const activeActions = filtered.actions
 
     // Emit-only: the SDK rejects an invalid-arguments tools/call before the
     // handler (and its telemetry emit) ever runs, so surface it here. The
@@ -285,22 +374,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       enableJsonResponse: options.enableJsonResponse,
       ...dnsRebindingOptions(options)
     })
-
-    // Gate the skill surface (resources + instructions) on the skill actions
-    // having survived the per-request filter - see SkillServing.visible.
-    const skillsVisible = _serving?.visible(activeActions) ?? false
-    const server = new McpServer({
-      name: _options!.name,
-      description: _options!.description,
-      version: _options!.version
-    }, {
-      capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
-      ...(skillsVisible && _serving ? { instructions: _serving.instructions } : {})
-    })
-
-    registerTools(server, activeActions, requestContext, { onToolCall: options.onToolCall })
-    if (skillsVisible) { _serving?.register(server) }
-
+    const server = createEdgeMcpServer(_options!, activeActions, requestContext, options.onToolCall, _serving)
     await server.connect(transport)
     return transport.handleRequest(request)
   }
@@ -325,7 +399,12 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
         try {
           actions.forEach(validateActionDisposition)
           _actions = actions
-          _serving = await prepareSkills(options.skills, { extension: options.skillsExtension })
+          _serving = await prepareSkills(options.skills, {
+            extension: options.skillsExtension,
+            ...(options.skillsMarketplace
+              ? { marketplace: { ...options.skillsMarketplace, name: options.skillsMarketplace.name ?? silkweaveOptions.name } }
+              : {})
+          })
           _readyResolve()
         } catch (error) {
           // Reject `_ready` so awaiting handlers get a 500 instead of hanging

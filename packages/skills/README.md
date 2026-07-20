@@ -48,6 +48,7 @@ A skill is a directory with a `SKILL.md` (YAML frontmatter + Markdown body) plus
 - `name`: 1-64 lowercase alphanumerics/hyphens; must match the directory name (`defineSkill({ name })` is the explicit override).
 - `description`: required, 1-1024 chars.
 - Versioning: the spec has no first-class version field - Silkweave reads the conventional `metadata.version` frontmatter entry, overridable via `defineSkill({ version })`.
+- npm identity (for the marketplace bridge below): the conventional `metadata.npmPackage` frontmatter entry, overridable via `defineSkill({ npmPackage })`.
 
 Every file gets a `sha256:<hex>` content digest, plus an aggregate skill digest - the identity `silkweave skills sync` uses for update checks and install verification.
 
@@ -60,8 +61,35 @@ Every file gets a `sha256:<hex>` content digest, plus an aggregate skill digest 
 | `skillInstructions(skills)` | The server-instructions blurb announcing the skills. |
 | `skillManifest(skills)` / `skillPayload(skill)` | Wire shapes: metadata-only listing and full-content payload. |
 | `diffSkills(manifest, lockfile)` / `lockEntry()` / `emptyLockfile()` | Lockfile model + diff (`missing` / `outdated` / `up-to-date` / `held` / `orphaned`) shared with the CLI. |
+| `marketplaceJson(skills, config)` / `pluginFiles(skill, { npmPackage })` | The Claude Code marketplace document and the packed plugin layout (pure data - the adapters serve the former, `silkweave skills pack` writes the latter). |
 | `sha256(data)` / `assertSafeSkillPath(path)` | The digest and path-safety primitives (Web Crypto only - identical on Node and edge). |
 | `registerSkillResources(server, skills)` (from `@silkweave/skills/mcp`) | Registers the `skill://` file resources on an SDK `McpServer`. Separate entry so the package root has no MCP SDK dependency. |
+
+## Public skills: the Claude Code marketplace bridge
+
+Public skills can additionally get the **native Claude Code `/plugin` experience** - real versioning and `/plugin update` - without exposing a repo or running a registry:
+
+1. **Pack + publish** each public skill as a skills-only plugin npm package: `npx silkweave skills pack ./skills/commit-message`, then `npm publish` (see the [`silkweave` CLI](../silkweave)).
+2. **Serve a marketplace** from the same MCP server with the `http()`/`edge()` adapters' `skillsMarketplace` option:
+
+```typescript
+http({
+  port: 8080,
+  skills: [defineSkill({ dir: './skills/commit-message', npmPackage: 'commit-message-skill' })],
+  skillsMarketplace: { owner: { name: 'Atomic' } }  // name defaults to the server name
+})
+```
+
+The server then answers `GET /.claude-plugin/marketplace.json` with npm-sourced plugin entries for every served skill that carries an `npmPackage` (from `defineSkill({ npmPackage })` or the `metadata.npmPackage` frontmatter entry; entries pin the skill's version, and `skillsMarketplace.registry` targets a private registry). Consumers run:
+
+```
+/plugin marketplace add https://skills.example.com/.claude-plugin/marketplace.json
+/plugin install commit-message@team-skills
+```
+
+The marketplace document is served **unauthenticated** (like `/.well-known/`): it only points at npm packages that are public anyway - Claude Code fetches plugin content from npm, never from your server. npm sources are the only kind emitted because a URL-added marketplace cannot resolve relative paths. Skills without an `npmPackage` stay private to the MCP surface; a `skillsMarketplace` with zero npm-published skills fails at boot.
+
+> The marketplace is a pointer, not a host: declaring `npmPackage` does not publish anything. Until you actually `npm publish` the packed plugin, `/plugin install` fails with a npm 404 for that entry - pack and publish first, then list.
 
 ## Access control
 

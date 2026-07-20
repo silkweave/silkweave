@@ -10,6 +10,7 @@ import { protectedResourceMetadata } from '../handlers/metadata.js'
 import { oauthRoutes } from '../handlers/oauth.js'
 import { type FilterActions } from '../handlers/filter.js'
 import { sideloadResource } from '../handlers/sideload.js'
+import { MARKETPLACE_PATH, type SkillsMarketplaceOptions } from '../handlers/skills.js'
 import { mcpTransport } from '../handlers/transport.js'
 
 export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
@@ -41,6 +42,14 @@ export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
   skills?: (Skill | SkillDefinition)[]
   /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
   skillsExtension?: boolean
+  /**
+   * Serve a Claude Code plugin marketplace at `/.claude-plugin/marketplace.json`
+   * listing every served skill that carries an `npmPackage` (packed with
+   * `silkweave skills pack`, published to npm). Served unauthenticated, like
+   * `/.well-known/` - the document only points at already-public npm packages.
+   * Requires `skills`.
+   */
+  skillsMarketplace?: SkillsMarketplaceOptions
 }
 
 /**
@@ -56,7 +65,7 @@ export function buildMcpExpressApp(
   actions: Action[],
   options: StartMcpHttpOptions
 ): Express {
-  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, skillsExtension, ...mcpAppOptions } = options
+  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, skillsExtension, skillsMarketplace, ...mcpAppOptions } = options
   const app = createMcpExpressApp({ ...mcpAppOptions, host })
 
   const corsHandler = mcpCors(corsConfig ?? true)
@@ -80,7 +89,9 @@ export function buildMcpExpressApp(
   if (auth) {
     const guard = authMiddleware(auth, context)
     app.use((req, res, next) => {
-      if (req.path.startsWith('/.well-known/') || oauthPaths.has(req.path)) { return next() }
+      // The marketplace document is public by construction (it only points at
+      // npm-published packages), so it bypasses auth like /.well-known/.
+      if (req.path.startsWith('/.well-known/') || oauthPaths.has(req.path) || (skillsMarketplace && req.path === MARKETPLACE_PATH)) { return next() }
       return guard(req, res, next)
     })
   }
@@ -89,7 +100,18 @@ export function buildMcpExpressApp(
     app.get('/resource/:id', sideloadResource({ resourceDir }))
   }
 
-  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall, skills, skillsExtension })
+  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall, skills, skillsExtension, skillsMarketplace })
+
+  if (skillsMarketplace) {
+    app.get(MARKETPLACE_PATH, (_req, res) => {
+      transport.skills
+        .then((serving) => {
+          res.set('Cache-Control', 'max-age=300').type('application/json').send(serving?.marketplace)
+        })
+        .catch(() => res.status(500).json({ error: 'internal_error' }))
+    })
+  }
+
   app.post('/mcp', express.json(), transport.post)
   // Surface a skill boot failure (bad SKILL.md, missing @silkweave/skills) at
   // start rather than as per-request 500s.

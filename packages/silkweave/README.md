@@ -29,6 +29,23 @@ npx silkweave skills sync --prune --url ...  # remove skills the server dropped
 - **Automation**: run `sync` from a login item, cron, or a Claude Code `SessionStart` hook to keep a fleet of machines converged on one skills server.
 - **SEP-2640 aware**: when a server declares the (draft) MCP skills extension, the CLI consumes `skills/list` + `resources/read` instead of the silkweave tools - so `skills sync` also installs from any conforming third-party MCP server. Per-file digest verification applies on both paths.
 
+## Publishing public skills (Claude Code plugins)
+
+`skills pack` wraps one skill directory into a **skills-only Claude Code plugin** package, ready for `npm publish` - public skills get the native `/plugin` experience (real versioning, `/plugin update`) without exposing a repo:
+
+```bash
+npx silkweave skills pack ./skills/commit-message
+# -> dist/commit-message-plugin/
+#      package.json                      npm identity
+#      .claude-plugin/plugin.json        plugin manifest
+#      skills/commit-message/SKILL.md    the skill, auto-discovered by Claude Code
+npm publish dist/commit-message-plugin --access public
+```
+
+- **Package name**: `--package <name>`, else the frontmatter `metadata.npmPackage`, else `<skill-name>-skill`.
+- **Version**: from the frontmatter `metadata.version` (required - the plugin version is what drives `/plugin update`). Packing **refuses a version already on the registry** so changed content always ships under a new version; `--force` overrides, `--registry <url>` points the check at a private registry.
+- **Distribution**: serve a marketplace from the same server via the `http()`/`edge()` adapters' `skillsMarketplace` option (see [`@silkweave/skills`](https://github.com/silkweave/silkweave/tree/master/packages/skills)). Consumers then run `/plugin marketplace add https://<host>/.claude-plugin/marketplace.json` and `/plugin install <skill>@<marketplace>`.
+
 ## Universal proxy
 
 Turn any Silkweave (or plain MCP Streamable HTTP) server into a CLI on the spot - its tools become subcommands, built from `tools/list` at invocation time:
@@ -52,4 +69,8 @@ This is the packaged [`cliProxy`](https://github.com/silkweave/silkweave/tree/ma
 | `-H, --header <key=value>` | all remote | Extra request header, repeatable |
 | `--target <dir>` | `skills *` | Install directory (default `~/.claude/skills`) |
 | `--prune` | `skills sync` | Remove installed skills the server no longer offers |
+| `-p, --package <name>` | `skills pack` | npm package name (default: `metadata.npmPackage`, else `<skill-name>-skill`) |
+| `-o, --out <dir>` | `skills pack` | Output directory (default `dist/<skill-name>-plugin`) |
+| `--registry <url>` | `skills pack` | npm registry for the already-published check |
+| `--force` | `skills pack` | Pack even when this version is already published |
 | `-s, --silent` | `proxy` | Suppress log messages |

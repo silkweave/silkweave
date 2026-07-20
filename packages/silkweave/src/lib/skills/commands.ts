@@ -5,6 +5,7 @@ import { connectRemote, parseUrl, type RemoteOptions } from '../connect.js'
 import { skillSource } from './client.js'
 import { installSkill, removeSkill } from './install.js'
 import { defaultTarget, readLockfile, writeLockfile } from './io.js'
+import { DEFAULT_REGISTRY, packSkill } from './pack.js'
 
 interface SkillsOptions extends RemoteOptions {
   url?: string
@@ -149,6 +150,27 @@ export function registerSkillsCommands(program: Command): void {
           process.exitCode = 1
         }
       })
+    })
+
+  skills.command('pack')
+    .description('Pack a skill directory into a skills-only Claude Code plugin, ready for npm publish')
+    .argument('<dir>', 'skill directory containing SKILL.md')
+    .option('-p, --package <name>', 'npm package name (default: frontmatter metadata.npmPackage, else <skill-name>-skill)')
+    .option('-o, --out <dir>', 'output directory (default: dist/<skill-name>-plugin)')
+    .option('--registry <url>', 'npm registry for the already-published check', DEFAULT_REGISTRY)
+    .option('--force', 'pack even when this version is already published', false)
+    .action(async (dir: string, options: { package?: string; out?: string; registry: string; force: boolean }) => {
+      try {
+        const result = await packSkill({ dir, packageName: options.package, out: options.out, registry: options.registry, force: options.force })
+        for (const warning of result.warnings) { console.warn(`warning: ${warning}`) }
+        console.log(`packed      ${result.packageName}@${result.version} -> ${result.outDir}`)
+        console.log(`publish:    npm publish ${result.outDir} --access public`)
+        console.log('serve:      list it via the http()/edge() `skillsMarketplace` option, then')
+        console.log('            /plugin marketplace add https://<host>/.claude-plugin/marketplace.json')
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error))
+        process.exit(1)
+      }
     })
 
   skills.command('pin')

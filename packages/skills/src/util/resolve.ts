@@ -43,11 +43,12 @@ async function loadSkillDir(dir: string): Promise<RawSkillFiles> {
   return { files, dirName: path.basename(root) }
 }
 
-function frontmatterVersion(frontmatter: Record<string, unknown>): string | undefined {
+/** Conventional string entries under the frontmatter `metadata` mapping (`version`, `npmPackage`). */
+function frontmatterMetadata(frontmatter: Record<string, unknown>, key: string): string | undefined {
   const metadata = frontmatter['metadata']
   if (typeof metadata !== 'object' || metadata === null) { return undefined }
-  const version = (metadata as Record<string, unknown>)['version']
-  return typeof version === 'string' ? version : undefined
+  const value = (metadata as Record<string, unknown>)[key]
+  return typeof value === 'string' ? value : undefined
 }
 
 /** SKILL.md first, then supporting files alphabetically - a stable order for digests and listings. */
@@ -105,12 +106,14 @@ export async function resolveSkill(definition: SkillDefinition): Promise<Skill> 
     digest: await sha256(data)
   }))))
   const digest = await aggregateDigest(files)
-  const version = definition.version ?? frontmatterVersion(frontmatter)
+  const version = definition.version ?? frontmatterMetadata(frontmatter, 'version')
+  const npmPackage = definition.npmPackage ?? frontmatterMetadata(frontmatter, 'npmPackage')
   return {
     name,
     description,
     ...(version ? { version } : {}),
     ...(definition.tags?.length ? { tags: definition.tags } : {}),
+    ...(npmPackage ? { npmPackage } : {}),
     frontmatter,
     digest,
     files

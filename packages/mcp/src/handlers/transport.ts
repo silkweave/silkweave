@@ -6,7 +6,7 @@ import { authFromRequest } from './auth.js'
 import { filterErrorResponse, rpcInfo, type FilterActions } from './filter.js'
 import { emitInvalidArguments } from './prevalidate.js'
 import { registerTools } from './registerTools.js'
-import { prepareSkills, type SkillServing } from './skills.js'
+import { prepareSkills, type SkillServing, type SkillsMarketplaceOptions } from './skills.js'
 
 function createMcpServer(
   options: SilkweaveOptions,
@@ -40,6 +40,12 @@ export interface McpTransportHandlers {
    * await this so a bad skill fails `start()` instead of every request.
    */
   ready: Promise<void>
+  /**
+   * The resolved skill-serving surface (undefined without a `skills` option).
+   * `buildMcpExpressApp` reads `marketplace` off it for the
+   * `/.claude-plugin/marketplace.json` route.
+   */
+  skills: Promise<SkillServing | undefined>
 }
 
 export interface McpTransportOptions {
@@ -58,6 +64,11 @@ export interface McpTransportOptions {
   skills?: (Skill | SkillDefinition)[]
   /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
   skillsExtension?: boolean
+  /**
+   * Serve a Claude Code plugin marketplace at `/.claude-plugin/marketplace.json`
+   * listing the served skills that carry an `npmPackage`. Requires `skills`.
+   */
+  skillsMarketplace?: SkillsMarketplaceOptions
 }
 
 /**
@@ -79,7 +90,12 @@ export function mcpTransport(
   actions.forEach(validateActionDisposition)
   // Resolved once; a rejection is surfaced through `ready` (and re-thrown per
   // request), never left as an unhandled rejection.
-  const skillsReady = prepareSkills(options.skills, { extension: options.skillsExtension })
+  const skillsReady = prepareSkills(options.skills, {
+    extension: options.skillsExtension,
+    ...(options.skillsMarketplace
+      ? { marketplace: { ...options.skillsMarketplace, name: options.skillsMarketplace.name ?? silkweaveOptions.name } }
+      : {})
+  })
   skillsReady.catch(() => { /* surfaced via `ready` / per-request await */ })
 
   const post: RequestHandler = async (req, res) => {
@@ -135,5 +151,5 @@ export function mcpTransport(
     }
   }
 
-  return { post, ready: skillsReady.then(() => undefined) }
+  return { post, ready: skillsReady.then(() => undefined), skills: skillsReady }
 }

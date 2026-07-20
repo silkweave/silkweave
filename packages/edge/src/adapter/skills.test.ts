@@ -136,6 +136,43 @@ describe('edge skills serving', () => {
     expect(listing.error?.code).toBe(-32601)
   })
 
+  it('serves the plugin marketplace for npm-published skills', async () => {
+    const app = await startEdge({
+      skills: [defineSkill({
+        files: { 'SKILL.md': SKILL_MD, 'references/steps.md': '# Steps\n' },
+        npmPackage: 'deploy-checklist-skill'
+      })],
+      skillsMarketplace: { owner: { name: 'Atomic' } }
+    })
+    const response = await app.handler(new Request('http://localhost/.claude-plugin/marketplace.json'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('application/json')
+    const doc = await response.json() as { name: string; owner: { name: string }; plugins: { name: string; source: object; version?: string }[] }
+    expect(doc.name).toBe('test')
+    expect(doc.owner).toEqual({ name: 'Atomic' })
+    expect(doc.plugins).toEqual([{
+      name: 'deploy-checklist',
+      source: { source: 'npm', package: 'deploy-checklist-skill', version: '1.0.0' },
+      description: 'Walk the release checklist before deploying',
+      version: '1.0.0'
+    }])
+
+    const rejected = await app.handler(new Request('http://localhost/.claude-plugin/marketplace.json', { method: 'POST' }))
+    expect(rejected.status).toBe(405)
+  })
+
+  it('404s the marketplace path without the skillsMarketplace option', async () => {
+    const app = await startEdge()
+    const response = await app.handler(new Request('http://localhost/.claude-plugin/marketplace.json'))
+    expect(response.status).toBe(404)
+  })
+
+  it('fails start when skillsMarketplace is set but no skill carries an npmPackage', async () => {
+    const app = edge({ enableJsonResponse: true, skills, skillsMarketplace: { owner: { name: 'Atomic' } } })
+    const generated = app.adapter({ name: 'test', description: 'test', version: '0.0.0' }, createContext())
+    await expect(generated.start([hello])).rejects.toThrow(/npmPackage/)
+  })
+
   it('hides resources and instructions when a filter drops the skill tools', async () => {
     const app = await startEdge({
       filterActions: (all, request) => request.headers['x-role'] === 'insider'

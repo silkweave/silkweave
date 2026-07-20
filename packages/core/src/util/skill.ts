@@ -36,6 +36,14 @@ export interface Skill {
   version?: string
   /** Free-form grouping labels, matched by per-request skill/tool filters. */
   tags?: string[]
+  /**
+   * npm package the skill is published as (a skills-only Claude Code plugin,
+   * built with `silkweave skills pack`). Sourced from
+   * `defineSkill({ npmPackage })` or the `metadata.npmPackage` frontmatter
+   * convention; the adapters' `skillsMarketplace` option lists only skills
+   * that carry one.
+   */
+  npmPackage?: string
   /** The verbatim SKILL.md frontmatter, parsed to JSON. */
   frontmatter: Record<string, unknown>
   /** Aggregate digest over the sorted per-file digests - the skill's identity for update checks. */
@@ -64,6 +72,8 @@ export interface SkillDefinition {
   version?: string
   /** Grouping labels carried onto the resolved skill. */
   tags?: string[]
+  /** npm package name for the marketplace bridge; wins over the frontmatter `metadata.npmPackage` convention. */
+  npmPackage?: string
 }
 
 /**

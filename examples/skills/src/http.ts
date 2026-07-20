@@ -28,6 +28,15 @@ async function main() {
       // Experimental: also serve the SEP-2640 draft extension
       // (skills/list + skills/get + capability declaration).
       skillsExtension: true
+      // Claude Code plugin marketplace: the marketplace only POINTS at npm, so
+      // enable this after actually publishing the packed skill - otherwise
+      // `/plugin install` 404s. To try it:
+      //   npx silkweave skills pack examples/skills/skills/commit-message
+      //   npm publish dist/commit-message-plugin --access public
+      // then add `npmPackage: 'commit-message-skill'` to the defineSkill above,
+      // uncomment the line below, and:
+      //   /plugin marketplace add http://localhost:8080/.claude-plugin/marketplace.json
+      // skillsMarketplace: { owner: { name: 'Silkweave Example' } }
     }))
     .action(HelloAction)
     .start()
