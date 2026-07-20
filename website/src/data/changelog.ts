@@ -39,6 +39,44 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '5.0.0',
+    date: '2026-07-20',
+    summary: 'Skills over MCP: serve Agent Skills (SKILL.md) from any Silkweave MCP server - versioned, digest-verified, installable with one command - and the silkweave package becomes the CLI that installs them.',
+    unreleased: true,
+    changes: [
+      {
+        type: 'breaking',
+        text: 'The silkweave npm package is now the Silkweave CLI, not an umbrella of re-exports: the silkweave/core, silkweave/mcp, ... subpaths are gone. Depend on the scoped packages (@silkweave/core, @silkweave/mcp, ...) directly.',
+        commit: 'e71d427'
+      },
+      {
+        type: 'feature',
+        text: 'Serve Agent Skills over MCP: a skills option on stdio()/http()/mcpTransport()/edge() serves each SKILL.md directory three ways at once - skill:// file resources (the SEP-2640 baseline), ListSkills/GetSkill tools every current client can call, and a server-instructions pointer that activates the skills in hosts. Per-request filterActions gates the whole surface: hiding the skill tools also hides the resources and instructions.',
+        commit: 'e71d427'
+      },
+      {
+        type: 'feature',
+        text: 'The silkweave CLI: npx silkweave skills sync|install|list|outdated|pin|unpin installs digest-verified skills into ~/.claude/skills (or --target) with a lockfile recording server, versions, and per-file sha256 digests - every file re-verified client-side, names/paths revalidated so a server can never write outside the target. Plus npx silkweave proxy <url>: any MCP server as a CLI on the spot.',
+        commit: 'e71d427'
+      },
+      {
+        type: 'feature',
+        text: 'Claude Code plugin bridge for public skills: silkweave skills pack wraps a skill into a skills-only plugin package for npm (refusing versions already on the registry), and the skillsMarketplace option serves /.claude-plugin/marketplace.json with npm-sourced entries - consumers get native /plugin install and /plugin update.',
+        commit: 'ecc1fc9'
+      },
+      {
+        type: 'feature',
+        text: 'EXPERIMENTAL SEP-2640 extension: skillsExtension: true additionally serves the draft skills/list + skills/get methods and the capability declaration; the CLI auto-consumes the extension where declared, so skills sync also installs from conforming third-party servers (e.g. Hugging Face MCP). Off by default while the draft churns.',
+        commit: 'f93c8fe'
+      },
+      {
+        type: 'improvement',
+        text: 'MCP servers now pass initialize instructions when serving skills (the working-group-validated activation pattern), and @silkweave/skills is a lazy-loaded optional peer - the option costs nothing when unused.',
+        commit: 'e71d427'
+      }
+    ]
+  },
+  {
     version: '4.4.0',
     date: '2026-07-20',
     summary: 'Binary resources: one action can now return a screenshot, PDF, or JSON artifact - delivered as an MCP image block the model can see, raw bytes over REST, a typed envelope over tRPC, and a file (or clean pipe) from the CLI.',
