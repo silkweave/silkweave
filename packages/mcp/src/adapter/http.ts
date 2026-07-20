@@ -39,6 +39,8 @@ export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
    * (optional peer); resolved once at start.
    */
   skills?: (Skill | SkillDefinition)[]
+  /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
+  skillsExtension?: boolean
 }
 
 /**
@@ -54,7 +56,7 @@ export function buildMcpExpressApp(
   actions: Action[],
   options: StartMcpHttpOptions
 ): Express {
-  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, ...mcpAppOptions } = options
+  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, skillsExtension, ...mcpAppOptions } = options
   const app = createMcpExpressApp({ ...mcpAppOptions, host })
 
   const corsHandler = mcpCors(corsConfig ?? true)
@@ -87,7 +89,7 @@ export function buildMcpExpressApp(
     app.get('/resource/:id', sideloadResource({ resourceDir }))
   }
 
-  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall, skills })
+  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall, skills, skillsExtension })
   app.post('/mcp', express.json(), transport.post)
   // Surface a skill boot failure (bad SKILL.md, missing @silkweave/skills) at
   // start rather than as per-request 500s.

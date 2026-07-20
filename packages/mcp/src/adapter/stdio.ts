@@ -13,6 +13,8 @@ export interface StdioAdapterOptions {
    * (optional peer); resolved once at start.
    */
   skills?: (Skill | SkillDefinition)[]
+  /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
+  skillsExtension?: boolean
 }
 
 export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions) => {
@@ -24,7 +26,7 @@ export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions
       start: async (actions) => {
         // Skills resolve async (file reads + digests), so the server is built
         // here rather than in the generator - its instructions are ctor-only.
-        const serving = await prepareSkills(adapterOptions?.skills)
+        const serving = await prepareSkills(adapterOptions?.skills, { extension: adapterOptions?.skillsExtension })
         server = new McpServer({
           name: options.name,
           description: options.description,

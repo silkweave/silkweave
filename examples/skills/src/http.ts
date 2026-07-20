@@ -24,7 +24,10 @@ async function main() {
       skills: [
         defineSkill({ dir: skillDir('commit-message') }),
         defineSkill({ dir: skillDir('release-checklist') })
-      ]
+      ],
+      // Experimental: also serve the SEP-2640 draft extension
+      // (skills/list + skills/get + capability declaration).
+      skillsExtension: true
     }))
     .action(HelloAction)
     .start()

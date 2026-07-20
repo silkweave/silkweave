@@ -56,6 +56,8 @@ export interface McpTransportOptions {
    * (optional peer); resolved once, reused across per-request servers.
    */
   skills?: (Skill | SkillDefinition)[]
+  /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
+  skillsExtension?: boolean
 }
 
 /**
@@ -77,7 +79,7 @@ export function mcpTransport(
   actions.forEach(validateActionDisposition)
   // Resolved once; a rejection is surfaced through `ready` (and re-thrown per
   // request), never left as an unhandled rejection.
-  const skillsReady = prepareSkills(options.skills)
+  const skillsReady = prepareSkills(options.skills, { extension: options.skillsExtension })
   skillsReady.catch(() => { /* surfaced via `ready` / per-request await */ })
 
   const post: RequestHandler = async (req, res) => {

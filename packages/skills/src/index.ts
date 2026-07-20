@@ -1,5 +1,6 @@
 export * from './util/actions.js'
 export * from './util/digest.js'
+export * from './util/extension.js'
 export * from './util/frontmatter.js'
 export * from './util/instructions.js'
 export * from './util/lockfile.js'

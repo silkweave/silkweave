@@ -25,3 +25,24 @@ export async function fetchManifest(client: Client): Promise<SkillManifestEntry[
 export async function fetchSkill(client: Client, name: string): Promise<SkillPayload> {
   return callJsonTool<SkillPayload>(client, 'GetSkill', { name })
 }
+
+export interface SkillSource {
+  /** How the server is being consumed: SEP-2640 extension methods or the silkweave tools. */
+  kind: 'extension' | 'tools'
+  manifest: () => Promise<SkillManifestEntry[]>
+  payload: (name: string) => Promise<SkillPayload>
+}
+
+/**
+ * Pick the consumption path for a connected server: the SEP-2640 extension
+ * when the server declares it (works against any conforming server, silkweave
+ * or not), otherwise the silkweave `ListSkills`/`GetSkill` tools.
+ */
+export async function skillSource(client: Client): Promise<SkillSource> {
+  const { fetchExtensionSkills, hasSkillsExtension } = await import('./extension.js')
+  if (hasSkillsExtension(client)) {
+    const extension = await fetchExtensionSkills(client)
+    return { kind: 'extension', manifest: async () => extension.manifest, payload: extension.payload }
+  }
+  return { kind: 'tools', manifest: () => fetchManifest(client), payload: (name) => fetchSkill(client, name) }
+}

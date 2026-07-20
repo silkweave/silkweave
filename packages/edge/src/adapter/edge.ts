@@ -38,6 +38,8 @@ export interface EdgeAdapterOptions {
    * `defineSkill({ files })` with inline content.
    */
   skills?: (Skill | SkillDefinition)[]
+  /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
+  skillsExtension?: boolean
 }
 
 export interface EdgeAdapter {
@@ -323,7 +325,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
         try {
           actions.forEach(validateActionDisposition)
           _actions = actions
-          _serving = await prepareSkills(options.skills)
+          _serving = await prepareSkills(options.skills, { extension: options.skillsExtension })
           _readyResolve()
         } catch (error) {
           // Reject `_ready` so awaiting handlers get a 500 instead of hanging

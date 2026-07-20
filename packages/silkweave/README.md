@@ -27,6 +27,7 @@ npx silkweave skills sync --prune --url ...  # remove skills the server dropped
 - **Lockfile**: `.silkweave-lock.json` in the target records server, versions, and per-file sha256 digests. Every installed file is verified against its digest; names and paths are revalidated so a server can never write outside the target.
 - **Auth**: `--token <bearer>` (or `SILKWEAVE_TOKEN`), repeatable `--header key=value`. The endpoint can come from `SILKWEAVE_URL`.
 - **Automation**: run `sync` from a login item, cron, or a Claude Code `SessionStart` hook to keep a fleet of machines converged on one skills server.
+- **SEP-2640 aware**: when a server declares the (draft) MCP skills extension, the CLI consumes `skills/list` + `resources/read` instead of the silkweave tools - so `skills sync` also installs from any conforming third-party MCP server. Per-file digest verification applies on both paths.
 
 ## Universal proxy
 

@@ -7,6 +7,7 @@ The serving model follows the MCP Skills working group's direction (SEP-2640, "s
 1. **`skill://` resources** - every skill file is an MCP resource (`skill://<name>/<path>`), readable via plain `resources/list`/`resources/read`.
 2. **`ListSkills` / `GetSkill` tools** - ordinary Silkweave actions returning the digest-carrying manifest and per-file content, so any current MCP client (and the `silkweave skills` CLI) can list and install skills. Being actions, they compose with `filterActions`, auth, and telemetry.
 3. **Server instructions** - the MCP `initialize` response announces the skills, so hosts that surface instructions activate them without any SEP-2640 support.
+4. **SEP-2640 extension methods** (experimental, opt-in via the adapters' `skillsExtension: true`) - the draft `skills/list`/`skills/get` methods plus the `capabilities.extensions["io.modelcontextprotocol/skills"]` declaration, via `registerSkillExtension()` from `@silkweave/skills/mcp`. Off by default while the draft churns; shapes track the draft and may change.
 
 ## Usage
 

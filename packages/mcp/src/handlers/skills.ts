@@ -29,7 +29,17 @@ export interface SkillServing {
  * option costs nothing when unused. Called once at adapter start; the result
  * is reused across per-request server instances.
  */
-export async function prepareSkills(entries?: (Skill | SkillDefinition)[]): Promise<SkillServing | undefined> {
+export interface PrepareSkillsOptions {
+  /**
+   * EXPERIMENTAL: also serve the SEP-2640 draft extension - the
+   * `capabilities.extensions["io.modelcontextprotocol/skills"]` declaration
+   * plus the `skills/list`/`skills/get` methods. Off by default while the
+   * draft churns; the resources/tools/instructions surfaces are unaffected.
+   */
+  extension?: boolean
+}
+
+export async function prepareSkills(entries?: (Skill | SkillDefinition)[], options: PrepareSkillsOptions = {}): Promise<SkillServing | undefined> {
   if (!entries?.length) { return undefined }
   let skillsModule: typeof import('@silkweave/skills')
   let mcpModule: typeof import('@silkweave/skills/mcp')
@@ -48,7 +58,10 @@ export async function prepareSkills(entries?: (Skill | SkillDefinition)[]): Prom
     skills,
     actions,
     instructions: skillsModule.skillInstructions(skills),
-    register: (server) => mcpModule.registerSkillResources(server, skills),
+    register: (server) => {
+      mcpModule.registerSkillResources(server, skills)
+      if (options.extension) { mcpModule.registerSkillExtension(server, skills) }
+    },
     visible: (active) => actions.every((action) => active.includes(action))
   }
 }

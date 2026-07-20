@@ -93,6 +93,49 @@ describe('edge skills serving', () => {
     expect(payload.files[0].text).toContain('Deploy checklist')
   })
 
+  it('serves the SEP-2640 extension when skillsExtension is enabled', async () => {
+    const app = await startEdge({ skillsExtension: true })
+    const init = await (await app.handler(post(rpc('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'test-client', version: '0.0.0' }
+    })))).json() as { result: { capabilities: { extensions?: Record<string, unknown> } } }
+    expect(init.result.capabilities.extensions?.['io.modelcontextprotocol/skills']).toEqual({ directoryRead: false })
+
+    const listing = await (await app.handler(post(rpc('skills/list', {})))).json() as {
+      result: { skills: { uri: string; frontmatter: Record<string, unknown>; resources: { uri: string; digest: string }[] }[] }
+    }
+    expect(listing.result.skills).toHaveLength(1)
+    const entry = listing.result.skills[0]
+    expect(entry.uri).toBe('skill://deploy-checklist/SKILL.md')
+    expect(entry.frontmatter['name']).toBe('deploy-checklist')
+    expect(entry.resources.map((resource) => resource.uri)).toEqual([
+      'skill://deploy-checklist/SKILL.md',
+      'skill://deploy-checklist/references/steps.md'
+    ])
+    expect(entry.resources[0].digest).toMatch(/^sha256:/)
+
+    const got = await (await app.handler(post(rpc('skills/get', { uri: 'skill://deploy-checklist/SKILL.md' })))).json() as {
+      result: { skill: { uri: string } }
+    }
+    expect(got.result.skill.uri).toBe('skill://deploy-checklist/SKILL.md')
+
+    const missing = await (await app.handler(post(rpc('skills/get', { uri: 'skill://nope/SKILL.md' })))).json() as { error: { message: string } }
+    expect(missing.error.message).toContain('Unknown skill uri')
+  })
+
+  it('does not serve the extension methods without the flag', async () => {
+    const app = await startEdge()
+    const init = await (await app.handler(post(rpc('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'test-client', version: '0.0.0' }
+    })))).json() as { result: { capabilities: { extensions?: Record<string, unknown> } } }
+    expect(init.result.capabilities.extensions).toBeUndefined()
+    const listing = await (await app.handler(post(rpc('skills/list', {})))).json() as { error?: { code: number } }
+    expect(listing.error?.code).toBe(-32601)
+  })
+
   it('hides resources and instructions when a filter drops the skill tools', async () => {
     const app = await startEdge({
       filterActions: (all, request) => request.headers['x-role'] === 'insider'

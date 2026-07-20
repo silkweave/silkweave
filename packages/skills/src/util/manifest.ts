@@ -6,8 +6,8 @@ export interface SkillManifestFile {
   path: string
   mimeType: string
   digest: string
-  /** Content size in bytes. */
-  size: number
+  /** Content size in bytes. Absent when the manifest was derived from a foreign SEP-2640 listing. */
+  size?: number
 }
 
 /**

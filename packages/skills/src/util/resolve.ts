@@ -1,5 +1,6 @@
 import { isResolvedSkill, isTextMimeType, SilkweaveError, type Skill, type SkillDefinition, type SkillFile } from '@silkweave/core'
 import { sha256 } from './digest.js'
+import { aggregateDigest } from './extension.js'
 import { parseSkillMarkdown } from './frontmatter.js'
 import { mimeForPath } from './mime.js'
 import { assertSafeSkillPath } from './paths.js'
@@ -103,7 +104,7 @@ export async function resolveSkill(definition: SkillDefinition): Promise<Skill> 
     data,
     digest: await sha256(data)
   }))))
-  const digest = await sha256(files.map((file) => `${file.path} ${file.digest}`).join('\n'))
+  const digest = await aggregateDigest(files)
   const version = definition.version ?? frontmatterVersion(frontmatter)
   return {
     name,

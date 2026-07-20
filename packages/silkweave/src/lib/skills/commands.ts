@@ -2,7 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client'
 import { diffSkills, lockEntry, type SkillDiff } from '@silkweave/skills'
 import type { Command } from 'commander'
 import { connectRemote, parseUrl, type RemoteOptions } from '../connect.js'
-import { fetchManifest, fetchSkill } from './client.js'
+import { skillSource } from './client.js'
 import { installSkill, removeSkill } from './install.js'
 import { defaultTarget, readLockfile, writeLockfile } from './io.js'
 
@@ -66,7 +66,9 @@ async function runSync(options: SkillsOptions, flags: SyncFlags): Promise<void> 
     if (lockfile.server && lockfile.server !== server) {
       console.warn(`warning: ${options.target} was last synced from ${lockfile.server} - one server per target is supported`)
     }
-    const manifest = await fetchManifest(client)
+    const source = await skillSource(client)
+    if (source.kind === 'extension') { console.log('(consuming SEP-2640 skills extension)') }
+    const manifest = await source.manifest()
     let diffs = diffSkills(manifest, lockfile)
     if (flags.names?.length) {
       const known = new Set(diffs.map((diff) => diff.name))
@@ -81,7 +83,7 @@ async function runSync(options: SkillsOptions, flags: SyncFlags): Promise<void> 
     let removed = 0
     for (const diff of diffs) {
       if (diff.status === 'missing' || diff.status === 'outdated') {
-        const payload = await fetchSkill(client, diff.name)
+        const payload = await source.payload(diff.name)
         if (payload.digest !== diff.remote!.digest) {
           throw new Error(`${diff.name}: manifest/payload digest mismatch (server changed mid-sync?) - retry`)
         }
@@ -127,7 +129,8 @@ export function registerSkillsCommands(program: Command): void {
     .action(async (options: SkillsOptions) => {
       await withClient(options, async (client) => {
         const lockfile = await readLockfile(options.target)
-        for (const diff of diffSkills(await fetchManifest(client), lockfile)) {
+        const source = await skillSource(client)
+        for (const diff of diffSkills(await source.manifest(), lockfile)) {
           console.log(describeDiff(diff))
         }
       })
@@ -138,7 +141,8 @@ export function registerSkillsCommands(program: Command): void {
     .action(async (options: SkillsOptions) => {
       await withClient(options, async (client) => {
         const lockfile = await readLockfile(options.target)
-        const stale = diffSkills(await fetchManifest(client), lockfile)
+        const source = await skillSource(client)
+        const stale = diffSkills(await source.manifest(), lockfile)
           .filter((diff) => diff.status !== 'up-to-date')
         for (const diff of stale) { console.log(describeDiff(diff)) }
         if (stale.some((diff) => diff.status === 'missing' || diff.status === 'outdated')) {
