@@ -7,6 +7,9 @@ const HelloAction = createAction({
   description: 'Greet a person by name and return a friendly greeting message.',
   input: z.object({ name: z.string().describe('The name of the person to greet.') }),
   output: z.object({ message: z.string() }),
+  // Rendered as a positional by CLI clients: `cli-proxy hello Alice`
+  // (carried to cliProxy via the MCP tool's _meta `silkweave/args`).
+  args: ['name'],
   run: async ({ name }, context) => {
     const logger = context.get<Logger>('logger')
     const message = `Hello, ${name}!`

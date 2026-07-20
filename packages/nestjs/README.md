@@ -136,6 +136,7 @@ Exposes the decorated controller route as an MCP tool. Every option is optional.
 | `output` | `z.ZodType \| Type \| Record<string, z.ZodType>` | - | Explicit output schema backing `result: 'structured'` - a Zod type, DTO class, or raw shape (like `@Trpc({ output })`; wins over it when both are set). The parsed (extra-fields-stripped) result ships as `structuredContent`, so returning a wider object than the schema is safe |
 | `annotations` | `ToolAnnotations` | verb-derived | MCP tool annotations merged over the verb-derived defaults: `@Get` ⇒ `{ readOnlyHint: true, idempotentHint: true }`, `@Put` ⇒ `{ readOnlyHint: false, idempotentHint: true }`, `@Delete` ⇒ `{ readOnlyHint: false, destructiveHint: true, idempotentHint: true }`, else `{ readOnlyHint: false }`. Set a field to override its derived value (e.g. `{ destructiveHint: true }` on a POST that deletes) |
 | `tags` | `string[]` | - | Free-form grouping labels carried on the synthesized action (e.g. `['leads', 'write']`) for the `mcp({ filterActions })` per-request filter to match on |
+| `args` | `string[]` | - | Input fields exposed as CLI **positional arguments**, in order (e.g. `['sessionId']` so a `cliProxy` CLI reads `my-cli get-session abc123` instead of `--session-id abc123`). Published in the tool's `_meta` as `silkweave/args`; other MCP clients ignore it. Each entry must be a reflected (or `input`-overridden) field - validated at boot |
 
 ### Result format
 

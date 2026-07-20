@@ -117,9 +117,51 @@ import { silkweave } from '@silkweave/core'
 import { cliProxy } from '@silkweave/mcp/cli-proxy'
 
 await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
-  .adapter(cliProxy({ url: 'http://localhost:8080/mcp' }))
+  .adapter(cliProxy({ url: new URL('http://localhost:8080/mcp') }))
   .start()
 ```
+
+#### Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `url` | `URL` | The MCP server's Streamable HTTP endpoint |
+| `formatter` | `CLIFormatterFn` | Custom per-content-block output formatter |
+| `headers` | `Record<string, string>` or a (async) thunk returning one | Extra headers sent on every request, merged over `requestInit.headers`. A thunk is resolved once per invocation, before connecting - use it to read a token lazily from config |
+| `requestInit` | `RequestInit` | Passed through to `StreamableHTTPClientTransport` |
+| `fetch` | `FetchLike` | Custom fetch implementation, passed through to the transport |
+| `authProvider` | `OAuthClientProvider` | OAuth provider for full auth flows, passed through to the transport |
+
+Authenticating against a bearer-gated server (e.g. `http({ auth })`) is one option:
+
+```typescript
+cliProxy({
+  url: new URL(config.gatewayUrl + '/mcp'),
+  headers: () => ({ authorization: `Bearer ${config.token}` })
+})
+```
+
+A failed connect prints a short, legible message (`authentication failed for <origin> - check your token` on a 401/403) instead of an SDK stack trace, and root `--help`/`--version` still work when the server is unreachable (the subcommand list needs a live connection; the base help does not).
+
+#### Positional arguments
+
+Tools are synthesized as subcommands with one `--flag` per input field. A silkweave server can additionally mark input fields as **positional arguments** by declaring `args` on the action (or `@Mcp({ args })` in `@silkweave/nestjs`):
+
+```typescript
+createAction({
+  name: 'create-identity',
+  description: 'Create a new identity',
+  input: z.object({ id: z.string(), profile: z.string().optional() }),
+  args: ['id'],
+  run: async ({ id, profile }) => { /* ... */ }
+})
+```
+
+```bash
+my-tools create-identity default --profile work   # instead of --id default
+```
+
+The MCP adapters publish `args` in the tool's `_meta` as `silkweave/args` (spec-legal, ignored by non-silkweave clients); `cliProxy` reads it and registers those fields as positionals in declared order - required fields (per the input schema) as `<required>` arguments, optional ones as `[optional]`.
 
 ## How Actions Become MCP Tools
 

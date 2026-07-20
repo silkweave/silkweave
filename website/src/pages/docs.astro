@@ -363,7 +363,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
       <li><strong><code>output</code></strong> - Optional Zod object schema for the return type. Used by the <a href="#adapter-typegen">typegen adapter</a> to generate typed response interfaces and by Fastify for OpenAPI response schemas.</li>
       <li><strong><code>chunk</code></strong> - Optional Zod schema for individual chunks yielded by a streaming <code>run</code> (an <code>async function*</code>). Presence of this field plus a generator <code>run</code> marks the action as <a href="#streaming">streaming</a>; adapters then switch to per-chunk wire delivery.</li>
       <li><strong><code>method</code></strong> / <strong><code>path</code></strong> / <strong><code>queryParams</code></strong> - Optional REST routing for the <a href="#adapter-fastify">Fastify</a> and <a href="#integration-nestjs">NestJS</a> <code>rest</code> adapters. See <a href="#rest-routing">REST routing</a>.</li>
-      <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options.</li>
+      <li><strong><code>args</code></strong> - Keys from <code>input</code> to treat as CLI positional arguments instead of named options. Honored by the local <a href="#adapter-cli">CLI adapter</a> and carried over the wire (via MCP tool <code>_meta</code>) to <a href="#adapter-cli-proxy">CLI Proxy</a> clients.</li>
       <li><strong><code>isEnabled</code></strong> - Optional guard. Return <code>false</code> to hide this action from a specific adapter or context. See <a href="#per-action-guards">Per-Action Guards</a>.</li>
       <li><strong><code>run</code></strong> - Your business logic. Receives validated input and a <a href="#context">context</a> bag.</li>
       <li><strong><code>toolResult</code></strong> - Optional hook to customize how the return value is formatted as an MCP <code>CallToolResult</code>. Return <code>undefined</code> to fall through to the resolved <code>disposition</code>. Only affects MCP adapters.</li>
@@ -688,7 +688,7 @@ export const POST: APIRoute = ({ request }) => handler(request)`)} /></pre>
 
   <section id="adapter-cli">
     <h3>CLI</h3>
-    <p>The <code>cli()</code> adapter exposes each action as a CLI command using Commander with beautiful Clack terminal UI.</p>
+    <p>The <code>cli()</code> adapter exposes each action as a CLI command using Commander, with plain zero-dependency console output.</p>
     <div class="code-block">
       <div class="code-block-header"><span>cli.ts</span></div>
       <pre><code set:html={hl(`import { cli } from '@silkweave/cli'
@@ -704,6 +704,29 @@ await silkweave({ name: 'my-tool', version: '1.0.0' })
       <li>Zod types map to CLI options: <code>z.string()</code> &rarr; <code>--name &lt;string&gt;</code>, <code>z.boolean()</code> &rarr; <code>--verbose / --no-verbose</code></li>
       <li>Use <code>args: ['name']</code> to make a field a positional argument instead</li>
       <li><a href="#streaming">Streaming actions</a> write NDJSON to stdout (one JSON chunk per line) - pipe-friendly with <code>jq</code>, <code>head</code>, etc.</li>
+    </ul>
+  </section>
+
+  <section id="adapter-cli-proxy">
+    <h3>CLI Proxy</h3>
+    <p>The <code>cliProxy()</code> adapter (from <code>@silkweave/mcp/cli-proxy</code>) is the client-side twin of the <a href="#adapter-mcp-http">MCP HTTP adapter</a>: it connects to a running MCP server, lists its tools, and synthesizes a Commander subcommand for each. A remote server's tools become a local CLI with zero per-command code - and the CLI stays in sync as tools are added on the server.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>cli.ts</span></div>
+      <pre><code set:html={hl(`import { silkweave } from '@silkweave/core'
+import { cliProxy } from '@silkweave/mcp/cli-proxy'
+
+await silkweave({ name: 'my-cli', description: 'My CLI', version: '1.0.0' })
+  .adapter(cliProxy({
+    url: new URL('https://gateway.example.com/mcp'),
+    headers: () => ({ authorization: \`Bearer \${process.env.MY_TOKEN}\` })
+  }))
+  .start()
+// $ my-cli create-identity default`)} /></pre>
+    </div>
+    <ul>
+      <li><strong>Auth passthrough</strong> - <code>headers</code> (a record, or a lazy sync/async thunk resolved once per invocation before connecting) is merged into every request; <code>requestInit</code>, <code>fetch</code>, and <code>authProvider</code> are forwarded to the SDK's <code>StreamableHTTPClientTransport</code> for full control.</li>
+      <li><strong>Positional arguments</strong> - input fields listed in an action's <code>args</code> cross the wire via the MCP tool's <code>_meta</code> (<code>silkweave/args</code>, ignored by non-silkweave clients) and render as positionals in declared order: required fields as <code>&lt;arg&gt;</code>, optional ones as <code>[arg]</code>. Remaining fields stay named <code>--flags</code>.</li>
+      <li><strong>Legible failures</strong> - a failed connect prints a short message (<code>authentication failed for &lt;origin&gt; - check your token</code> on a 401/403) instead of an SDK stack trace, and root <code>--help</code> / <code>--version</code> still work when the server is unreachable.</li>
     </ul>
   </section>
 

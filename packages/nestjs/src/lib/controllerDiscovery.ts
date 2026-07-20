@@ -183,6 +183,16 @@ export class ControllerDiscovery {
       }
     }
 
+    // Positional args must name real input fields - a typo here would silently
+    // demote the positional to nothing on the CLI, so fail at boot instead.
+    const badArgs = (meta.args ?? []).filter((key) => !(key in shape))
+    if (badArgs.length) {
+      throw new SilkweaveError(
+        `${d.classRef.name}.${d.methodName}: @Mcp({ args }) entries not in the input schema: ${badArgs.join(', ')}`,
+        'invalid_action'
+      )
+    }
+
     return {
       name,
       description,
@@ -190,6 +200,7 @@ export class ControllerDiscovery {
       ...(disposition ? { disposition } : {}),
       ...(disposition === 'structured' && output ? { output } : {}),
       ...(meta.tags ? { tags: meta.tags } : {}),
+      ...(meta.args ? { args: meta.args } : {}),
       annotations: { ...verbAnnotations(shared.route.method), ...meta.annotations },
       isEnabled: (ctx) => ctx.getOptional<string>('adapter') === 'mcp',
       ...(streaming

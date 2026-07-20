@@ -164,7 +164,11 @@ export function registerTools(
       // Only structured actions declare an outputSchema contract - the SDK
       // enforces it server-side and SDK clients enforce it independently, so
       // forwarding is strictly opt-in via disposition.
-      ...(action.disposition === 'structured' && action.output ? { outputSchema: action.output } : {})
+      ...(action.disposition === 'structured' && action.output ? { outputSchema: action.output } : {}),
+      // Positional-argument intent for silkweave-aware CLI clients (cliProxy
+      // renders these input fields as positional arguments, in order).
+      // Spec-legal tool _meta, ignored by every other client.
+      ...(action.args?.length ? { _meta: { 'silkweave/args': action.args } } : {})
     }, async (input, extra) => {
       const logger = createToolLogger(extra, stream)
       // `auth` (when present) is carried on `context` by the transport's

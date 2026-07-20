@@ -52,6 +52,20 @@ describe('registerTools annotations', () => {
   })
 })
 
+describe('registerTools positional args _meta', () => {
+  it('publishes action.args as silkweave/args tool _meta', async () => {
+    const client = await connect([action({ args: ['name'] })])
+    const { tools } = await client.listTools()
+    expect(tools[0]._meta).toMatchObject({ 'silkweave/args': ['name'] })
+  })
+
+  it('emits no silkweave/args _meta when the action declares none', async () => {
+    const client = await connect([action({})])
+    const { tools } = await client.listTools()
+    expect(tools[0]._meta?.['silkweave/args']).toBeUndefined()
+  })
+})
+
 interface TextBlock { type: 'text'; text: string }
 
 describe('registerTools structured output', () => {

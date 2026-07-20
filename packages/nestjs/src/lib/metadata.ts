@@ -81,6 +81,15 @@ export interface McpMetadata {
    * (or any other consumer) to match on. No behavior on their own.
    */
   tags?: string[]
+  /**
+   * Input fields exposed as CLI **positional arguments**, in order (e.g.
+   * `['sessionId']` so a `cliProxy` CLI reads `my-cli get-session abc123`
+   * instead of `--session-id abc123`). Published in the MCP tool's `_meta` as
+   * `silkweave/args` and consumed by silkweave-aware CLI clients; other MCP
+   * clients ignore it. Each entry must be a reflected (or `input`-overridden)
+   * input field - validated at boot.
+   */
+  args?: string[]
 }
 
 /** tRPC procedure kind for a `@Trpc`-decorated route. */
