@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-skills",
-  "version": "4.4.0",
+  "version": "5.0.0-rc.1",
   "description": "Silkweave skills example - serve Agent Skills over MCP, install them with the silkweave CLI",
   "private": true,
   "type": "module",

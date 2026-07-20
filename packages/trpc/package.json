@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/trpc",
-  "version": "4.4.0",
+  "version": "5.0.0-rc.1",
   "description": "Silkweave tRPC Adapter",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
