@@ -39,6 +39,18 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '5.0.1',
+    date: '2026-07-29',
+    summary: 'A CLI adapter fix: an action with a union-typed input field no longer takes the whole binary down.',
+    changes: [
+      {
+        type: 'fix',
+        text: 'CLI adapter: a union-typed input field (z.union([z.number(), z.array(z.number())])) now builds as an option instead of throwing "Invalid zod type: union" while the command table is assembled - which previously killed every subcommand, --version and --help alike. Unions map to --flag <json> and accept either arm (--cost 3 and --cost \'[1,2]\'); a union of literals renders as <a|b>. Any remaining unsupported type now names the offending field in the error.',
+        commit: 'fdabff6'
+      }
+    ]
+  },
+  {
     version: '5.0.0',
     date: '2026-07-21',
     summary: 'Skills over MCP: serve Agent Skills (SKILL.md) from any Silkweave MCP server - versioned, digest-verified, installable with one command - and the silkweave package becomes the CLI that installs them.',
