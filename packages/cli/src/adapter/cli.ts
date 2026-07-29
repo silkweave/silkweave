@@ -45,13 +45,49 @@ function parseCLIInput(action: Action, args: any[]) {
   return data
 }
 
+interface OptionSpec { placeholder: string; parseArg?: (value: string) => unknown }
+
+/**
+ * Tolerant JSON parse. A union arm is typically a scalar (`number | number[]`),
+ * and commander hands scalars over as bare strings that are not valid JSON -
+ * `--cost 3` must survive as `"3"` for Zod to coerce, while `--cost '[1,2]'`
+ * parses. Throwing here would trade a build-time crash for a run-time one.
+ */
+function parseMaybeJson(value: string): unknown {
+  try { return JSON.parse(value) } catch { return value }
+}
+
+/**
+ * Render a literal-bearing option as its arms (`<a|b>`) rather than `<json>`,
+ * and coerce only when it needs it: all-string literals arrive usable as-is,
+ * anything else (numbers, booleans, null) has to be parsed back off the string.
+ */
+function literalSpec(values: readonly unknown[]): OptionSpec {
+  const placeholder = `<${values.map((value) => String(value)).join('|')}>`
+  if (values.every((value) => typeof value === 'string')) { return { placeholder } }
+  return { placeholder, parseArg: parseMaybeJson }
+}
+
+/** The literal values every arm of a union carries, or undefined if any arm is not a literal. */
+function literalUnionValues(options: readonly z.ZodType[]): unknown[] | undefined {
+  const values: unknown[] = []
+  for (const option of options) {
+    if (!(option instanceof z.ZodLiteral)) { return undefined }
+    values.push(...option.def.values)
+  }
+  return values
+}
+
 /**
  * Map a Zod option type to its commander placeholder and, when the value needs
  * coercing from commander's raw string, a `parseArg`. Numeric/bigint/json fields
  * MUST carry a parser - without it every z.number() field fails Zod with
  * `expected number, received string`.
+ *
+ * This runs while the command table is built, so an unsupported type takes the
+ * whole binary down (`--help` included) - hence the key in the error message.
  */
-function optionSpec(type: z.ZodType): { placeholder: string; parseArg?: (value: string) => unknown } {
+function optionSpec(type: z.ZodType, key: string): OptionSpec {
   if (type instanceof z.ZodNumber) {
     return { placeholder: '<number>', parseArg: (value) => Number(value) }
   }
@@ -61,10 +97,17 @@ function optionSpec(type: z.ZodType): { placeholder: string; parseArg?: (value: 
   if (type instanceof z.ZodString || type instanceof z.ZodEnum) {
     return { placeholder: '<string>' }
   }
+  if (type instanceof z.ZodLiteral) {
+    return literalSpec(type.def.values)
+  }
+  if (type instanceof z.ZodUnion) {
+    const literals = literalUnionValues(type.def.options as readonly z.ZodType[])
+    return literals ? literalSpec(literals) : { placeholder: '<json>', parseArg: parseMaybeJson }
+  }
   if (type instanceof z.ZodObject || type instanceof z.ZodRecord || type instanceof z.ZodArray) {
     return { placeholder: '<json>', parseArg: JSON.parse }
   }
-  throw new Error(`Invalid zod type: ${type.def.type}`)
+  throw new Error(`option "${key}": unsupported zod type ${type.def.type}`)
 }
 
 function addCliOption(command: Command, key: string, type: z.ZodType, defaultValue: any, isArgument: boolean) {
@@ -79,7 +122,7 @@ function addCliOption(command: Command, key: string, type: z.ZodType, defaultVal
     command.option(`--no-${flag}`)
     return
   }
-  const { placeholder, parseArg } = optionSpec(type)
+  const { placeholder, parseArg } = optionSpec(type, key)
   if (parseArg) {
     command.option(`--${flag} ${placeholder}`, description ?? '', parseArg, defaultValue)
   } else {

@@ -62,3 +62,48 @@ describe('cli option key mapping', () => {
     expect(input).toEqual({ name: 'world', loud: true })
   })
 })
+
+describe('cli union options', () => {
+  // optionSpec runs while the command table is built, so an unsupported type
+  // takes down every command including --help. This is the regression guard
+  // that needs no invocation at all.
+  it('builds the command table for an action with a union input', async () => {
+    const input = await runCommand(action({
+      input: z.object({ cost: z.union([z.number(), z.array(z.number())]).optional() })
+    }), ['do-thing'])
+    expect(input).toEqual({})
+  })
+
+  it('round-trips both arms of a scalar-or-array union', async () => {
+    const numeric = z.object({ cost: z.union([z.number(), z.array(z.number())]).optional() })
+    expect(await runCommand(action({ input: numeric }), ['do-thing', '--cost', '3'])).toEqual({ cost: 3 })
+    expect(await runCommand(action({ input: numeric }), ['do-thing', '--cost', '[1,2]'])).toEqual({ cost: [1, 2] })
+  })
+
+  it('keeps a non-JSON string arm intact instead of throwing on it', async () => {
+    const input = await runCommand(action({
+      input: z.object({ tag: z.union([z.string(), z.array(z.string())]).optional() })
+    }), ['do-thing', '--tag', 'alpha'])
+    expect(input).toEqual({ tag: 'alpha' })
+  })
+
+  it('does not coerce a union of string literals', async () => {
+    const input = await runCommand(action({
+      input: z.object({ mode: z.union([z.literal('1'), z.literal('2')]).optional() })
+    }), ['do-thing', '--mode', '1'])
+    expect(input).toEqual({ mode: '1' })
+  })
+
+  it('parses a union of non-string literals back off the string', async () => {
+    const input = await runCommand(action({
+      input: z.object({ level: z.union([z.literal(1), z.literal(2)]).optional() })
+    }), ['do-thing', '--level', '2'])
+    expect(input).toEqual({ level: 2 })
+  })
+
+  it('names the offending field when a type is unsupported', async () => {
+    await expect(runCommand(action({
+      input: z.object({ when: z.date() })
+    }), ['do-thing'])).rejects.toThrow('option "when": unsupported zod type date')
+  })
+})

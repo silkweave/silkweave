@@ -33,11 +33,19 @@ $ mytool greet --name "World" --enthusiastic
 |----------|-------------------|
 | `z.string()` | `--option-name <string>` |
 | `z.number()` | `--option-name <number>` |
+| `z.bigint()` | `--option-name <bigint>` |
 | `z.boolean()` | `--option-name` / `--no-option-name` |
-| `z.enum([...])` | `--option-name <choice>` with choices validation |
-| `z.record()` | `--option-name <json>` |
+| `z.enum([...])` | `--option-name <string>` (values validated by Zod) |
+| `z.literal('a')` | `--option-name <a>` |
+| `z.object()` / `z.record()` / `z.array()` | `--option-name <json>` |
+| `z.union([...])` | `--option-name <json>`, or `<a\|b>` when every arm is a literal |
 | `.default(value)` | Sets the default in help text |
 | `.describe('...')` | Sets the option description |
+
+Union values are JSON-parsed when they parse and passed through as the raw string
+otherwise, so a `z.union([z.number(), z.array(z.number())])` field accepts both
+`--cost 3` and `--cost '[1,2,3]'`. A type with no mapping fails at startup with
+the offending field named (`option "when": unsupported zod type date`).
 
 Field names are automatically converted to `kebab-case`. Action names become subcommands.
 
