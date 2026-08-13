@@ -274,6 +274,44 @@ function createEdgeMcpServer(
   return server
 }
 
+/** How a request path relates to the routes this adapter serves. */
+interface EdgePathMatch {
+  /** The path is one this adapter serves at all (else: 404 before any async work). */
+  known: boolean
+  /** An RFC 9728 insertion-form sub-resource document (resolver configs only). */
+  isResolverMetadata: boolean
+}
+
+interface EdgePathMatchers {
+  validPaths: Set<string>
+  extraTransportPaths: string[]
+  matchTransportPath?: (pathname: string) => boolean
+  resolverMetadata: boolean
+}
+
+/** Classify a request path. Pure and allocation-free, so unknown paths cost nothing. */
+function matchEdgePath(pathname: string, m: EdgePathMatchers): EdgePathMatch {
+  const isResolverMetadata = m.resolverMetadata && pathname.startsWith(`${PROTECTED_RESOURCE_WELL_KNOWN}/`)
+  const isTransport = m.extraTransportPaths.includes(pathname) || m.matchTransportPath?.(pathname) === true
+  return { known: m.validPaths.has(pathname) || isResolverMetadata || isTransport, isResolverMetadata }
+}
+
+/** Dispatch the OAuth provider routes; `undefined` when this path is not one of them. */
+function matchOAuthRoute(
+  oauthPaths: Record<string, string[]> | null,
+  url: URL,
+  request: Request,
+  auth: AuthConfig,
+  callbackPath: string
+): Promise<Response> | Response | undefined {
+  const methods = oauthPaths?.[url.pathname]
+  if (!methods) { return undefined }
+  if (!methods.includes(request.method)) {
+    return new Response('Method not allowed', { status: 405 })
+  }
+  return routeOAuth(url, request, auth.provider!, callbackPath)
+}
+
 export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   const mcpPath = options.path ?? '/mcp'
   const callbackPath = options.auth?.callbackPath ?? '/auth/callback'
@@ -303,7 +341,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   }
   // A string resourceUrl has exactly one document; a resolver serves a family of
   // insertion-form paths, matched by prefix below rather than by exact set.
-  const resolverMetadata = options.auth?.authorizationServers?.length && typeof options.auth.resourceUrl === 'function'
+  const resolverMetadata = Boolean(options.auth?.authorizationServers?.length) && typeof options.auth?.resourceUrl === 'function'
   if (options.auth?.authorizationServers?.length && options.auth.resourceUrl) {
     validPaths.add(PROTECTED_RESOURCE_WELL_KNOWN)
   }
@@ -314,6 +352,8 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     validPaths.add('/token')
     validPaths.add('/register')
   }
+
+  const pathMatchers: EdgePathMatchers = { validPaths, extraTransportPaths, matchTransportPath, resolverMetadata }
 
   // OAuth path → allowed methods (built once, not per-request)
   const oauthPaths: Record<string, string[]> | null = options.auth?.provider
@@ -329,14 +369,9 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   const handleRequestInner = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
 
-    // Fast rejection - no async work, no allocations for unknown paths. A
-    // resolver additionally serves the insertion-form sub-paths under the
-    // well-known prefix, so those are matched by prefix rather than by set.
-    const isResolverMetadata = resolverMetadata && url.pathname.startsWith(`${PROTECTED_RESOURCE_WELL_KNOWN}/`)
-    const isTransportPath = url.pathname === mcpPath
-      || extraTransportPaths.includes(url.pathname)
-      || matchTransportPath?.(url.pathname) === true
-    if (!validPaths.has(url.pathname) && !isResolverMetadata && !isTransportPath) {
+    // Fast rejection - no async work, no allocations for unknown paths.
+    const { known, isResolverMetadata } = matchEdgePath(url.pathname, pathMatchers)
+    if (!known) {
       return new Response('Not Found', { status: 404 })
     }
 
@@ -360,15 +395,8 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     }
 
     // OAuth provider routes
-    if (oauthPaths) {
-      const methods = oauthPaths[url.pathname]
-      if (methods) {
-        if (!methods.includes(request.method)) {
-          return new Response('Method not allowed', { status: 405 })
-        }
-        return routeOAuth(url, request, options.auth!.provider!, callbackPath)
-      }
-    }
+    const oauthResponse = matchOAuthRoute(oauthPaths, url, request, options.auth!, callbackPath)
+    if (oauthResponse) { return oauthResponse }
 
     // MCP transport (stateless): only POST carries JSON-RPC. A standing-stream
     // GET or a session-teardown DELETE has no session to act on - and the SDK's
