@@ -8,6 +8,8 @@ CLI adapter for [Silkweave](https://github.com/silkweave/silkweave) - turn your 
 pnpm add @silkweave/core @silkweave/cli
 ```
 
+Requires **Node.js >= 22.12** (this package bundles `commander` 15).
+
 ## Usage
 
 ```typescript

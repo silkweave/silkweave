@@ -66,7 +66,7 @@ The core pattern is **Action → Adapter → Silkweave**:
 | `@silkweave/skills` | `packages/skills` | Skills - serve [Agent Skills](https://agentskills.io/specification) (`SKILL.md` dirs) from MCP servers: loader/validator (`resolveSkills`), per-file + aggregate sha256 digests (Web Crypto, edge-safe), `ListSkills`/`GetSkill` actions, server-instructions blurb, lockfile diff model shared with the CLI. The `skill://` resource registrar lives behind **`@silkweave/skills/mcp`** (MCP SDK is an optional peer of the root). `defineSkill()` + the `Skill`/`SkillDefinition` types live in core (the coupling seam, like `Action`); this package is an **optional peer** of `@silkweave/mcp`/`@silkweave/edge`, lazy-imported by `prepareSkills()` only when an adapter's `skills` option is set. See [Skills](#skills-serving-agent-skills-over-mcp) below. |
 | `silkweave` | `packages/silkweave` | **The Silkweave CLI** (`npx silkweave`) - `skills sync|install|list|outdated|pin|unpin` (digest-verified installs into `~/.claude/skills` with a `.silkweave-lock.json`), `skills pack` (wrap a skill dir into a publishable skills-only Claude Code plugin npm package), and `proxy <url>` (universal cliProxy: any MCP server's tools as CLI subcommands, built from `tools/list` at invocation). **(5.0)** Repurposed from the former umbrella re-export package - the `silkweave/core`-style subpaths are gone; bin-only, lean deps (commander + MCP SDK client + `@silkweave/mcp/cli-proxy` internals + `@silkweave/skills`). |
 | `@silkweave/ai` | `packages/ai` | Vercel AI SDK bridge - `createChatAction()` wraps `streamText` into a streaming action; `silkweaveTransport()` is a custom `ChatTransport` that adapts any subscribe-style function (typically a tRPC subscription) into the `ReadableStream<UIMessageChunk>` that `useChat` consumes |
-| `@silkweave/example-*` | `examples/*` | One example per adapter package: `examples/core`, `examples/cli`, `examples/mcp`, `examples/fastify`, `examples/trpc`, `examples/typegen`, `examples/edge`, `examples/nestjs`, `examples/nextjs`, `examples/skills` (two `SKILL.md` skill dirs served via `http({ skills })` / `stdio({ skills })`). Each is a self-contained workspace package with its own `package.json`, `tsconfig.json`, `eslint.config.mjs`, and minimal inline actions. |
+| `@silkweave/example-*` | `examples/*` | One example per adapter package: `examples/core`, `examples/cli`, `examples/mcp`, `examples/fastify`, `examples/trpc`, `examples/typegen`, `examples/edge`, `examples/nestjs`, `examples/nextjs`, `examples/skills` (two `SKILL.md` skill dirs served via `http({ skills })` / `stdio({ skills })`). Each is a self-contained workspace package with its own `package.json`, `tsconfig.json`, and minimal inline actions. |
 | `@silkweave/example-ai` | `examples/ai` | End-to-end chat app: Vite + React + `useChat` → `silkweaveTransport` → tRPC subscription → Silkweave streaming action → AI SDK `streamText`. Run with `pnpm -F @silkweave/example-ai dev` (needs `ANTHROPIC_API_KEY`). |
 | `@silkweave/example-cloudflare` | `examples/cloudflare` | Deployment example (not a new adapter): the `edge()` Web-Standard adapter on a **Cloudflare Worker** - stateless MCP + **Google Workspace OAuth 2.1** with OAuth state in **Cloudflare KV** (reuses `createRedisStore` over a tiny KV adapter, since Workers have no filesystem for `createJsonStore`). App built lazily per-request because KV/secrets arrive on `env`. `wrangler.jsonc` + `.dev.vars.example`; README has from-scratch Cloudflare + Google setup. Run with `pnpm -F @silkweave/example-cloudflare dev`. |
 
@@ -327,11 +327,27 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 ## Code Style
 
 - ESM-only (`"type": "module"` in package.json)
-- No semicolons, single quotes, 2-space indent, no trailing commas
+- No semicolons, single quotes, 2-space indent, no trailing commas - **enforced by `oxfmt`**, not by hand (`pnpm format`); the rules live in `.oxfmtrc.json`
 - Unused vars must be prefixed with `_`
 - Imports use `.js` extensions (NodeNext module resolution)
-- Zod v4 (`zod@^4.3.6`)
+- Zod: source imports the v4 API as `from 'zod/v4'`; published packages declare **`zod@^3.25.0 || ^4.0.0`**, matching what the MCP SDK / AI SDK / zod-to-json-schema all declare. The `zod/v4` subpath exists in both 3.25+ and 4.x, so one import style serves both and consumers are never forced to migrate.
 - Always avoid Em-Dash (`—`), use regular dash instead, or ideally avoid altogether (comments, markdown, docs, website)
+
+### Linting and formatting (oxc stack)
+
+`eslint` + `typescript-eslint` + `@stylistic` were replaced by the **oxc** toolchain, which is what unblocked TypeScript 7 (`typescript-eslint` hard-errors on TS 7 - see [typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
+
+- **`oxlint`** (`.oxlintrc.json`, one config at the repo root - it is discovered from any package subdirectory, so each package's `"lint": "oxlint"` script needs no path). Categories are `correctness` + `suspicious` only; `pedantic`/`style`/`perf` impose opinions the old eslint config deliberately did not. Rule-level exemptions are commented in the config - notably `no-underscore-dangle` (MCP's `_meta` is a protocol field) and `unicorn/require-post-message-target-origin` (`Worker.postMessage` has no `targetOrigin` parameter).
+- **`oxfmt`** (`.oxfmtrc.json`) owns formatting. oxlint has **no** formatting rules at all, so the style contract above lives entirely in the formatter. Scoped to code (`.ts`/`.tsx`/`.mjs`/`.js`); markdown, JSON, CSS and YAML are ignored, since markdown is published content where reflowing can change rendered output.
+- Suppression comments use oxlint's own syntax: `// oxlint-disable-next-line <rule>`. `eslint-disable` comments are gone.
+- `pnpm format` writes, `pnpm format:check` gates. Formatting is a whole-repo concern (one sub-second pass), so it hangs off the **root** `check` script rather than being duplicated per package the way `lint`/`typecheck` are - and it runs as its own step in both CI workflows.
+
+### TypeScript 7
+
+The workspace is on **TypeScript 7.0.2** (the native Go port). One migration note that is easy to lose an afternoon to:
+
+- **TS 7 no longer auto-includes `@types/*` packages.** Every `tsconfig.json` therefore carries an explicit `"types": [...]` array; without it `console`, `process`, `NodeJS`, `Blob`, `File`, `TextEncoder` and friends all vanish. Reproduced in a clean non-pnpm project, so it is a TS 7 behavior change, not a workspace-layout artifact. When adding a package, list its type providers (`node`, plus e.g. `react`/`vite/client` where relevant).
+- `tsdown` warns that the TS 7 API is experimental. Verified this does **not** affect published output: `packages/core/build/index.d.mts` is byte-identical between TS 5.9.3 and TS 7 apart from quote style.
 
 ## Package resolution (dev source vs. published build)
 
@@ -356,8 +372,8 @@ Each publishable package (`packages/*`, except the `silkweave` CLI - bin-only, n
 
 ## Wrapup Config
 
-- check: `pnpm check` - always run from the **repo root** (not from a sub-package), so turbo runs lint + typecheck across every workspace package
-- test: `pnpm test` - runs `turbo test` (Vitest) across every package that defines a `test` script. New `*.test.ts` files co-locate in a package's `src/` (never shipped - tsdown builds only its explicit entries) and resolve cross-package `@silkweave/*` imports to TS source via the shared `vitest.shared.ts` (the `@silkweave/source` condition). To add Vitest to a package without it: `pnpm -F <pkg> add -D vitest`, add a one-line `vitest.config.ts` re-exporting `sharedConfig`, a `"test": "vitest run"` script, and `vitest.config.ts` to the eslint `ignores`.
+- check: `pnpm check` - always run from the **repo root** (not from a sub-package). It runs `oxfmt --check` over the whole repo first, then turbo's lint + typecheck across every workspace package. A formatting failure is fixed with `pnpm format`, never by hand.
+- test: `pnpm test` - runs `turbo test` (Vitest) across every package that defines a `test` script. New `*.test.ts` files co-locate in a package's `src/` (never shipped - tsdown builds only its explicit entries) and resolve cross-package `@silkweave/*` imports to TS source via the shared `vitest.shared.ts` (the `@silkweave/source` condition). To add Vitest to a package without it: `pnpm -F <pkg> add -D vitest`, add a one-line `vitest.config.ts` re-exporting `sharedConfig`, and a `"test": "vitest run"` script.
 - push: yes
 - version_bump: yes (aligned across all packages)
   + `pnpm -r exec npm version 1.9.0 --no-git-tag-version --force`
@@ -389,7 +405,7 @@ The website `/changelog` page (`website/src/pages/changelog.astro`) and the GitH
 
 Two GitHub Actions workflows live in `.github/workflows/`:
 
-- **`ci.yml`** - runs on every push to `master` and every pull request. Installs (`--frozen-lockfile`), builds, then runs `pnpm exec turbo lint check` (lint + typecheck across all workspace packages) followed by `pnpm exec turbo test` (the Vitest suites). It deliberately does **not** run the root `pnpm check`'s trailing `pnpm roam` step, since the roam CLI isn't available on CI runners.
+- **`ci.yml`** - runs on every push to `master` and every pull request. Installs (`--frozen-lockfile`), builds, then runs `pnpm exec turbo lint check` (lint + typecheck across all workspace packages) followed by `pnpm exec turbo test` (the Vitest suites). A `pnpm format:check` step runs before them (the root `check` script's formatting gate, lifted out so CI reports it separately). It deliberately does **not** run the root `pnpm check`'s trailing `pnpm roam` step, since the roam CLI isn't available on CI runners.
 - **`publish.yml`** - runs when a `vX.Y.Z` tag is pushed. Builds, lints, tests, then runs `pnpm publish -r --access public --no-git-checks`. Publishing uses **npm trusted publishing (OIDC)** - there is **no `NPM_TOKEN`**; auth comes from the `id-token: write` permission, and npm auto-generates provenance attestations.
 
 Key facts for maintaining the publish flow:

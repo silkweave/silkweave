@@ -1,6 +1,6 @@
 # silkweave
 
-The Silkweave CLI - team tooling for [Silkweave](https://www.silkweave.dev) MCP servers, run with `npx silkweave`.
+The Silkweave CLI - team tooling for [Silkweave](https://www.silkweave.dev) MCP servers, run with `npx silkweave`. Requires **Node.js >= 22.12**.
 
 > **4.x note:** this package was previously an umbrella of re-exports (`silkweave/core`, `silkweave/mcp`, ...). Those subpaths are gone - depend on the scoped packages (`@silkweave/core`, `@silkweave/mcp`, ...) directly. The `silkweave` name now ships the CLI.
 

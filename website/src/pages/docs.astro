@@ -372,6 +372,7 @@ await silkweave({ name: 'my-server', version: '1.0.0' })
       </div>
       <pre><code set:html={hl(installRaw)} /></pre>
     </div>
+    <p><strong>Zod 3 or 4.</strong> Every package declares <code>zod@^3.25.0 || ^4.0.0</code>, so Silkweave installs cleanly alongside whichever major your app is already on - no forced migration. Import the v4 API as <code>zod/v4</code> either way; that subpath ships in both 3.25+ and 4.x. <code>@silkweave/cli</code> and the <code>silkweave</code> CLI require <strong>Node.js 22.12+</strong>; the other packages require Node 18+.</p>
     <table class="docs-table">
       <thead><tr><th>Package</th><th>Description</th></tr></thead>
       <tbody>
