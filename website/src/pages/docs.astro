@@ -850,6 +850,52 @@ export const POST: APIRoute = ({ request }) => handler(request)`)} /></pre>
       <li>Internal <code>_ready</code> promise gates the handler until <code>server.start()</code> completes, guarding against cold-start races on serverless</li>
       <li>Returns <code>{'{'} adapter, handler, GET, POST {'}'}</code>; <code>GET</code>/<code>POST</code> are aliases for the primary <code>handler</code> so you can export them directly in Astro-style route files</li>
     </ul>
+
+    <h4>Mounting on a server you already own (<code>trpcNode</code>)</h4>
+    <p><code>trpc()</code> binds its own port and <code>trpcFetch()</code> returns a Web Standard handler. The third shape is the one a real Node application has - an HTTP server that already exists, owned by something else, onto which tRPC mounts as one route among many. <code>trpcNode()</code> returns that <code>(req, res)</code> handler.</p>
+    <p>This is not only a convenience. An app whose browser talks tRPC and whose agent talks MCP usually needs both on <strong>one origin</strong>, for a reason with no workaround: a browser cannot put an <code>Authorization</code> header on a WebSocket upgrade, so the only credential a tab can present on an attach is a cookie - and a cookie is per-origin. Move the API to another port and the app's own login stops authenticating the agent socket.</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>server.ts</span></div>
+      <pre><code set:html={hl(`import { silkweave } from '@silkweave/core'
+import { trpcNode, type InferTrpcRouter } from '@silkweave/trpc'
+
+const api = trpcNode({ endpoint: '/trpc', auth })
+
+const server = silkweave({ name: 'wiki', version: '1.0.0' })
+  .adapter(api.adapter)
+  .actions(wikiActions)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+await server.start()
+
+// Mount on whatever owns the port.
+httpServer.on('request', (req, res) => {
+  if (req.url?.startsWith('/trpc')) { return api.handler(req, res) }
+  // ...the MCP transport, the agent gateway, the SPA
+})`)} /></pre>
+    </div>
+    <ul>
+      <li>Returns <code>{'{'} adapter, handler {'}'}</code>; <code>handler</code> is a <code>(req: IncomingMessage, res: ServerResponse) =&gt; void</code></li>
+      <li><strong>The handler does not verify the prefix</strong> - the underlying tRPC handler slices <code>endpoint</code> off the path unconditionally, so route only matching URLs into it</li>
+      <li>No CORS, like <code>trpcFetch</code> and unlike <code>trpc()</code>: a mounted handler does not own the response headers of the server it is mounted on</li>
+      <li>Ready-gated, answering <code>503</code> if the router failed to build, so a request arriving before <code>start()</code> resolves neither hangs nor 500s</li>
+    </ul>
+
+    <h4>Cookie / custom authentication (<code>authenticate</code>)</h4>
+    <p><code>auth</code> reads exactly one credential: a bearer token in the <code>Authorization</code> header. That is right for MCP and for service-to-service calls, and it is not how a same-origin SPA authenticates - the browser sends a cookie, because that is also what authenticates the WebSocket upgrade. <code>authenticate</code> resolves the caller from the request itself, and is available on all three tRPC adapters:</p>
+    <div class="code-block">
+      <div class="code-block-header"><span>server.ts</span></div>
+      <pre><code set:html={hl(`trpcNode({
+  endpoint: '/trpc',
+  auth,                              // the agent still presents a bearer token
+  authenticate: (req) => {           // the user's tab presents a cookie
+    const user = sessions.resolve(req)
+    return user ? { token: user.sessionId, clientId: user.id } : null
+  }
+})`)} /></pre>
+    </div>
+    <p>The chain: <code>authenticate</code> first; returning <code>null</code> falls through to the <code>auth</code> bearer path, so one endpoint serves both callers. With no <code>auth</code> configured, a decline is a <code>401</code> <em>without</em> a <code>WWW-Authenticate</code> challenge - advertising OAuth discovery on a cookie endpoint would mislead. Throw a <code>SilkweaveError</code> to reject with a specific status. The <code>AuthInfo</code> you return lands on the <strong>same <code>auth</code> context key</strong> the MCP adapters use, so one action's <code>run()</code> serves the browser and the agent unchanged.</p>
+    <p><strong>Two things to know.</strong> <code>authenticate</code> bypasses every check <code>validateToken</code> performs - expiry, issuer, audience, required scopes - because what you are validating is not a token; validation is entirely yours, and this is not a "custom token validator". And once a cookie authenticates the endpoint, it inherits a browser CSRF threat model that bearer endpoints are structurally immune to: <code>kind: 'query'</code> actions execute on <code>GET</code> and <code>SameSite=Lax</code> cookies ride top-level <code>GET</code> navigations. Pair it with <code>SameSite</code> cookies, check <code>Origin</code> or <code>Sec-Fetch-Site</code> (you receive the whole request precisely so you can), and keep side effects out of queries.</p>
   </section>
 
   <section id="adapter-cli">

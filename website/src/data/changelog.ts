@@ -61,6 +61,18 @@ export const releases: Release[] = [
         text: 'NestJS: the MCP adapter now also serves the RFC 8414 authorization-server metadata at the root insertion-form path (/.well-known/oauth-authorization-server<basePath>). MCP clients probe that path and never the basePath-appended one, so OAuth discovery previously failed and clients fell back to root-absolute /authorize and /register, which nothing mounted.'
       },
       {
+        type: 'feature',
+        text: 'trpcNode(): mount tRPC on a node:http server you already own, instead of binding a port or converting to Web Standard Request/Response by hand. This matters beyond convenience - an app whose browser talks tRPC and whose agent talks MCP usually needs both on one origin, because a browser cannot put an Authorization header on a WebSocket upgrade, so the only credential a tab can present is a per-origin cookie. Returns { adapter, handler }, ready-gated with a 503 on boot failure, and configures no CORS since a mounted handler does not own its host\'s response headers.'
+      },
+      {
+        type: 'feature',
+        text: 'authenticate on every tRPC adapter: resolve the caller from the request itself (a session cookie, typically) instead of a bearer token. Returning null falls through to the bearer path, so one endpoint serves a cookie-bearing browser and a token-bearing agent, and the resolved identity lands on the same auth context key the MCP adapters use - so one action\'s run() serves both callers unchanged. Note it bypasses every validateToken check (expiry/issuer/audience/scopes) and inherits a browser CSRF threat model; see the docs before reaching for it.'
+      },
+      {
+        type: 'fix',
+        text: 'MCP over HTTP now answers GET and DELETE on the transport path with 405 and Allow: POST, instead of falling through to the framework\'s default 404. The stateless transport is POST-only and Streamable HTTP requires 405 there; clients read 405 as the "no stream here" signal, while a 404 surfaced as an error naming neither the method nor the route. edge() already complied, so silkweave\'s two HTTP transports disagreed.'
+      },
+      {
         type: 'improvement',
         text: 'The OAuth proxy has tests for the first time: the full authorize -> callback -> token -> refresh -> verify flow against a stubbed upstream, covering the minting rules, the authorize/token equality rule, refresh audience preservation, and cross-resource replay rejection.'
       }
