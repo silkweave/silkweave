@@ -41,8 +41,7 @@ export const releases: Release[] = [
   {
     version: '5.1.0',
     date: '2026-08-13',
-    summary: 'Multi-resource OAuth: one authorization server can now front N protected resources - per-tenant MCP endpoints, each with its own token audience, so a token minted for one tenant is rejected at another.',
-    unreleased: true,
+    summary: 'Multi-resource OAuth - one authorization server fronting N protected resources, each with its own token audience - plus trpcNode() for mounting on a Node server you already own, and cookie-shaped authentication for the tRPC adapters.',
     changes: [
       {
         type: 'feature',
