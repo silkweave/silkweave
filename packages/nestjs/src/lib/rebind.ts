@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
 import { Logger } from '@nestjs/common'
 import { PARAMTYPE } from './reflect/params.js'
 
@@ -37,13 +36,21 @@ function newInstance(P: any): any | null {
   }
 }
 
-async function applyPipes(value: unknown, pipes: unknown[] | undefined, metatype: unknown, type: 'param' | 'query' | 'body', data: string | undefined): Promise<unknown> {
-  if (!pipes || pipes.length === 0) { return value }
+async function applyPipes(
+  value: unknown,
+  pipes: unknown[] | undefined,
+  metatype: unknown,
+  type: 'param' | 'query' | 'body',
+  data: string | undefined
+): Promise<unknown> {
+  if (!pipes || pipes.length === 0) {
+    return value
+  }
   let current = value
   for (const p of pipes) {
     const pipe = typeof p === 'function' ? newInstance(p) : p
-    if (pipe && typeof (pipe).transform === 'function') {
-      current = await (pipe).transform(current, { type, metatype, data })
+    if (pipe && typeof pipe.transform === 'function') {
+      current = await pipe.transform(current, { type, metatype, data })
     }
   }
   return current
@@ -53,7 +60,9 @@ async function applyPipes(value: unknown, pipes: unknown[] | undefined, metatype
 function pickFields(input: Record<string, unknown>, fields: string[]): Record<string, unknown> {
   const obj: Record<string, unknown> = {}
   for (const f of fields) {
-    if (input[f] !== undefined) { obj[f] = input[f] }
+    if (input[f] !== undefined) {
+      obj[f] = input[f]
+    }
   }
   return obj
 }
@@ -119,16 +128,23 @@ export async function invokeRebound(
 /** Map a non-input parameter slot (`@Req`/`@Headers`/`@Ip`/...) to its runtime binding. */
 export function specialBinding(paramtype: number, data: string | undefined): Binding | null {
   switch (paramtype) {
-    case PARAMTYPE.REQUEST: return { kind: 'request' }
+    case PARAMTYPE.REQUEST:
+      return { kind: 'request' }
     case PARAMTYPE.RESPONSE:
-    case PARAMTYPE.NEXT: return { kind: 'response' }
-    case PARAMTYPE.HEADERS: return { kind: 'headers', data }
-    case PARAMTYPE.IP: return { kind: 'ip' }
-    case PARAMTYPE.HOST: return { kind: 'host', data }
+    case PARAMTYPE.NEXT:
+      return { kind: 'response' }
+    case PARAMTYPE.HEADERS:
+      return { kind: 'headers', data }
+    case PARAMTYPE.IP:
+      return { kind: 'ip' }
+    case PARAMTYPE.HOST:
+      return { kind: 'host', data }
     case PARAMTYPE.SESSION:
     case PARAMTYPE.FILE:
     case PARAMTYPE.FILES:
-    case PARAMTYPE.RAW_BODY: return { kind: 'missing' }
-    default: return null
+    case PARAMTYPE.RAW_BODY:
+      return { kind: 'missing' }
+    default:
+      return null
   }
 }

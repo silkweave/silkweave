@@ -23,8 +23,9 @@ function action(overrides: Partial<Action>): Action {
 
 describe('buildRouter resource results', () => {
   it('serializes a binary resource to a base64 envelope', async () => {
-    const result = await (caller([action({})]) as never as { takeScreenshot: (input: object) => Promise<unknown> })
-      .takeScreenshot({ url: 'https://example.com' })
+    const result = await (
+      caller([action({})]) as never as { takeScreenshot: (input: object) => Promise<unknown> }
+    ).takeScreenshot({ url: 'https://example.com' })
     expect(result).toEqual({
       kind: 'resource',
       mimeType: 'image/png',
@@ -36,23 +37,26 @@ describe('buildRouter resource results', () => {
 
   it('serializes a text resource with text instead of base64', async () => {
     const md = action({ run: async () => resource('# report', { mimeType: 'text/markdown' }) })
-    const result = await (caller([md]) as never as { takeScreenshot: (input: object) => Promise<unknown> })
-      .takeScreenshot({ url: 'x' })
+    const result = await (
+      caller([md]) as never as { takeScreenshot: (input: object) => Promise<unknown> }
+    ).takeScreenshot({ url: 'x' })
     expect(result).toEqual({ kind: 'resource', mimeType: 'text/markdown', text: '# report' })
   })
 
   it('normalizes bare bytes using the binary() schema mime type', async () => {
     const bare = action({ run: async () => PNG })
-    const result = await (caller([bare]) as never as { takeScreenshot: (input: object) => Promise<{ mimeType: string; base64: string }> })
-      .takeScreenshot({ url: 'x' })
+    const result = await (
+      caller([bare]) as never as { takeScreenshot: (input: object) => Promise<{ mimeType: string; base64: string }> }
+    ).takeScreenshot({ url: 'x' })
     expect(result.mimeType).toBe('image/png')
     expect(result.base64).toBe(Buffer.from(PNG).toString('base64'))
   })
 
   it('leaves plain JSON results untouched', async () => {
     const plain = action({ output: undefined, run: async () => ({ ok: true }) })
-    const result = await (caller([plain]) as never as { takeScreenshot: (input: object) => Promise<unknown> })
-      .takeScreenshot({ url: 'x' })
+    const result = await (
+      caller([plain]) as never as { takeScreenshot: (input: object) => Promise<unknown> }
+    ).takeScreenshot({ url: 'x' })
     expect(result).toEqual({ ok: true })
   })
 })

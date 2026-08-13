@@ -22,7 +22,9 @@ export function normalizeResourceUri(value: string): string | undefined {
   } catch {
     return undefined
   }
-  if (url.hash) { return undefined }
+  if (url.hash) {
+    return undefined
+  }
   url.hash = ''
   // `new URL` already lowercases scheme + host and strips the default port.
   const serialized = url.toString()
@@ -71,7 +73,9 @@ function flattenHeaders(headers: HeaderBag): Record<string, string | undefined> 
  */
 export function toResourceRequest(context: SilkweaveContext): ResourceRequest | undefined {
   const request = context.getOptional<unknown>('request')
-  if (!request || typeof request !== 'object') { return undefined }
+  if (!request || typeof request !== 'object') {
+    return undefined
+  }
 
   // Fetch Request: absolute url, Headers instance.
   const fetchLike = request as { url?: unknown; headers?: unknown }
@@ -83,7 +87,9 @@ export function toResourceRequest(context: SilkweaveContext): ResourceRequest | 
       return undefined
     }
     const headers: Record<string, string | undefined> = {}
-    fetchLike.headers.forEach((value, key) => { headers[key.toLowerCase()] = value })
+    fetchLike.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value
+    })
     return { url, headers }
   }
 
@@ -94,14 +100,18 @@ export function toResourceRequest(context: SilkweaveContext): ResourceRequest | 
     protocol?: unknown
     headers?: unknown
   }
-  const rawHeaders = (nodeLike.headers && typeof nodeLike.headers === 'object')
-    ? flattenHeaders(nodeLike.headers as HeaderBag)
-    : {}
+  const rawHeaders =
+    nodeLike.headers && typeof nodeLike.headers === 'object' ? flattenHeaders(nodeLike.headers as HeaderBag) : {}
 
-  const path = typeof nodeLike.originalUrl === 'string'
-    ? nodeLike.originalUrl
-    : typeof nodeLike.url === 'string' ? nodeLike.url : undefined
-  if (path === undefined) { return undefined }
+  const path =
+    typeof nodeLike.originalUrl === 'string'
+      ? nodeLike.originalUrl
+      : typeof nodeLike.url === 'string'
+        ? nodeLike.url
+        : undefined
+  if (path === undefined) {
+    return undefined
+  }
 
   // Already absolute (some frameworks hand over a full URL).
   try {
@@ -112,9 +122,11 @@ export function toResourceRequest(context: SilkweaveContext): ResourceRequest | 
     // (Express `trust proxy`, Fastify `trustProxy`) to be accurate - which is
     // why nothing security-bearing may echo this origin. See `ResourceResolver`.
     const forwardedProto = headerValue(rawHeaders['x-forwarded-proto'])?.split(',')[0]?.trim()
-    const protocol = typeof nodeLike.protocol === 'string' ? nodeLike.protocol : forwardedProto ?? 'http'
+    const protocol = typeof nodeLike.protocol === 'string' ? nodeLike.protocol : (forwardedProto ?? 'http')
     const host = rawHeaders['x-forwarded-host']?.split(',')[0]?.trim() ?? rawHeaders.host
-    if (!host) { return undefined }
+    if (!host) {
+      return undefined
+    }
     try {
       return { url: new URL(path, `${protocol}://${host}`), headers: rawHeaders }
     } catch {
@@ -130,10 +142,16 @@ export function toResourceRequest(context: SilkweaveContext): ResourceRequest | 
  */
 export function resolveResourceUrl(config: AuthConfig, context: SilkweaveContext): string | undefined {
   const configured = config.resourceUrl
-  if (configured === undefined) { return undefined }
-  if (typeof configured === 'string') { return configured }
+  if (configured === undefined) {
+    return undefined
+  }
+  if (typeof configured === 'string') {
+    return configured
+  }
   const request = toResourceRequest(context)
-  if (!request) { return undefined }
+  if (!request) {
+    return undefined
+  }
   return configured(request, context)
 }
 
@@ -177,7 +195,9 @@ export function pathResolver(options: PathResolverOptions): ResourceResolver {
       const captured = match.exec(request.url.pathname)?.[1]
       path = captured === undefined ? undefined : `/${captured}`
     }
-    if (path === undefined) { return undefined }
+    if (path === undefined) {
+      return undefined
+    }
     return path === '' ? origin : `${origin}${path.startsWith('/') ? path : `/${path}`}`
   }
 }

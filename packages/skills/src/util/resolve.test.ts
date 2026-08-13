@@ -94,7 +94,10 @@ describe('resolveSkill', () => {
 describe('resolveSkills', () => {
   it('passes through resolved skills and rejects duplicates', async () => {
     const skill = await resolveSkill({ files: files() })
-    const skills = await resolveSkills([skill, { files: { 'SKILL.md': SKILL_MD.replace('commit-message', 'other-skill') } }])
+    const skills = await resolveSkills([
+      skill,
+      { files: { 'SKILL.md': SKILL_MD.replace('commit-message', 'other-skill') } }
+    ])
     expect(skills.map((entry) => entry.name)).toEqual(['commit-message', 'other-skill'])
     await expect(resolveSkills([skill, { files: files() }])).rejects.toThrow(/Duplicate skill name/)
   })

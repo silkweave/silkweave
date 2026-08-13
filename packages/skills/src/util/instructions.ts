@@ -8,11 +8,13 @@ import type { Skill } from '@silkweave/core'
  * required.
  */
 export function skillInstructions(skills: Skill[]): string {
-  const lines = skills.map((skill) => `- ${skill.name}${skill.version ? ` (v${skill.version})` : ''}: ${skill.description}`)
+  const lines = skills.map(
+    (skill) => `- ${skill.name}${skill.version ? ` (v${skill.version})` : ''}: ${skill.description}`
+  )
   return [
     'This server provides agent skills (SKILL.md format):',
     ...lines,
-    'Before performing a matching task, read the skill\'s files - via its `skill://<name>/<path>` resources or the GetSkill tool.',
-    'To install these skills into a local agent, run: npx silkweave skills sync --url <this server\'s MCP endpoint>'
+    "Before performing a matching task, read the skill's files - via its `skill://<name>/<path>` resources or the GetSkill tool.",
+    "To install these skills into a local agent, run: npx silkweave skills sync --url <this server's MCP endpoint>"
   ].join('\n')
 }

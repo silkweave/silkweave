@@ -23,7 +23,9 @@ const CODE_MAP: Record<number, TRPCErrorCode> = {
 }
 
 export function mapError(error: unknown): TRPCError {
-  if (error instanceof TRPCError) { return error }
+  if (error instanceof TRPCError) {
+    return error
+  }
   if (error instanceof z.ZodError) {
     return new TRPCError({ code: 'BAD_REQUEST', message: error.message, cause: error })
   }

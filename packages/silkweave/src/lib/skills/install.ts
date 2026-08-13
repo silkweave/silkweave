@@ -7,7 +7,9 @@ import { dirname, join } from 'node:path'
 const SKILL_NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 function payloadBytes(file: { text?: string; base64?: string }): Uint8Array {
-  if (file.text !== undefined) { return new TextEncoder().encode(file.text) }
+  if (file.text !== undefined) {
+    return new TextEncoder().encode(file.text)
+  }
   return base64ToBytes(file.base64 ?? '')
 }
 
@@ -22,14 +24,16 @@ export async function installSkill(target: string, payload: SkillPayload, previo
   if (!SKILL_NAME_PATTERN.test(payload.name) || payload.name.length > 64) {
     throw new Error(`Refusing to install skill with invalid name '${payload.name}'`)
   }
-  const files = await Promise.all(payload.files.map(async (file) => {
-    const bytes = payloadBytes(file)
-    const digest = await sha256(bytes)
-    if (digest !== file.digest) {
-      throw new Error(`Digest mismatch for ${payload.name}/${file.path} - expected ${file.digest}, got ${digest}`)
-    }
-    return { path: assertSafeSkillPath(file.path), bytes }
-  }))
+  const files = await Promise.all(
+    payload.files.map(async (file) => {
+      const bytes = payloadBytes(file)
+      const digest = await sha256(bytes)
+      if (digest !== file.digest) {
+        throw new Error(`Digest mismatch for ${payload.name}/${file.path} - expected ${file.digest}, got ${digest}`)
+      }
+      return { path: assertSafeSkillPath(file.path), bytes }
+    })
+  )
   const root = join(target, payload.name)
   for (const file of files) {
     const destination = join(root, file.path)

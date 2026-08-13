@@ -4,21 +4,24 @@ import { z } from 'astro:schema'
 
 const blog = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/blog' }),
-  schema: ({ image }) => z.object({
-    title: z.string(),
-    description: z.string(),
-    date: z.coerce.date(),
-    slug: z.string(),
-    author: z.string().default('Silkweave'),
-    keywords: z.array(z.string()).default([]),
-    ogImage: image().optional(),
-    socialLinks: z.object({
-      reddit: z.string().optional(),
-      x: z.string().optional(),
-      linkedin: z.string().optional()
-    }).optional(),
-    draft: z.boolean().default(false)
-  })
+  schema: ({ image }) =>
+    z.object({
+      title: z.string(),
+      description: z.string(),
+      date: z.coerce.date(),
+      slug: z.string(),
+      author: z.string().default('Silkweave'),
+      keywords: z.array(z.string()).default([]),
+      ogImage: image().optional(),
+      socialLinks: z
+        .object({
+          reddit: z.string().optional(),
+          x: z.string().optional(),
+          linkedin: z.string().optional()
+        })
+        .optional(),
+      draft: z.boolean().default(false)
+    })
 })
 
 export const collections = { blog }

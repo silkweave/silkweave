@@ -25,10 +25,14 @@ const HEADINGS: Record<Change['type'], string> = {
 // Render the release body as GitHub-flavoured markdown, grouped by change type.
 function notesFor(release: Release): string {
   const lines: string[] = []
-  if (release.summary) { lines.push(release.summary, '') }
+  if (release.summary) {
+    lines.push(release.summary, '')
+  }
   for (const type of ['breaking', 'feature', 'improvement', 'fix'] as const) {
     const group = release.changes.filter((c) => c.type === type)
-    if (group.length === 0) { continue }
+    if (group.length === 0) {
+      continue
+    }
     lines.push(HEADINGS[type])
     for (const change of group) {
       const link = change.commit ? ` ([\`${change.commit}\`](${REPO_URL}/commit/${change.commit}))` : ''

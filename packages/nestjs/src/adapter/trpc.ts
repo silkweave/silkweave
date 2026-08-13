@@ -27,7 +27,9 @@ export interface TrpcAdapterOptions {
 }
 
 function resolveCors(config: CorsOptions | boolean | undefined): RequestHandler | null {
-  if (config === false) { return null }
+  if (config === false) {
+    return null
+  }
   const userConfig = config === true || config === undefined ? {} : config
   return cors({ origin: '*', ...userConfig }) as RequestHandler
 }
@@ -49,7 +51,9 @@ export function trpc(options: TrpcAdapterOptions = {}): NestSilkweaveAdapter {
     name: 'trpc',
     register({ httpAdapter, baseContext, actions, onToolCall }: NestAdapterRegisterContext): void {
       const basePath = (options.basePath ?? '/trpc').replace(/\/$/, '')
-      if (!basePath) { throw new Error('@silkweave/nestjs trpc(): basePath cannot be empty or "/" - pick a path like "/trpc".') }
+      if (!basePath) {
+        throw new Error('@silkweave/nestjs trpc(): basePath cannot be empty or "/" - pick a path like "/trpc".')
+      }
 
       const router = buildRouter(actions)
       const logger = createActionLogger()
@@ -58,7 +62,11 @@ export function trpc(options: TrpcAdapterOptions = {}): NestSilkweaveAdapter {
         router,
         onError: buildValidationErrorEmitter(actions, baseContext, onToolCall),
         createContext: async ({ req, res }: { req: Request; res: Response }): Promise<TrpcHandlerContext> => {
-          const resolved = await resolveAuth(options.auth, req.headers.authorization, baseContext.fork({ request: req }))
+          const resolved = await resolveAuth(
+            options.auth,
+            req.headers.authorization,
+            baseContext.fork({ request: req })
+          )
           if (resolved.kind === 'error') {
             throw new TRPCError({ code: 'UNAUTHORIZED', message: resolved.error.body.error_description })
           }

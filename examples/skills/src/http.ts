@@ -17,26 +17,28 @@ const HelloAction = createAction({
 
 async function main() {
   await silkweave({ name: 'team-skills', description: 'Silkweave skills-over-MCP example', version: '1.0.0' })
-    .adapter(http({
-      host: 'localhost',
-      port: 8080,
-      allowedHosts: ['localhost'],
-      skills: [
-        // Both skills share one npmPackage, so the marketplace lists them as
-        // ONE multi-skill plugin ("example-plugin"). The package is published
-        // (via `silkweave skills pack <dir...> --package @silkweave/example-plugin`);
-        // a marketplace only POINTS at npm - unpublished entries 404 on install.
-        defineSkill({ dir: skillDir('commit-message'), npmPackage: '@silkweave/example-plugin' }),
-        defineSkill({ dir: skillDir('release-checklist'), npmPackage: '@silkweave/example-plugin' })
-      ],
-      // Experimental: also serve the SEP-2640 draft extension
-      // (skills/list + skills/get + capability declaration).
-      skillsExtension: true,
-      // Claude Code plugin marketplace:
-      //   /plugin marketplace add http://localhost:8080/.claude-plugin/marketplace.json
-      //   /plugin install example-plugin@team-skills
-      skillsMarketplace: { owner: { name: 'Silkweave Example' } }
-    }))
+    .adapter(
+      http({
+        host: 'localhost',
+        port: 8080,
+        allowedHosts: ['localhost'],
+        skills: [
+          // Both skills share one npmPackage, so the marketplace lists them as
+          // ONE multi-skill plugin ("example-plugin"). The package is published
+          // (via `silkweave skills pack <dir...> --package @silkweave/example-plugin`);
+          // a marketplace only POINTS at npm - unpublished entries 404 on install.
+          defineSkill({ dir: skillDir('commit-message'), npmPackage: '@silkweave/example-plugin' }),
+          defineSkill({ dir: skillDir('release-checklist'), npmPackage: '@silkweave/example-plugin' })
+        ],
+        // Experimental: also serve the SEP-2640 draft extension
+        // (skills/list + skills/get + capability declaration).
+        skillsExtension: true,
+        // Claude Code plugin marketplace:
+        //   /plugin marketplace add http://localhost:8080/.claude-plugin/marketplace.json
+        //   /plugin install example-plugin@team-skills
+        skillsMarketplace: { owner: { name: 'Silkweave Example' } }
+      })
+    )
     .action(HelloAction)
     .start()
 

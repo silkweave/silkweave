@@ -17,15 +17,23 @@ export function Users() {
     // Fully typed call against the same actions exposed over MCP.
     trpc.listUsers
       .query({ activeOnly: true })
-      .then((result) => { setUsers(result.users) })
-      .catch((err: unknown) => { setError(String(err)) })
+      .then((result) => {
+        setUsers(result.users)
+      })
+      .catch((err: unknown) => {
+        setError(String(err))
+      })
   }, [])
 
-  if (error) { return <p style={{ color: 'crimson' }}>Failed to load: {error}</p> }
+  if (error) {
+    return <p style={{ color: 'crimson' }}>Failed to load: {error}</p>
+  }
 
   return (
     <ul>
-      {users.map((user) => <li key={user.id}>{user.name}</li>)}
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
     </ul>
   )
 }

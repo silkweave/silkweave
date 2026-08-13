@@ -4,7 +4,11 @@ import { Mcp, Trpc } from '@silkweave/nestjs'
 import { IsBoolean, IsNumber, IsOptional, IsString, MinLength } from 'class-validator'
 import { AdminGuard } from './admin.guard.js'
 
-interface User { id: string; name: string; active: boolean }
+interface User {
+  id: string
+  name: string
+  active: boolean
+}
 
 const USERS: User[] = [
   { id: '1', name: 'Alice', active: true },
@@ -85,7 +89,9 @@ export class UsersController {
   @Trpc() // → tRPC query `usersGet`
   get(@Param('id') id: string) {
     const user = USERS.find((u) => u.id === id)
-    if (!user) { throw new NotFoundException('user not found') }
+    if (!user) {
+      throw new NotFoundException('user not found')
+    }
     return { user }
   }
 
@@ -94,7 +100,10 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiOkResponse({ type: BanResponse })
   @UseGuards(AdminGuard)
-  @Mcp({ description: 'Ban a user (admin only - the AdminGuard checks the x-admin-token header on every transport, including MCP).' })
+  @Mcp({
+    description:
+      'Ban a user (admin only - the AdminGuard checks the x-admin-token header on every transport, including MCP).'
+  })
   @Trpc({ description: 'Ban a user (admin only).' }) // → tRPC mutation `usersBan`, guarded
   ban(@Param('id') id: string, @Body() body: BanUserDto) {
     return { banned: id, reason: body.reason, permanent: body.permanent ?? false }

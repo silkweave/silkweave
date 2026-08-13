@@ -19,7 +19,9 @@ export function sideloadResource(options: SideloadResourceOptions = {}): Request
   const baseDir = resolve(resourceDir)
   return async (req, res) => {
     const id = req.params['id']
-    if (!id || typeof id !== 'string') { throw new Error('Invalid ID') }
+    if (!id || typeof id !== 'string') {
+      throw new Error('Invalid ID')
+    }
     // Contain the read to resourceDir. Express 5 decodes %2F in the route param,
     // so an untrusted `id` like `../../etc/passwd` would otherwise escape the
     // directory. basename() strips any path separators; the resolve+prefix check

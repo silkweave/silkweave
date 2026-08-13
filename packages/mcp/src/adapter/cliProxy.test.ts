@@ -15,7 +15,7 @@ vi.mock('@modelcontextprotocol/sdk/client', () => ({
     connect = mocks.connect
     listTools = mocks.listTools
     callTool = mocks.callTool
-    setNotificationHandler = () => { }
+    setNotificationHandler = () => {}
   }
 }))
 
@@ -24,8 +24,10 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', async (importOrigi
   return {
     ...actual,
     StreamableHTTPClientTransport: class {
-      constructor(_url: URL, options?: unknown) { mocks.transportOptions.push(options) }
-      close = async () => { }
+      constructor(_url: URL, options?: unknown) {
+        mocks.transportOptions.push(options)
+      }
+      close = async () => {}
     }
   }
 })
@@ -78,8 +80,8 @@ beforeEach(() => {
   mocks.listTools.mockReset().mockResolvedValue({ tools: TOOLS })
   mocks.callTool.mockReset().mockResolvedValue({ content: [] })
   mocks.transportOptions.length = 0
-  vi.spyOn(console, 'info').mockImplementation(() => { })
-  vi.spyOn(console, 'error').mockImplementation(() => { })
+  vi.spyOn(console, 'info').mockImplementation(() => {})
+  vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 afterEach(() => {
@@ -118,32 +120,40 @@ describe('cliProxy auth passthrough', () => {
 describe('cliProxy positional arguments', () => {
   it('maps a single positional into the tool call input', async () => {
     await run(['create-identity', 'abc', '--count', '2'])
-    expect(mocks.callTool).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'CreateIdentity',
-      arguments: { id: 'abc', count: 2 }
-    }))
+    expect(mocks.callTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'CreateIdentity',
+        arguments: { id: 'abc', count: 2 }
+      })
+    )
   })
 
   it('maps multiple positionals in silkweave/args order, dropping unknown keys', async () => {
     await run(['allocate-tab', 'default', 'cli', '--url', 'https://example.com'])
-    expect(mocks.callTool).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'AllocateTab',
-      arguments: { identity: 'default', agentId: 'cli', url: 'https://example.com' }
-    }))
+    expect(mocks.callTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'AllocateTab',
+        arguments: { identity: 'default', agentId: 'cli', url: 'https://example.com' }
+      })
+    )
   })
 
   it('omits an optional positional that was not provided', async () => {
-    const tools = [{
-      name: 'ListSessions',
-      inputSchema: { type: 'object', properties: { filter: { type: 'string' } } },
-      _meta: { 'silkweave/args': ['filter'] }
-    }]
+    const tools = [
+      {
+        name: 'ListSessions',
+        inputSchema: { type: 'object', properties: { filter: { type: 'string' } } },
+        _meta: { 'silkweave/args': ['filter'] }
+      }
+    ]
     mocks.listTools.mockResolvedValue({ tools })
     await run(['list-sessions'])
-    expect(mocks.callTool).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'ListSessions',
-      arguments: {}
-    }))
+    expect(mocks.callTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'ListSessions',
+        arguments: {}
+      })
+    )
   })
 })
 

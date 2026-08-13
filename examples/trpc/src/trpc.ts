@@ -24,9 +24,7 @@ const ListThingsAction = createAction({
   input: z.object({ contains: z.string().optional() }),
   output: z.object({ items: z.array(z.string()) }),
   run: async ({ contains }) => {
-    const items = contains
-      ? THINGS.filter((thing) => thing.toLowerCase().includes(contains.toLowerCase()))
-      : THINGS
+    const items = contains ? THINGS.filter((thing) => thing.toLowerCase().includes(contains.toLowerCase())) : THINGS
     return { items }
   }
 })
@@ -43,7 +41,9 @@ const GenerateMessagesAction = createAction({
   run: async function* ({ topic, count, delayMs }) {
     for (let i = 0; i < count; i += 1) {
       if (delayMs > 0) {
-        await new Promise<void>((resolve) => { setTimeout(resolve, delayMs) })
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, delayMs)
+        })
       }
       yield { index: i, text: `Message ${i + 1} about ${topic}` }
     }

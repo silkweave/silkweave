@@ -76,14 +76,16 @@ async function main() {
   console.log('Starting multi-resource MCP server on', AS)
   console.log('Tenant connector URLs:', [...SPACES].map((id) => `${AS}/${id}`).join(', '))
   await silkweave({ name: 'silkweave-multi-resource', description: 'One AS, N protected resources', version: '1.0.0' })
-    .adapter(http({
-      host: 'localhost',
-      port: 8080,
-      allowedHosts: ['localhost'],
-      auth,
-      // Mount the transport at each tenant path as well as /mcp.
-      transportPaths: ['/:spaceId']
-    }))
+    .adapter(
+      http({
+        host: 'localhost',
+        port: 8080,
+        allowedHosts: ['localhost'],
+        auth,
+        // Mount the transport at each tenant path as well as /mcp.
+        transportPaths: ['/:spaceId']
+      })
+    )
     .action(WhoAmI)
     .start()
 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
 import { type FieldDesc, mergeField, openapiSchemaToField } from './schema.js'
 
 /**
@@ -31,11 +30,15 @@ export function buildOpenApiLookup(doc: OpenApiDocument): OpenApiLookup {
 /** Locate the operation for a route, tolerating a global path prefix on the document side. */
 function findOperation(lookup: OpenApiLookup, method: string, openapiPath: string): any | undefined {
   const exact = lookup.operations.get(`${method} ${openapiPath}`)
-  if (exact) { return exact }
+  if (exact) {
+    return exact
+  }
   // Fall back to a suffix match so a `setGlobalPrefix('api')` document still resolves.
   for (const [key, op] of lookup.operations) {
     const [verb, path] = key.split(' ')
-    if (verb === method && (path.endsWith(openapiPath) || openapiPath.endsWith(path))) { return op }
+    if (verb === method && (path.endsWith(openapiPath) || openapiPath.endsWith(path))) {
+      return op
+    }
   }
   return undefined
 }
@@ -45,7 +48,9 @@ function resolveRef(doc: OpenApiDocument, schema: any): any {
   let guard = 0
   while (current && typeof current === 'object' && typeof current['$ref'] === 'string' && guard < 10) {
     const match = /^#\/components\/schemas\/(.+)$/.exec(current['$ref'])
-    if (!match) { break }
+    if (!match) {
+      break
+    }
     current = doc.components?.schemas?.[match[1]]
     guard += 1
   }
@@ -60,16 +65,24 @@ function resolveRef(doc: OpenApiDocument, schema: any): any {
  */
 export function openApiFields(lookup: OpenApiLookup, method: string, openapiPath: string): Record<string, FieldDesc> {
   const op = findOperation(lookup, method, openapiPath)
-  if (!op) { return {} }
+  if (!op) {
+    return {}
+  }
   const out: Record<string, FieldDesc> = {}
 
   for (const param of (op['parameters'] as Array<Record<string, any>> | undefined) ?? []) {
     const name = typeof param['name'] === 'string' ? param['name'] : undefined
-    if (!name) { continue }
+    if (!name) {
+      continue
+    }
     const schema = param['schema'] ? resolveRef(lookup.doc, param['schema']) : undefined
     let field = schema ? openapiSchemaToField(schema) : {}
-    if (param['description']) { field = mergeField(field, { description: param['description'] }) }
-    if (typeof param['required'] === 'boolean') { field = mergeField(field, { required: param['required'] }) }
+    if (param['description']) {
+      field = mergeField(field, { description: param['description'] })
+    }
+    if (typeof param['required'] === 'boolean') {
+      field = mergeField(field, { required: param['required'] })
+    }
     out[name] = field
   }
 

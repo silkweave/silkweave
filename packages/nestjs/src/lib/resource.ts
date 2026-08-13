@@ -4,7 +4,8 @@ import type { ResourceMetadata } from './metadata.js'
 
 /** The `@Header('Content-Type', ...)` value declared on a controller method, if any. */
 export function reflectContentType(method: (...args: unknown[]) => unknown): string | undefined {
-  const headers = (Reflect.getMetadata(HEADERS_METADATA, method) as { name?: string; value?: unknown }[] | undefined) ?? []
+  const headers =
+    (Reflect.getMetadata(HEADERS_METADATA, method) as { name?: string; value?: unknown }[] | undefined) ?? []
   const contentType = headers.find((header) => header.name?.toLowerCase() === 'content-type')
   return typeof contentType?.value === 'string' ? contentType.value : undefined
 }
@@ -45,9 +46,12 @@ interface StreamableFileLike {
 
 /** Duck-typed `StreamableFile` check - no value import of `@nestjs/common` needed. */
 function isStreamableFile(value: unknown): value is StreamableFileLike {
-  return typeof value === 'object' && value !== null
-    && typeof (value as StreamableFileLike).getStream === 'function'
-    && typeof (value as StreamableFileLike).getHeaders === 'function'
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as StreamableFileLike).getStream === 'function' &&
+    typeof (value as StreamableFileLike).getHeaders === 'function'
+  )
 }
 
 function filenameFromDisposition(disposition: string | undefined): string | undefined {
@@ -64,16 +68,23 @@ function filenameFromDisposition(disposition: string | undefined): string | unde
  * passes through for the adapters' own normalization.
  */
 export async function normalizeControllerResult(result: unknown): Promise<unknown> {
-  if (!isStreamableFile(result)) { return result }
+  if (!isStreamableFile(result)) {
+    return result
+  }
   const chunks: Uint8Array[] = []
   for await (const chunk of result.getStream()) {
     chunks.push(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk)
   }
   const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0))
   let offset = 0
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
   const { type, disposition } = result.options ?? {}
-  if (!type && !disposition) { return bytes }
+  if (!type && !disposition) {
+    return bytes
+  }
   const name = filenameFromDisposition(disposition)
   return resource(bytes, {
     mimeType: type ?? 'application/octet-stream',

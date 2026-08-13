@@ -4,7 +4,13 @@ import { createHTTPHandler } from '@trpc/server/adapters/standalone'
 import cors, { CorsOptions } from 'cors'
 import http, { IncomingMessage, ServerResponse } from 'http'
 import { buildRouter, TrpcHandlerContext } from '../lib/buildRouter.js'
-import { authResponseMeta, createActionLogger, resolveIdentity, throwAuthError, type Authenticate } from '../lib/createContext.js'
+import {
+  authResponseMeta,
+  createActionLogger,
+  resolveIdentity,
+  throwAuthError,
+  type Authenticate
+} from '../lib/createContext.js'
 
 export interface TrpcAdapterOptions {
   host?: string
@@ -26,7 +32,9 @@ export interface TrpcAdapterOptions {
 type CorsMiddleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
 
 function resolveCors(corsConfig: CorsOptions | boolean | undefined): CorsMiddleware | null {
-  if (corsConfig === false) { return null }
+  if (corsConfig === false) {
+    return null
+  }
   const userConfig = corsConfig === true || corsConfig === undefined ? {} : corsConfig
   return cors({ origin: '*', ...userConfig }) as CorsMiddleware
 }
@@ -46,9 +54,10 @@ export const trpc: AdapterFactory<TrpcAdapterOptions> = (options) => {
         const corsMiddleware = resolveCors(options.cors)
         const logger = createActionLogger()
 
-        const createContext = async (
-          opts: { req: IncomingMessage; res: ServerResponse }
-        ): Promise<TrpcHandlerContext> => {
+        const createContext = async (opts: {
+          req: IncomingMessage
+          res: ServerResponse
+        }): Promise<TrpcHandlerContext> => {
           const resolved = await resolveIdentity(
             options.authenticate,
             options.auth,
@@ -71,7 +80,12 @@ export const trpc: AdapterFactory<TrpcAdapterOptions> = (options) => {
           }
         }
 
-        const trpcHandler = createHTTPHandler({ router, basePath: endpoint, createContext, responseMeta: authResponseMeta })
+        const trpcHandler = createHTTPHandler({
+          router,
+          basePath: endpoint,
+          createContext,
+          responseMeta: authResponseMeta
+        })
 
         const handler = (req: IncomingMessage, res: ServerResponse) => {
           if (!req.url?.startsWith(endpoint)) {
@@ -86,7 +100,11 @@ export const trpc: AdapterFactory<TrpcAdapterOptions> = (options) => {
         server = http.createServer((req, res) => {
           if (corsMiddleware) {
             corsMiddleware(req, res, () => {
-              if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return }
+              if (req.method === 'OPTIONS') {
+                res.statusCode = 204
+                res.end()
+                return
+              }
               handler(req, res)
             })
           } else {
@@ -95,14 +113,22 @@ export const trpc: AdapterFactory<TrpcAdapterOptions> = (options) => {
         })
 
         await new Promise<void>((resolve) => {
-          server!.listen(port, host, () => { resolve() })
+          server!.listen(port, host, () => {
+            resolve()
+          })
         })
       },
       stop: async () => {
-        if (!server) { return }
+        if (!server) {
+          return
+        }
         await new Promise<void>((resolve, reject) => {
           server!.close((err) => {
-            if (err) { reject(err) } else { resolve() }
+            if (err) {
+              reject(err)
+            } else {
+              resolve()
+            }
           })
         })
       }

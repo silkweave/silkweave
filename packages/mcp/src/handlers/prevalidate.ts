@@ -26,15 +26,23 @@ export async function emitInvalidArguments(
   context: SilkweaveContext,
   onToolCall: OnToolCall | undefined
 ): Promise<void> {
-  if (!onToolCall) { return }
+  if (!onToolCall) {
+    return
+  }
   try {
     const message = body as { method?: unknown; params?: { name?: unknown; arguments?: unknown } } | undefined
-    if (message?.method !== 'tools/call' || typeof message.params?.name !== 'string') { return }
+    if (message?.method !== 'tools/call' || typeof message.params?.name !== 'string') {
+      return
+    }
     const tool = message.params.name
     const action = actions.find((candidate) => pascalCase(candidate.name) === tool)
-    if (!action) { return }
+    if (!action) {
+      return
+    }
     const parsed = await action.input.safeParseAsync(message.params.arguments)
-    if (parsed.success) { return }
+    if (parsed.success) {
+      return
+    }
     const details = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ')

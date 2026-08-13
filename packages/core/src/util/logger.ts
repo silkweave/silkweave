@@ -10,7 +10,7 @@ export interface ProgressOptions {
 
 const LogLevels = ['error', 'debug', 'info', 'notice', 'warning', 'critical', 'alert', 'emergency'] as const
 
-export type LogLevel = typeof LogLevels[number]
+export type LogLevel = (typeof LogLevels)[number]
 
 export type LogFn = (data: unknown) => void
 
@@ -51,24 +51,30 @@ export interface CreateLoggerOptions {
 export function createLogger(options: CreateLoggerOptions = {}): Logger {
   const { name, level = 'debug', stream, onLog, onProgress } = options
 
-  const target = stream === false ? undefined : stream ?? process.stdout
+  const target = stream === false ? undefined : (stream ?? process.stdout)
   const threshold = LEVEL_SEVERITY[level] ?? LEVEL_SEVERITY.debug
 
   const write = (logLevel: LogLevel, data: unknown) => {
     if (target && LEVEL_SEVERITY[logLevel] >= threshold) {
-      const line = typeof data === 'object' && data !== null
-        ? { level: logLevel, time: Date.now(), name, ...data }
-        : { level: logLevel, time: Date.now(), name, msg: data }
+      const line =
+        typeof data === 'object' && data !== null
+          ? { level: logLevel, time: Date.now(), name, ...data }
+          : { level: logLevel, time: Date.now(), name, msg: data }
       target.write(`${JSON.stringify(line)}\n`)
     }
   }
 
-  const logLevels = Object.fromEntries(LogLevels.map((logLevel) => {
-    return [logLevel, (data: unknown) => {
-      write(logLevel, data)
-      onLog?.(logLevel, data)
-    }]
-  })) as Record<LogLevel, LogFn>
+  const logLevels = Object.fromEntries(
+    LogLevels.map((logLevel) => {
+      return [
+        logLevel,
+        (data: unknown) => {
+          write(logLevel, data)
+          onLog?.(logLevel, data)
+        }
+      ]
+    })
+  ) as Record<LogLevel, LogFn>
 
   return {
     ...logLevels,
@@ -83,7 +89,14 @@ export function createLogger(options: CreateLoggerOptions = {}): Logger {
 }
 
 export function buildLogLevels(fn: (level: LogLevel, data: unknown) => void): Record<LogLevel, LogFn> {
-  return Object.fromEntries(LogLevels.map((level) => [level, (data: unknown) => { fn(level, data) }])) as Record<LogLevel, LogFn>
+  return Object.fromEntries(
+    LogLevels.map((level) => [
+      level,
+      (data: unknown) => {
+        fn(level, data)
+      }
+    ])
+  ) as Record<LogLevel, LogFn>
 }
 
 // Maps each syslog level onto a `console` method for a human-readable terminal
@@ -105,7 +118,7 @@ const CONSOLE_LEVEL_MAP: Record<LogLevel, 'log' | 'info' | 'warn' | 'error'> = {
  * written verbatim; objects are JSON-stringified. Zero dependencies.
  */
 export function createConsoleLogger(): Logger {
-  const toString = (value: unknown) => typeof value === 'string' ? value : JSON.stringify(value)
+  const toString = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value))
   return {
     ...buildLogLevels((level, data) => {
       console[CONSOLE_LEVEL_MAP[level]](toString(data))

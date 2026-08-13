@@ -18,12 +18,15 @@ describe('diffSkills', () => {
     lockfile.skills['frozen'] = lockEntry(entry('frozen', 'sha256:old', '1.0.0'), '1.0.0')
     lockfile.skills['gone'] = lockEntry(entry('gone', 'sha256:aa'))
 
-    const diffs = diffSkills([
-      entry('current', 'sha256:aa'),
-      entry('stale', 'sha256:new'),
-      entry('frozen', 'sha256:new', '2.0.0'),
-      entry('fresh', 'sha256:aa')
-    ], lockfile)
+    const diffs = diffSkills(
+      [
+        entry('current', 'sha256:aa'),
+        entry('stale', 'sha256:new'),
+        entry('frozen', 'sha256:new', '2.0.0'),
+        entry('fresh', 'sha256:aa')
+      ],
+      lockfile
+    )
 
     const byName = Object.fromEntries(diffs.map((diff) => [diff.name, diff.status]))
     expect(byName).toEqual({

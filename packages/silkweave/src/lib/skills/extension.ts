@@ -1,7 +1,14 @@
 import type { Client } from '@modelcontextprotocol/sdk/client'
 import {
-  aggregateDigest, mimeForPath, SKILLS_EXTENSION_ID, SKILLS_GET_METHOD, SKILLS_LIST_METHOD,
-  type SkillEntryWire, type SkillManifestEntry, type SkillPayload, type SkillPayloadFile
+  aggregateDigest,
+  mimeForPath,
+  SKILLS_EXTENSION_ID,
+  SKILLS_GET_METHOD,
+  SKILLS_LIST_METHOD,
+  type SkillEntryWire,
+  type SkillManifestEntry,
+  type SkillPayload,
+  type SkillPayloadFile
 } from '@silkweave/skills'
 import z from 'zod/v4'
 
@@ -24,7 +31,9 @@ export function hasSkillsExtension(client: Client): boolean {
 
 function entryName(entry: SkillEntryWire): string {
   const fromFrontmatter = entry.frontmatter['name']
-  if (typeof fromFrontmatter === 'string' && fromFrontmatter) { return fromFrontmatter }
+  if (typeof fromFrontmatter === 'string' && fromFrontmatter) {
+    return fromFrontmatter
+  }
   // Spec: the skill URI's final path segment before SKILL.md equals the name.
   const segments = entry.uri.replace(/^skill:\/\//, '').split('/')
   return segments.length > 1 ? segments[segments.length - 2] : segments[0]
@@ -32,7 +41,9 @@ function entryName(entry: SkillEntryWire): string {
 
 function entryVersion(entry: SkillEntryWire): string | undefined {
   const metadata = entry.frontmatter['metadata']
-  if (typeof metadata !== 'object' || metadata === null) { return undefined }
+  if (typeof metadata !== 'object' || metadata === null) {
+    return undefined
+  }
   const version = (metadata as Record<string, unknown>)['version']
   return typeof version === 'string' ? version : undefined
 }
@@ -49,7 +60,7 @@ async function entryToManifest(entry: SkillEntryWire): Promise<SkillManifestEntr
   const files = entry.resources.map((resource) => {
     const path = resource.uri.startsWith(root)
       ? resource.uri.slice(root.length)
-      : resource.uri.split('/').pop() ?? resource.uri
+      : (resource.uri.split('/').pop() ?? resource.uri)
     return { path, mimeType: mimeForPath(path), digest: resource.digest }
   })
   const description = entry.frontmatter['description']
@@ -85,13 +96,17 @@ export async function fetchExtensionSkills(client: Client): Promise<ExtensionSki
     manifest: [...entries.values()].map(({ manifest }) => manifest),
     payload: async (name) => {
       const found = entries.get(name)
-      if (!found) { throw new Error(`Unknown skill '${name}' (${SKILLS_GET_METHOD} listing has no such entry)`) }
+      if (!found) {
+        throw new Error(`Unknown skill '${name}' (${SKILLS_GET_METHOD} listing has no such entry)`)
+      }
       const files: SkillPayloadFile[] = []
       for (const [index, resource] of found.entry.resources.entries()) {
         const file = found.manifest.files[index]
         const read = await client.readResource({ uri: resource.uri })
         const content = read.contents[0] as { text?: string; blob?: string } | undefined
-        if (!content) { throw new Error(`Empty resource read for ${resource.uri}`) }
+        if (!content) {
+          throw new Error(`Empty resource read for ${resource.uri}`)
+        }
         files.push({
           path: file.path,
           mimeType: file.mimeType,

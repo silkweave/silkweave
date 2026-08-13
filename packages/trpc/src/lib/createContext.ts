@@ -19,7 +19,9 @@ export function createActionLogger(): Logger {
     ...buildLogLevels((level, data) => {
       console[CONSOLE_LEVEL_MAP[level]](data)
     }),
-    progress: () => { /* progress notifications not supported on tRPC HTTP */ }
+    progress: () => {
+      /* progress notifications not supported on tRPC HTTP */
+    }
   }
 }
 
@@ -29,18 +31,20 @@ export interface AuthErrorPayload {
   body: { error: string; error_description: string }
 }
 
-export type ResolvedAuth =
-  | { kind: 'ok'; authInfo?: AuthInfo }
-  | { kind: 'error'; error: AuthErrorPayload }
+export type ResolvedAuth = { kind: 'ok'; authInfo?: AuthInfo } | { kind: 'error'; error: AuthErrorPayload }
 
 export async function resolveAuth(
   auth: AuthConfig | undefined,
   authHeader: string | null | undefined,
   context: SilkweaveContext
 ): Promise<ResolvedAuth> {
-  if (!auth) { return { kind: 'ok' } }
+  if (!auth) {
+    return { kind: 'ok' }
+  }
   const result = await validateToken(authHeader, auth, context)
-  if (result.error) { return { kind: 'error', error: result.error } }
+  if (result.error) {
+    return { kind: 'error', error: result.error }
+  }
   return { kind: 'ok', authInfo: result.auth }
 }
 
@@ -99,10 +103,14 @@ export async function resolveIdentity<Req>(
       // surfaces as an opaque 500, so map it to a TRPCError here.
       throw mapError(error)
     }
-    if (authInfo) { return { kind: 'ok', authInfo } }
+    if (authInfo) {
+      return { kind: 'ok', authInfo }
+    }
     // Declined: fall through to the bearer path so one endpoint can serve a
     // cookie-bearing browser and a token-bearing agent.
-    if (!auth) { return { kind: 'error', error: UNAUTHENTICATED } }
+    if (!auth) {
+      return { kind: 'error', error: UNAUTHENTICATED }
+    }
   }
   return resolveAuth(auth, authHeader, context)
 }
@@ -142,9 +150,10 @@ export function throwAuthError(payload: AuthErrorPayload): never {
  * OAuth challenge headers so discovery/step-up flows work. Shared by the
  * standalone (`createHTTPHandler`) and fetch (`fetchRequestHandler`) adapters.
  */
-export function authResponseMeta(
-  opts: { errors: readonly { cause?: unknown }[] }
-): { status?: number; headers?: Record<string, string> } {
+export function authResponseMeta(opts: { errors: readonly { cause?: unknown }[] }): {
+  status?: number
+  headers?: Record<string, string>
+} {
   for (const err of opts.errors) {
     if (err.cause instanceof AuthChallengeError) {
       return { status: err.cause.payload.statusCode, headers: err.cause.payload.headers }

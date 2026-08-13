@@ -29,7 +29,7 @@ export class SilkweaveExecutionContext implements ExecutionContext, ArgumentsHos
     private readonly classRef: Type<unknown>,
     private readonly handler: (...handlerArgs: unknown[]) => unknown,
     private readonly contextType = 'http'
-  ) { }
+  ) {}
 
   getType<T extends string = ContextType>(): T {
     return this.contextType as T

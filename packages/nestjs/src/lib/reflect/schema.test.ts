@@ -15,8 +15,15 @@ import {
 
 describe('mergeField', () => {
   it('lets defined keys of over win, without clobbering base with undefined', () => {
-    expect(mergeField({ type: 'string', required: true }, { required: false })).toEqual({ type: 'string', required: false })
-    expect(mergeField({ type: 'string', min: 1 }, { type: undefined, max: 5 })).toEqual({ type: 'string', min: 1, max: 5 })
+    expect(mergeField({ type: 'string', required: true }, { required: false })).toEqual({
+      type: 'string',
+      required: false
+    })
+    expect(mergeField({ type: 'string', min: 1 }, { type: undefined, max: 5 })).toEqual({
+      type: 'string',
+      min: 1,
+      max: 5
+    })
   })
 })
 
@@ -116,39 +123,64 @@ describe('classValidatorToField', () => {
   })
 
   it('combines multiple entries for one property', () => {
-    expect(classValidatorToField([{ name: 'isString' }, { name: 'minLength', constraints: [2] }, { name: 'isOptional' }]))
-      .toEqual({ type: 'string', minLength: 2, required: false })
+    expect(
+      classValidatorToField([{ name: 'isString' }, { name: 'minLength', constraints: [2] }, { name: 'isOptional' }])
+    ).toEqual({ type: 'string', minLength: 2, required: false })
   })
 })
 
 describe('apiPropertyToField', () => {
   it('reads description/required/type and array items', () => {
-    expect(apiPropertyToField({ description: 'd', required: false, type: String })).toEqual({ description: 'd', required: false, type: 'string' })
+    expect(apiPropertyToField({ description: 'd', required: false, type: String })).toEqual({
+      description: 'd',
+      required: false,
+      type: 'string'
+    })
     expect(apiPropertyToField({ type: String, isArray: true })).toEqual({ type: 'array', items: { type: 'string' } })
   })
 
   it('reads numeric/string constraints, format, nullable, default, enum', () => {
-    expect(apiPropertyToField({ minimum: 1, maximum: 9, minLength: 2, maxLength: 5, format: 'email', nullable: true, default: 'x' }))
-      .toEqual({ min: 1, max: 9, minLength: 2, maxLength: 5, format: 'email', nullable: true, default: 'x' })
+    expect(
+      apiPropertyToField({
+        minimum: 1,
+        maximum: 9,
+        minLength: 2,
+        maxLength: 5,
+        format: 'email',
+        nullable: true,
+        default: 'x'
+      })
+    ).toEqual({ min: 1, max: 9, minLength: 2, maxLength: 5, format: 'email', nullable: true, default: 'x' })
     expect(apiPropertyToField({ enum: ['a', 'b'] })).toEqual({ enum: ['a', 'b'] })
   })
 })
 
 describe('openapiSchemaToField', () => {
   it('reads a scalar schema with constraints and nullable', () => {
-    expect(openapiSchemaToField({ type: 'string', minLength: 2, format: 'email', nullable: true }))
-      .toEqual({ type: 'string', minLength: 2, format: 'email', nullable: true })
+    expect(openapiSchemaToField({ type: 'string', minLength: 2, format: 'email', nullable: true })).toEqual({
+      type: 'string',
+      minLength: 2,
+      format: 'email',
+      nullable: true
+    })
   })
 
   it('reads an array schema with nested items and a default', () => {
-    expect(openapiSchemaToField({ type: 'array', items: { type: 'number' }, default: [] }))
-      .toEqual({ type: 'array', items: { type: 'number' }, default: [] })
+    expect(openapiSchemaToField({ type: 'array', items: { type: 'number' }, default: [] })).toEqual({
+      type: 'array',
+      items: { type: 'number' },
+      default: []
+    })
   })
 })
 
 describe('swaggerParamToField', () => {
   it('reads description/required/type and isArray', () => {
-    expect(swaggerParamToField({ description: 'd', required: true, type: Number })).toEqual({ description: 'd', required: true, type: 'number' })
+    expect(swaggerParamToField({ description: 'd', required: true, type: Number })).toEqual({
+      description: 'd',
+      required: true,
+      type: 'number'
+    })
     expect(swaggerParamToField({ isArray: true })).toEqual({ type: 'array' })
   })
 

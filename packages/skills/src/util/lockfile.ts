@@ -57,12 +57,18 @@ export function diffSkills(manifest: SkillManifestEntry[], lockfile: SkillLockfi
   const remoteNames = new Set(manifest.map((entry) => entry.name))
   const diffs: SkillDiff[] = manifest.map((remote) => {
     const locked = lockfile.skills[remote.name]
-    if (!locked) { return { name: remote.name, status: 'missing', remote } }
-    if (locked.digest === remote.digest) { return { name: remote.name, status: 'up-to-date', remote, locked } }
+    if (!locked) {
+      return { name: remote.name, status: 'missing', remote }
+    }
+    if (locked.digest === remote.digest) {
+      return { name: remote.name, status: 'up-to-date', remote, locked }
+    }
     return { name: remote.name, status: locked.pinned ? 'held' : 'outdated', remote, locked }
   })
   for (const [name, locked] of Object.entries(lockfile.skills)) {
-    if (!remoteNames.has(name)) { diffs.push({ name, status: 'orphaned', locked }) }
+    if (!remoteNames.has(name)) {
+      diffs.push({ name, status: 'orphaned', locked })
+    }
   }
   return diffs
 }

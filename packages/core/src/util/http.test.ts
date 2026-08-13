@@ -32,7 +32,9 @@ describe('actionMethod', () => {
 describe('methodHasBody', () => {
   it('is false only for GET', () => {
     expect(methodHasBody('GET')).toBe(false)
-    for (const m of ['POST', 'PUT', 'DELETE'] as const) { expect(methodHasBody(m)).toBe(true) }
+    for (const m of ['POST', 'PUT', 'DELETE'] as const) {
+      expect(methodHasBody(m)).toBe(true)
+    }
   })
 })
 
@@ -70,21 +72,36 @@ describe('validateActionRouting', () => {
 describe('resolveActionInput', () => {
   it('reads every non-path field from the query string on a bodyless GET, coercing scalars', () => {
     const action = makeAction(
-      z.object({ spaceId: z.string(), offset: z.number().optional(), limit: z.number().optional(), flag: z.boolean().optional() }),
+      z.object({
+        spaceId: z.string(),
+        offset: z.number().optional(),
+        limit: z.number().optional(),
+        flag: z.boolean().optional()
+      }),
       { kind: 'query', path: 'spaces/:spaceId/users' }
     )
-    const input = resolveActionInput(action, { params: { spaceId: 'sp1' }, query: { offset: '5', limit: '10', flag: 'true' } })
+    const input = resolveActionInput(action, {
+      params: { spaceId: 'sp1' },
+      query: { offset: '5', limit: '10', flag: 'true' }
+    })
     expect(input).toEqual({ spaceId: 'sp1', offset: 5, limit: 10, flag: true })
   })
 
   it('reads only declared queryParams from the query on a body method, body forming the base', () => {
-    const action = makeAction(z.object({ name: z.string(), offset: z.number().optional() }), { method: 'POST', queryParams: ['offset'] })
+    const action = makeAction(z.object({ name: z.string(), offset: z.number().optional() }), {
+      method: 'POST',
+      queryParams: ['offset']
+    })
     const input = resolveActionInput(action, { body: { name: 'ada' }, query: { offset: '7', other: 'x' } })
     expect(input).toEqual({ name: 'ada', offset: 7 })
   })
 
   it('applies precedence body < query < path', () => {
-    const action = makeAction(z.object({ id: z.string(), tag: z.string().optional() }), { method: 'PUT', path: 'items/:id', queryParams: ['tag'] })
+    const action = makeAction(z.object({ id: z.string(), tag: z.string().optional() }), {
+      method: 'PUT',
+      path: 'items/:id',
+      queryParams: ['tag']
+    })
     const input = resolveActionInput(action, {
       params: { id: 'fromPath' },
       query: { tag: 'fromQuery' },

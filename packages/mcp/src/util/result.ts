@@ -1,19 +1,30 @@
 import { EmbeddedResource, type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { bytesToBase64, isTextMimeType, resourceBytes, resourceText, SilkweaveError, type ActionResource } from '@silkweave/core'
+import {
+  bytesToBase64,
+  isTextMimeType,
+  resourceBytes,
+  resourceText,
+  SilkweaveError,
+  type ActionResource
+} from '@silkweave/core'
 
 // Web-standard (Node 18+ and edge/Workers) UTF-8 <-> base64 so this subpath,
 // which @silkweave/edge imports, carries no Node-only crypto/Buffer dependency.
 function utf8ToBase64(text: string): { base64: string; byteLength: number } {
   const bytes = new TextEncoder().encode(text)
   let binary = ''
-  for (const byte of bytes) { binary += String.fromCharCode(byte) }
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
   return { base64: btoa(binary), byteLength: bytes.length }
 }
 
 function base64ToUtf8(base64: string): string {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) { bytes[i] = binary.charCodeAt(i) }
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
   return new TextDecoder().decode(bytes)
 }
 
@@ -99,17 +110,21 @@ export function structuredToolResult(data: object): CallToolResult {
 
 export function jsonToolResult(data: object, isError = false): CallToolResult {
   const result: CallToolResult = { content: [{ type: 'text' as const, text: JSON.stringify(data) }] }
-  if (isError) { result.isError = true }
+  if (isError) {
+    result.isError = true
+  }
   return result
 }
 
 export function errorToolResult({ code, name, message }: SilkweaveError): CallToolResult {
   return {
     isError: true,
-    content: [{
-      type: 'text',
-      text: JSON.stringify({ success: false, code, name, message })
-    }]
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({ success: false, code, name, message })
+      }
+    ]
   }
 }
 
@@ -129,6 +144,6 @@ export function handleToolError(error: unknown): CallToolResult {
 }
 
 export function parseResourceMessage({ resource }: EmbeddedResource) {
-  const text = ('blob' in resource) ? base64ToUtf8(resource.blob) : resource.text
+  const text = 'blob' in resource ? base64ToUtf8(resource.blob) : resource.text
   return text
 }

@@ -14,12 +14,21 @@ export const CalculateAction = createAction({
     logger.info(`Calculating ${a} ${operation} ${b}`)
     let result: number
     switch (operation) {
-      case 'add': result = a + b; break
-      case 'subtract': result = a - b; break
-      case 'multiply': result = a * b; break
+      case 'add':
+        result = a + b
+        break
+      case 'subtract':
+        result = a - b
+        break
+      case 'multiply':
+        result = a * b
+        break
       case 'divide':
-        if (b === 0) { throw new Error('Division by zero') }
-        result = a / b; break
+        if (b === 0) {
+          throw new Error('Division by zero')
+        }
+        result = a / b
+        break
     }
     return { operation, a, b, result }
   }

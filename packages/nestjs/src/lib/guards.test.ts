@@ -7,22 +7,37 @@ import { describe, expect, it } from 'vitest'
 import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
 
 class Allow implements CanActivate {
-  canActivate(): boolean { return true }
+  canActivate(): boolean {
+    return true
+  }
 }
 class Deny implements CanActivate {
-  canActivate(): boolean { return false }
+  canActivate(): boolean {
+    return false
+  }
 }
 
 const reflector = new Reflector()
-const moduleRef = { get: (ref: Type<CanActivate>): CanActivate => new ref(), create: (ref: Type<CanActivate>): CanActivate => new ref() } as unknown as ModuleRef
+const moduleRef = {
+  get: (ref: Type<CanActivate>): CanActivate => new ref(),
+  create: (ref: Type<CanActivate>): CanActivate => new ref()
+} as unknown as ModuleRef
 class Ctrl {}
 const handler = function route(): void {}
 const CtrlRef = Ctrl as Type<unknown>
 
 describe('collectGuards', () => {
   it('merges class then method @UseGuards, class first (matching Nest order)', () => {
-    class ClassGuard implements CanActivate { canActivate(): boolean { return true } }
-    class MethodGuard implements CanActivate { canActivate(): boolean { return true } }
+    class ClassGuard implements CanActivate {
+      canActivate(): boolean {
+        return true
+      }
+    }
+    class MethodGuard implements CanActivate {
+      canActivate(): boolean {
+        return true
+      }
+    }
     const cls = class {}
     const fn = function route(): void {}
     Reflect.defineMetadata(GUARDS_METADATA, [ClassGuard], cls)
@@ -37,8 +52,16 @@ describe('collectGuards', () => {
 })
 
 describe('collectGlobalGuards', () => {
-  class AllowedGlobal implements CanActivate { canActivate(): boolean { return true } }
-  class OtherGlobal implements CanActivate { canActivate(): boolean { return true } }
+  class AllowedGlobal implements CanActivate {
+    canActivate(): boolean {
+      return true
+    }
+  }
+  class OtherGlobal implements CanActivate {
+    canActivate(): boolean {
+      return true
+    }
+  }
 
   function appConfig(globals: CanActivate[], requestGuards: CanActivate[] = []): ApplicationConfig {
     return {
@@ -65,7 +88,11 @@ describe('collectGlobalGuards', () => {
 })
 
 describe('runGuards', () => {
-  function run(guards: (CanActivate | Type<CanActivate>)[], request: unknown = { headers: {} }, contextType: 'http' | 'rpc' = 'http'): Promise<void> {
+  function run(
+    guards: (CanActivate | Type<CanActivate>)[],
+    request: unknown = { headers: {} },
+    contextType: 'http' | 'rpc' = 'http'
+  ): Promise<void> {
     return runGuards(guards, moduleRef, reflector, CtrlRef, handler, request, null, contextType)
   }
 
@@ -112,7 +139,12 @@ describe('runGuards', () => {
 
   it('stops at the first denying guard (short-circuits)', async () => {
     let reached = false
-    const after: CanActivate = { canActivate: (): boolean => { reached = true; return true } }
+    const after: CanActivate = {
+      canActivate: (): boolean => {
+        reached = true
+        return true
+      }
+    }
     await expect(run([new Deny(), after])).rejects.toBeInstanceOf(ForbiddenException)
     expect(reached).toBe(false)
   })

@@ -55,18 +55,27 @@ export function registerSkillResources(server: McpServer, skills: Skill[]): void
   for (const skill of skills) {
     for (const file of skill.files) {
       const uri = skillFileUri(skill, file)
-      server.registerResource(`${skill.name}/${file.path}`, uri, {
-        mimeType: file.mimeType,
-        // The skill description on SKILL.md is what lets a resource-listing
-        // host decide relevance without reading every file.
-        ...(file.path === 'SKILL.md' ? { description: skill.description } : {})
-      }, async () => ({
-        contents: [
-          isTextMimeType(file.mimeType)
-            ? { uri, mimeType: file.mimeType, text: typeof file.data === 'string' ? file.data : new TextDecoder().decode(file.data) }
-            : { uri, mimeType: file.mimeType, blob: bytesToBase64(fileBytes(file.data)) }
-        ]
-      }))
+      server.registerResource(
+        `${skill.name}/${file.path}`,
+        uri,
+        {
+          mimeType: file.mimeType,
+          // The skill description on SKILL.md is what lets a resource-listing
+          // host decide relevance without reading every file.
+          ...(file.path === 'SKILL.md' ? { description: skill.description } : {})
+        },
+        async () => ({
+          contents: [
+            isTextMimeType(file.mimeType)
+              ? {
+                  uri,
+                  mimeType: file.mimeType,
+                  text: typeof file.data === 'string' ? file.data : new TextDecoder().decode(file.data)
+                }
+              : { uri, mimeType: file.mimeType, blob: bytesToBase64(fileBytes(file.data)) }
+          ]
+        })
+      )
     }
   }
 }

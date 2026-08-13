@@ -23,9 +23,7 @@ export function matchRedirectUri(uri: string, patterns: string[]): boolean {
 
 /** Escape regex metacharacters, then expand `*` to `.*` (component-scoped). */
 function componentRegex(part: string): RegExp {
-  const escaped = part
-    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*/g, '.*')
+  const escaped = part.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')
   return new RegExp(`^${escaped}$`)
 }
 
@@ -51,11 +49,11 @@ function matchPattern(target: URL, pattern: string): boolean {
 
   // Userinfo: a pattern without userinfo must reject any target that carries it
   // (this is what blocks `localhost:x@attacker.com`). With userinfo, match it.
-  const targetUserinfo = target.password
-    ? `${target.username}:${target.password}`
-    : target.username
+  const targetUserinfo = target.password ? `${target.username}:${target.password}` : target.username
   if (userinfo === undefined) {
-    if (targetUserinfo !== '') { return false }
+    if (targetUserinfo !== '') {
+      return false
+    }
   } else if (!componentRegex(userinfo).test(targetUserinfo)) {
     return false
   }
@@ -64,7 +62,6 @@ function matchPattern(target: URL, pattern: string): boolean {
     return false
   }
 
-  const targetTail =
-    (target.port ? `:${target.port}` : '') + target.pathname + target.search + target.hash
+  const targetTail = (target.port ? `:${target.port}` : '') + target.pathname + target.search + target.hash
   return componentRegex(tail).test(targetTail)
 }

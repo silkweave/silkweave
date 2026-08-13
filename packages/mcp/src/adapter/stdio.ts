@@ -27,14 +27,17 @@ export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions
         // Skills resolve async (file reads + digests), so the server is built
         // here rather than in the generator - its instructions are ctor-only.
         const serving = await prepareSkills(adapterOptions?.skills, { extension: adapterOptions?.skillsExtension })
-        server = new McpServer({
-          name: options.name,
-          description: options.description,
-          version: options.version
-        }, {
-          capabilities: { tools: {}, logging: {}, ...(serving ? { resources: {} } : {}) },
-          ...(serving ? { instructions: serving.instructions } : {})
-        })
+        server = new McpServer(
+          {
+            name: options.name,
+            description: options.description,
+            version: options.version
+          },
+          {
+            capabilities: { tools: {}, logging: {}, ...(serving ? { resources: {} } : {}) },
+            ...(serving ? { instructions: serving.instructions } : {})
+          }
+        )
         const all = serving ? [...actions, ...serving.actions] : actions
         all.forEach(validateActionDisposition)
         registerTools(server, all, context, { logStream: false, onToolCall: adapterOptions?.onToolCall })

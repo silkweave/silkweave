@@ -21,7 +21,10 @@ function req(url: string, body?: Record<string, string>): OAuthRequest {
   return { method: body ? 'POST' : 'GET', url: new URL(url), headers: {}, body }
 }
 
-function build(allowedResources?: AllowedResources): { provider: OAuthProvider; store: ReturnType<typeof createMemoryStore> } {
+function build(allowedResources?: AllowedResources): {
+  provider: OAuthProvider
+  store: ReturnType<typeof createMemoryStore>
+} {
   const store = createMemoryStore()
   const provider = createOAuthProxy({
     authorizeUrl: 'https://upstream.example.com/authorize',
@@ -40,16 +43,19 @@ function build(allowedResources?: AllowedResources): { provider: OAuthProvider; 
 
 /** Stub the upstream IdP's token + userinfo endpoints. */
 function stubUpstream(): void {
-  vi.stubGlobal('fetch', vi.fn(async (input: string | URL) => {
-    const url = String(input)
-    if (url.includes('/token')) {
-      return new Response(JSON.stringify({ access_token: 'upstream-at', id_token: 'upstream-it' }), { status: 200 })
-    }
-    if (url.includes('/userinfo')) {
-      return new Response(JSON.stringify({ email: 'user@example.com', sub: 'user-1' }), { status: 200 })
-    }
-    return new Response('not found', { status: 404 })
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL) => {
+      const url = String(input)
+      if (url.includes('/token')) {
+        return new Response(JSON.stringify({ access_token: 'upstream-at', id_token: 'upstream-it' }), { status: 200 })
+      }
+      if (url.includes('/userinfo')) {
+        return new Response(JSON.stringify({ email: 'user@example.com', sub: 'user-1' }), { status: 200 })
+      }
+      return new Response('not found', { status: 404 })
+    })
+  )
 }
 
 /**
@@ -76,33 +82,43 @@ async function runFlow(
   authorizeUrl.searchParams.set('redirect_uri', REDIRECT)
   authorizeUrl.searchParams.set('code_challenge', pkce.challenge)
   authorizeUrl.searchParams.set('code_challenge_method', 'S256')
-  if (opts.authorizeResource) { authorizeUrl.searchParams.set('resource', opts.authorizeResource) }
+  if (opts.authorizeResource) {
+    authorizeUrl.searchParams.set('resource', opts.authorizeResource)
+  }
 
   const authorized = await provider.authorize(req(authorizeUrl.toString()))
-  if (authorized.status !== 302) { return authorized }
+  if (authorized.status !== 302) {
+    return authorized
+  }
 
   const upstreamState = new URL(authorized.headers.Location).searchParams.get('state')!
   const callbackUrl = `${AS}/auth/callback?code=upstream-code&state=${upstreamState}`
   const callback = await provider.callback(req(callbackUrl))
-  if (callback.status !== 302) { return callback }
+  if (callback.status !== 302) {
+    return callback
+  }
 
   const code = new URL(callback.headers.Location).searchParams.get('code')!
 
-  return provider.token(req(`${AS}/token`, {
-    grant_type: 'authorization_code',
-    code,
-    code_verifier: pkce.verifier,
-    client_id: 'test-client',
-    redirect_uri: REDIRECT,
-    ...(opts.tokenResource ? { resource: opts.tokenResource } : {})
-  }))
+  return provider.token(
+    req(`${AS}/token`, {
+      grant_type: 'authorization_code',
+      code,
+      code_verifier: pkce.verifier,
+      client_id: 'test-client',
+      redirect_uri: REDIRECT,
+      ...(opts.tokenResource ? { resource: opts.tokenResource } : {})
+    })
+  )
 }
 
 const audOf = (response: OAuthResponse): unknown =>
   decodeJwt((response.body as { access_token: string }).access_token).aud
 
 beforeEach(stubUpstream)
-afterEach(() => { vi.unstubAllGlobals() })
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('createOAuthProxy - legacy mode (no allowedResources)', () => {
   it('mints a token for resourceUrl when no indicator is sent', async () => {
@@ -180,7 +196,10 @@ describe('createOAuthProxy - multi-resource minting', () => {
   it('rejects repeated resource params at /authorize', async () => {
     const { provider, store } = build(allowed)
     await store.saveClient('test-client', {
-      clientId: 'test-client', clientSecret: '', redirectUris: [REDIRECT], createdAt: Date.now() / 1000
+      clientId: 'test-client',
+      clientSecret: '',
+      redirectUris: [REDIRECT],
+      createdAt: Date.now() / 1000
     })
     const url = new URL(`${AS}/authorize`)
     url.searchParams.set('response_type', 'code')
@@ -212,12 +231,14 @@ describe('createOAuthProxy - refresh preserves the audience', () => {
   const allowed: AllowedResources = [TENANT_A, TENANT_B]
 
   const refresh = (provider: OAuthProvider, token: string, resource?: string) =>
-    provider.token(req(`${AS}/token`, {
-      grant_type: 'refresh_token',
-      refresh_token: token,
-      client_id: 'test-client',
-      ...(resource ? { resource } : {})
-    }))
+    provider.token(
+      req(`${AS}/token`, {
+        grant_type: 'refresh_token',
+        refresh_token: token,
+        client_id: 'test-client',
+        ...(resource ? { resource } : {})
+      })
+    )
 
   it('re-mints the same audience across rotation', async () => {
     const { provider, store } = build(allowed)

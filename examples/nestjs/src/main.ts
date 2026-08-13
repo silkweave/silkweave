@@ -8,10 +8,7 @@ async function bootstrap() {
 
   // The controllers are ordinary Nest controllers, so @nestjs/swagger documents
   // them natively - no Silkweave-specific merging required.
-  const config = new DocumentBuilder()
-    .setTitle('Silkweave NestJS example')
-    .setVersion('1.0.0')
-    .build()
+  const config = new DocumentBuilder().setTitle('Silkweave NestJS example').setVersion('1.0.0').build()
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config))
 
   await app.listen(8080)

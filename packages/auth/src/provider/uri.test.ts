@@ -31,7 +31,9 @@ describe('matchRedirectUri', () => {
   describe('boundary-crossing attacks are rejected', () => {
     it('does not let a subdomain wildcard cross the host boundary via the path', () => {
       // host is attacker.com, not *.example.com
-      expect(matchRedirectUri('https://attacker.com/x.example.com/callback', ['https://*.example.com/callback'])).toBe(false)
+      expect(matchRedirectUri('https://attacker.com/x.example.com/callback', ['https://*.example.com/callback'])).toBe(
+        false
+      )
     })
 
     it('does not match a host suffix attack', () => {

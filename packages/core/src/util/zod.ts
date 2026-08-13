@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from 'zod/v4'
 
 export interface UnwrapResult {
@@ -8,10 +7,7 @@ export interface UnwrapResult {
   isReadOnly?: boolean
 }
 
-export function unwrap(
-  type: z.ZodTypeAny,
-  result: UnwrapResult = {}
-): [z.ZodTypeAny, UnwrapResult] {
+export function unwrap(type: z.ZodTypeAny, result: UnwrapResult = {}): [z.ZodTypeAny, UnwrapResult] {
   if (type instanceof z.ZodOptional) {
     result.isOptional = true
     return unwrap(type.unwrap() as z.ZodTypeAny, result)
@@ -22,9 +18,7 @@ export function unwrap(
     result.isReadOnly = true
     return unwrap(type.def.innerType as z.ZodTypeAny, result)
   } else if (type instanceof z.ZodDefault) {
-    result.defaultValue = typeof type.def.defaultValue === 'function'
-      ? type.def.defaultValue()
-      : type.def.defaultValue
+    result.defaultValue = typeof type.def.defaultValue === 'function' ? type.def.defaultValue() : type.def.defaultValue
     return unwrap(type.unwrap() as z.ZodTypeAny, result)
   } else {
     return [type, result]

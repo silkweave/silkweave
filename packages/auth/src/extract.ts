@@ -1,5 +1,7 @@
 export function extractBearerToken(header: string | null | undefined): string | null {
-  if (!header) { return null }
+  if (!header) {
+    return null
+  }
   const match = /^Bearer\s+(.+)$/i.exec(header)
   return match?.[1] ?? null
 }

@@ -40,7 +40,7 @@ export class SilkweaveModule implements NestModule {
     private readonly discovery: ControllerDiscovery,
     private readonly httpAdapterHost: HttpAdapterHost,
     private readonly moduleRef: ModuleRef
-  ) { }
+  ) {}
 
   /**
    * Build the telemetry emitter from the configured class token. The instance
@@ -50,7 +50,9 @@ export class SilkweaveModule implements NestModule {
    */
   private telemetryEmitter(): OnToolCall | undefined {
     const token = this.options.telemetry
-    if (!token) { return undefined }
+    if (!token) {
+      return undefined
+    }
     let instance: SilkweaveTelemetry | undefined
     return (event) => {
       const resolved = instance ?? this.moduleRef.get<SilkweaveTelemetry>(token, { strict: false })
@@ -64,10 +66,7 @@ export class SilkweaveModule implements NestModule {
       module: SilkweaveModule,
       global: true,
       imports: [DiscoveryModule],
-      providers: [
-        { provide: SILKWEAVE_MODULE_OPTIONS, useValue: options },
-        ControllerDiscovery
-      ],
+      providers: [{ provide: SILKWEAVE_MODULE_OPTIONS, useValue: options }, ControllerDiscovery],
       exports: []
     }
   }
@@ -87,7 +86,7 @@ export class SilkweaveModule implements NestModule {
       onToolCall
     })
     for (const adapter of this.options.adapters) {
-      const baseContext = createContext({ ...(this.options.context ?? {}), adapter: adapter.name })
+      const baseContext = createContext({ ...this.options.context, adapter: adapter.name })
       const actions = adapter.allActions
         ? allActions
         : allActions.filter((a) => !a.isEnabled || a.isEnabled(baseContext))

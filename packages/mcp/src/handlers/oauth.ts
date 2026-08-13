@@ -11,7 +11,9 @@ function toOAuthReq(req: Request): OAuthRequest {
 }
 
 function sendOAuth(res: Response, oauthRes: OAuthResponse) {
-  for (const [key, value] of Object.entries(oauthRes.headers)) { res.header(key, value) }
+  for (const [key, value] of Object.entries(oauthRes.headers)) {
+    res.header(key, value)
+  }
   if (oauthRes.body) {
     res.status(oauthRes.status).send(typeof oauthRes.body === 'string' ? oauthRes.body : JSON.stringify(oauthRes.body))
   } else {
@@ -45,22 +47,34 @@ export interface OAuthRouteHandlers {
  * `app.post(path, ...token)`.
  */
 export function oauthRoutes(auth: AuthConfig): OAuthRouteHandlers {
-  if (!auth.provider) { throw new Error('@silkweave/mcp oauthRoutes(): auth.provider is required') }
+  if (!auth.provider) {
+    throw new Error('@silkweave/mcp oauthRoutes(): auth.provider is required')
+  }
   const provider = auth.provider
   const callbackPath = auth.callbackPath ?? '/auth/callback'
 
   return {
     callbackPath,
-    wellKnownAuthServer: (_req, res) => { sendOAuth(res, provider.metadata()) },
-    authorize: async (req, res) => { sendOAuth(res, await provider.authorize(toOAuthReq(req))) },
-    callback: async (req, res) => { sendOAuth(res, await provider.callback(toOAuthReq(req))) },
+    wellKnownAuthServer: (_req, res) => {
+      sendOAuth(res, provider.metadata())
+    },
+    authorize: async (req, res) => {
+      sendOAuth(res, await provider.authorize(toOAuthReq(req)))
+    },
+    callback: async (req, res) => {
+      sendOAuth(res, await provider.callback(toOAuthReq(req)))
+    },
     token: [
       express.urlencoded({ extended: false }),
-      async (req, res) => { sendOAuth(res, await provider.token(toOAuthReq(req))) }
+      async (req, res) => {
+        sendOAuth(res, await provider.token(toOAuthReq(req)))
+      }
     ],
     register: [
       express.json(),
-      async (req, res) => { sendOAuth(res, await provider.register(toOAuthReq(req))) }
+      async (req, res) => {
+        sendOAuth(res, await provider.register(toOAuthReq(req)))
+      }
     ]
   }
 }

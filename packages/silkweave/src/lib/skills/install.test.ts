@@ -49,6 +49,6 @@ describe('installSkill', () => {
     const data = await payload()
     data.files[0] = { ...data.files[0], path: '../evil.md' }
     await expect(installSkill(target, data)).rejects.toThrow(/Unsafe skill file path/)
-    await expect(installSkill(target, { ...await payload(), name: '../Evil' })).rejects.toThrow(/invalid name/)
+    await expect(installSkill(target, { ...(await payload()), name: '../Evil' })).rejects.toThrow(/invalid name/)
   })
 })

@@ -47,8 +47,10 @@ function compose(...handlers: RequestHandler[]): RequestHandler {
     let i = 0
     const dispatch: () => void = () => {
       const h = handlers[i++]
-      if (!h) { return next() }
-      h(req, res, (err) => err ? next(err) : dispatch())
+      if (!h) {
+        return next()
+      }
+      h(req, res, (err) => (err ? next(err) : dispatch()))
     }
     dispatch()
   }
@@ -74,7 +76,9 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
     name: 'mcp',
     register({ httpAdapter, silkweaveOptions, baseContext, actions, onToolCall }: NestAdapterRegisterContext): void {
       const basePath = (options.basePath ?? '/mcp').replace(/\/$/, '')
-      if (!basePath) { throw new Error('@silkweave/nestjs mcp(): basePath cannot be empty or "/" - pick a path like "/mcp".') }
+      if (!basePath) {
+        throw new Error('@silkweave/nestjs mcp(): basePath cannot be empty or "/" - pick a path like "/mcp".')
+      }
 
       const adapter = httpAdapter as unknown as {
         get: (path: string, ...h: RequestHandler[]) => unknown
@@ -108,14 +112,20 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
       }
       if (auth?.provider) {
         const oauth = oauthRoutes(auth)
-        adapter.get(`${basePath}/.well-known/oauth-authorization-server`, ...prefix(corsHandler, oauth.wellKnownAuthServer))
+        adapter.get(
+          `${basePath}/.well-known/oauth-authorization-server`,
+          ...prefix(corsHandler, oauth.wellKnownAuthServer)
+        )
         // The MCP SDK probes RFC 8414 insertion form for a path'd issuer
         // (`/.well-known/oauth-authorization-server/mcp`) and never the append
         // form above, so serve the same document there too. Without this, AS
         // discovery fails and the client falls back to root-absolute
         // `/authorize` + `/register`, which nothing here mounts.
         if (basePath) {
-          adapter.get(`/.well-known/oauth-authorization-server${basePath}`, ...prefix(corsHandler, oauth.wellKnownAuthServer))
+          adapter.get(
+            `/.well-known/oauth-authorization-server${basePath}`,
+            ...prefix(corsHandler, oauth.wellKnownAuthServer)
+          )
         }
         adapter.get(`${basePath}/authorize`, ...prefix(corsHandler, oauth.authorize))
         adapter.get(`${basePath}${oauth.callbackPath}`, ...prefix(corsHandler, oauth.callback))
@@ -127,10 +137,16 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
       const protect = guard ? (h: RequestHandler) => compose(guard, h) : (h: RequestHandler) => h
 
       if (options.sideloadResources !== false) {
-        adapter.get(`${basePath}/resource/:id`, ...prefix(corsHandler, protect(sideloadResource({ resourceDir: options.resourceDir }))))
+        adapter.get(
+          `${basePath}/resource/:id`,
+          ...prefix(corsHandler, protect(sideloadResource({ resourceDir: options.resourceDir })))
+        )
       }
 
-      const transport = mcpTransport(silkweaveOptions, baseContext, actions, { filterActions: options.filterActions, onToolCall })
+      const transport = mcpTransport(silkweaveOptions, baseContext, actions, {
+        filterActions: options.filterActions,
+        onToolCall
+      })
       for (const path of [basePath, ...(options.transportPaths ?? [])]) {
         adapter.post(path, ...prefix(corsHandler, express.json(), protect(transport.post)))
         // POST-only transport: 405 rather than Nest's default 404, which is what

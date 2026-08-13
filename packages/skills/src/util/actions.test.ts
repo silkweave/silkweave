@@ -20,7 +20,10 @@ describe('skillActions', () => {
     })
     const [listSkills, getSkill] = skillActions([skill])
 
-    const listing = await (listSkills.run as ActionRun<object, { skills: { name: string; digest: string }[] }>)({}, context)
+    const listing = await (listSkills.run as ActionRun<object, { skills: { name: string; digest: string }[] }>)(
+      {},
+      context
+    )
     expect(listing.skills).toHaveLength(1)
     expect(listing.skills[0].name).toBe('demo-skill')
     expect(listing.skills[0].digest).toBe(skill.digest)
@@ -30,8 +33,8 @@ describe('skillActions', () => {
     expect(payload.files[0].text).toContain('demo skill')
     expect(payload.files[1].base64).toBeDefined()
 
-    await expect(
-      (getSkill.run as ActionRun<object, SkillPayload>)({ name: 'nope' }, context)
-    ).rejects.toThrow(/Unknown skill/)
+    await expect((getSkill.run as ActionRun<object, SkillPayload>)({ name: 'nope' }, context)).rejects.toThrow(
+      /Unknown skill/
+    )
   })
 })

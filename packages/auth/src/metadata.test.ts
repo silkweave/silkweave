@@ -42,11 +42,9 @@ describe('resolveProtectedResourceMetadata', () => {
   })
 
   it('404s (undefined) for an unrecognized sub-resource', () => {
-    expect(resolveProtectedResourceMetadata(
-      auth,
-      requestFor('/.well-known/oauth-protected-resource/not-a-tenant'),
-      context
-    )).toBeUndefined()
+    expect(
+      resolveProtectedResourceMetadata(auth, requestFor('/.well-known/oauth-protected-resource/not-a-tenant'), context)
+    ).toBeUndefined()
   })
 
   it('404s when the resolver answers a different path than was requested', () => {
@@ -54,11 +52,9 @@ describe('resolveProtectedResourceMetadata', () => {
       ...auth,
       resourceUrl: () => 'https://mcp.example.com/elsewhere'
     }
-    expect(resolveProtectedResourceMetadata(
-      drifting,
-      requestFor('/.well-known/oauth-protected-resource/yoexoexl'),
-      context
-    )).toBeUndefined()
+    expect(
+      resolveProtectedResourceMetadata(drifting, requestFor('/.well-known/oauth-protected-resource/yoexoexl'), context)
+    ).toBeUndefined()
   })
 
   it('returns undefined for a non-well-known path', () => {
@@ -67,18 +63,14 @@ describe('resolveProtectedResourceMetadata', () => {
 
   it('returns undefined for a string resourceUrl (handled by the precomputed path)', () => {
     const stringConfig: AuthConfig = { ...auth, resourceUrl: 'https://mcp.example.com' }
-    expect(resolveProtectedResourceMetadata(
-      stringConfig,
-      requestFor('/.well-known/oauth-protected-resource'),
-      context
-    )).toBeUndefined()
+    expect(
+      resolveProtectedResourceMetadata(stringConfig, requestFor('/.well-known/oauth-protected-resource'), context)
+    ).toBeUndefined()
   })
 
   it('does not confuse a prefix-adjacent path for a sub-resource', () => {
-    expect(resolveProtectedResourceMetadata(
-      auth,
-      requestFor('/.well-known/oauth-protected-resource-other'),
-      context
-    )).toBeUndefined()
+    expect(
+      resolveProtectedResourceMetadata(auth, requestFor('/.well-known/oauth-protected-resource-other'), context)
+    ).toBeUndefined()
   })
 })

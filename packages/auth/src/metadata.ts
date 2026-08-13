@@ -43,19 +43,29 @@ export function resolveProtectedResourceMetadata(
   context: SilkweaveContext
 ): ProtectedResourceMetadata | undefined {
   const resolver = auth.resourceUrl
-  if (typeof resolver !== 'function' || !auth.authorizationServers?.length) { return undefined }
+  if (typeof resolver !== 'function' || !auth.authorizationServers?.length) {
+    return undefined
+  }
 
   const { pathname } = request.url
-  if (!pathname.startsWith(PROTECTED_RESOURCE_WELL_KNOWN)) { return undefined }
+  if (!pathname.startsWith(PROTECTED_RESOURCE_WELL_KNOWN)) {
+    return undefined
+  }
   const suffix = pathname.slice(PROTECTED_RESOURCE_WELL_KNOWN.length)
-  if (suffix !== '' && !suffix.startsWith('/')) { return undefined }
+  if (suffix !== '' && !suffix.startsWith('/')) {
+    return undefined
+  }
 
   const asIfUrl = new URL(request.url.toString())
   asIfUrl.pathname = suffix === '' ? '/' : suffix
 
   const resource = resolver({ url: asIfUrl, headers: request.headers }, context)
-  if (!resource) { return undefined }
-  if (resourcePathSuffix(resource) !== suffix) { return undefined }
+  if (!resource) {
+    return undefined
+  }
+  if (resourcePathSuffix(resource) !== suffix) {
+    return undefined
+  }
 
   return generateProtectedResourceMetadata(resource, auth.authorizationServers, auth.requiredScopes)
 }

@@ -1,6 +1,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { Action, OnToolCall, SilkweaveContext, SilkweaveOptions, Skill, SkillDefinition, validateActionDisposition } from '@silkweave/core'
+import {
+  Action,
+  OnToolCall,
+  SilkweaveContext,
+  SilkweaveOptions,
+  Skill,
+  SkillDefinition,
+  validateActionDisposition
+} from '@silkweave/core'
 import { type RequestHandler } from 'express'
 import { authFromRequest } from './auth.js'
 import { filterErrorResponse, rpcInfo, type FilterActions } from './filter.js'
@@ -18,16 +26,21 @@ function createMcpServer(
   // Gate the whole skill surface (resources + instructions) on the skill
   // actions having survived the per-request filter - see SkillServing.visible.
   const skillsVisible = serving?.visible(actions) ?? false
-  const server = new McpServer({
-    name: options.name,
-    description: options.description,
-    version: options.version
-  }, {
-    capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
-    ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
-  })
+  const server = new McpServer(
+    {
+      name: options.name,
+      description: options.description,
+      version: options.version
+    },
+    {
+      capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
+      ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
+    }
+  )
   registerTools(server, actions, context, { onToolCall })
-  if (skillsVisible) { serving?.register(server) }
+  if (skillsVisible) {
+    serving?.register(server)
+  }
   return server
 }
 
@@ -105,7 +118,9 @@ export function mcpTransport(
       ? { marketplace: { ...options.skillsMarketplace, name: options.skillsMarketplace.name ?? silkweaveOptions.name } }
       : {})
   })
-  skillsReady.catch(() => { /* surfaced via `ready` / per-request await */ })
+  skillsReady.catch(() => {
+    /* surfaced via `ready` / per-request await */
+  })
 
   const post: RequestHandler = async (req, res) => {
     // JSON-RPC batching was removed from the MCP spec (2025-06-18). A batch also
@@ -113,7 +128,11 @@ export function mcpTransport(
     // but the SDK transport would execute every entry, so a later batch entry
     // could invoke a tool the filter gated on the first. Reject batches outright.
     if (Array.isArray(req.body)) {
-      res.status(400).json({ jsonrpc: '2.0', error: { code: -32_600, message: 'JSON-RPC batch requests are not supported' }, id: null })
+      res.status(400).json({
+        jsonrpc: '2.0',
+        error: { code: -32_600, message: 'JSON-RPC batch requests are not supported' },
+        id: null
+      })
       return
     }
     let serving: SkillServing | undefined
@@ -128,7 +147,11 @@ export function mcpTransport(
     let active = combined
     if (options.filterActions) {
       try {
-        active = await options.filterActions(combined, { headers: req.headers, url: req.originalUrl ?? req.url, ...rpcInfo(req.body) })
+        active = await options.filterActions(combined, {
+          headers: req.headers,
+          url: req.originalUrl ?? req.url,
+          ...rpcInfo(req.body)
+        })
       } catch (error) {
         // A throw never degrades to an empty tool list - it surfaces as its
         // statusCode (SilkweaveError) or a 500, so a bad key reads as an auth
@@ -149,7 +172,10 @@ export function mcpTransport(
       // request still proceeds to the SDK for its native rejection.
       await emitInvalidArguments(req.body, active, reqContext, options.onToolCall)
       const server = createMcpServer(silkweaveOptions, active, reqContext, options.onToolCall, serving)
-      res.on('close', () => { void transport.close(); void server.close() })
+      res.on('close', () => {
+        void transport.close()
+        void server.close()
+      })
       await server.connect(transport)
       await transport.handleRequest(req, res, req.body)
     } catch (error) {
@@ -161,11 +187,14 @@ export function mcpTransport(
   }
 
   const methodNotAllowed: RequestHandler = (_req, res) => {
-    res.set('Allow', 'POST').status(405).json({
-      jsonrpc: '2.0',
-      error: { code: -32_000, message: 'Method Not Allowed: this MCP endpoint is POST-only' },
-      id: null
-    })
+    res
+      .set('Allow', 'POST')
+      .status(405)
+      .json({
+        jsonrpc: '2.0',
+        error: { code: -32_000, message: 'Method Not Allowed: this MCP endpoint is POST-only' },
+        id: null
+      })
   }
 
   return { post, methodNotAllowed, ready: skillsReady.then(() => undefined), skills: skillsReady }

@@ -27,9 +27,13 @@ export function buildMcpRoute(
   // module - but we MUST catch: an unhandled start() rejection (e.g. an invalid
   // `disposition: 'structured'` action) would otherwise crash the Next server.
   // On boot failure edge()'s `_ready` rejects, so requests get a 500, not a hang.
-  silkweave(identity).actions(actions).adapter(adapter).start().catch((error: unknown) => {
-    console.error('[silkweave/nextjs] MCP adapter failed to start:', error)
-  })
+  silkweave(identity)
+    .actions(actions)
+    .adapter(adapter)
+    .start()
+    .catch((error: unknown) => {
+      console.error('[silkweave/nextjs] MCP adapter failed to start:', error)
+    })
 
   const route = (request: Request): Promise<Response> => handler(rewriteRequestPath(request, basePath))
 

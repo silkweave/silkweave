@@ -29,9 +29,7 @@ export function generateDts(actions: Action[]): string {
 function interfaceBlock(name: string, schema: z.ZodTypeAny): string {
   const members = objectMembers(schema)
   if (members) {
-    return members.length
-      ? `export interface ${name} {\n${members.join('\n')}\n}`
-      : `export interface ${name} {}`
+    return members.length ? `export interface ${name} {\n${members.join('\n')}\n}` : `export interface ${name} {}`
   }
   // Non-object schema: fall back to a string-keyed index signature over the
   // whole type (matches the previous compiler-API behavior).

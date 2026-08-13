@@ -28,20 +28,24 @@ beforeAll(async () => {
     authenticate: (req) => {
       const cookie = req.headers.cookie ?? ''
       const match = /session=([^;]+)/.exec(cookie)
-      if (!match) { return null }
-      if (match[1] === 'banned') { throw new SilkweaveError('banned', 'forbidden', 403) }
+      if (!match) {
+        return null
+      }
+      if (match[1] === 'banned') {
+        throw new SilkweaveError('banned', 'forbidden', 403)
+      }
       return { token: match[1], clientId: `user-${match[1]}` }
     }
   })
 
-  const app = silkweave({ name: 'test', description: 'test', version: '0.0.0' })
-    .adapter(api.adapter)
-    .action(WhoAmI)
+  const app = silkweave({ name: 'test', description: 'test', version: '0.0.0' }).adapter(api.adapter).action(WhoAmI)
   await app.start()
 
   // Mount on a server the host owns, alongside its own routes.
   server = http.createServer((req, res) => {
-    if (req.url?.startsWith('/trpc')) { return api.handler(req, res) }
+    if (req.url?.startsWith('/trpc')) {
+      return api.handler(req, res)
+    }
     res.statusCode = 200
     res.end('the app')
   })
@@ -52,15 +56,16 @@ beforeAll(async () => {
 
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())))
 
-const call = (cookie?: string) => fetch(`http://127.0.0.1:${port}/trpc/whoami?input=${encodeURIComponent('{}')}`, {
-  headers: cookie ? { cookie } : {}
-})
+const call = (cookie?: string) =>
+  fetch(`http://127.0.0.1:${port}/trpc/whoami?input=${encodeURIComponent('{}')}`, {
+    headers: cookie ? { cookie } : {}
+  })
 
 describe('trpcNode', () => {
   it('serves procedures mounted on a host-owned server', async () => {
     const res = await call('session=abc')
     expect(res.status).toBe(200)
-    const body = await res.json() as { result: { data: { clientId: string } } }
+    const body = (await res.json()) as { result: { data: { clientId: string } } }
     expect(body.result.data.clientId).toBe('user-abc')
   })
 
@@ -96,7 +101,9 @@ describe('trpcNode readiness', () => {
     const app = silkweave({ name: 't', description: 't', version: '0.0.0' })
       .adapter(broken.adapter)
       .action(bogus as unknown as typeof WhoAmI)
-    await app.start().catch(() => { /* expected: the router cannot be built */ })
+    await app.start().catch(() => {
+      /* expected: the router cannot be built */
+    })
 
     const srv = http.createServer((req, res) => broken.handler(req, res))
     const p = await new Promise<number>((resolve) => {
@@ -104,7 +111,7 @@ describe('trpcNode readiness', () => {
     })
     const res = await fetch(`http://127.0.0.1:${p}/trpc/whoami`)
     expect(res.status).toBe(503)
-    expect((await res.json() as { error: string }).error).toBe('not_ready')
+    expect(((await res.json()) as { error: string }).error).toBe('not_ready')
     await new Promise<void>((resolve) => srv.close(() => resolve()))
   })
 })

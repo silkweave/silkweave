@@ -29,12 +29,14 @@ describe('marketplaceJson', () => {
     expect(doc).toEqual({
       name: 'team-skills',
       owner,
-      plugins: [{
-        name: 'demo-skill',
-        source: { source: 'npm', package: 'demo-skill-skill', version: '1.2.0' },
-        description: 'A demo skill',
-        version: '1.2.0'
-      }]
+      plugins: [
+        {
+          name: 'demo-skill',
+          source: { source: 'npm', package: 'demo-skill-skill', version: '1.2.0' },
+          description: 'A demo skill',
+          version: '1.2.0'
+        }
+      ]
     })
   })
 
@@ -57,16 +59,20 @@ describe('marketplaceJson', () => {
   it('groups skills sharing an npmPackage into one multi-skill plugin entry', async () => {
     const first = await resolveSkill({ files: { 'SKILL.md': SKILL_MD }, npmPackage: '@atomic/example-plugin' })
     const second = await resolveSkill({
-      files: { 'SKILL.md': '---\nname: other-skill\ndescription: Another one\nmetadata:\n  version: "1.2.0"\n---\nBody\n' },
+      files: {
+        'SKILL.md': '---\nname: other-skill\ndescription: Another one\nmetadata:\n  version: "1.2.0"\n---\nBody\n'
+      },
       npmPackage: '@atomic/example-plugin'
     })
     const doc = marketplaceJson([first, second], { name: 'team-skills', owner })
-    expect(doc.plugins).toEqual([{
-      name: 'example-plugin',
-      source: { source: 'npm', package: '@atomic/example-plugin', version: '1.2.0' },
-      description: 'Agent skills: demo-skill, other-skill',
-      version: '1.2.0'
-    }])
+    expect(doc.plugins).toEqual([
+      {
+        name: 'example-plugin',
+        source: { source: 'npm', package: '@atomic/example-plugin', version: '1.2.0' },
+        description: 'Agent skills: demo-skill, other-skill',
+        version: '1.2.0'
+      }
+    ])
   })
 })
 
@@ -74,7 +80,9 @@ describe('pluginFiles (multi-skill)', () => {
   it('lays out a multi-skill plugin named after the package', async () => {
     const first = await resolveSkill({ files: { 'SKILL.md': SKILL_MD } })
     const second = await resolveSkill({
-      files: { 'SKILL.md': '---\nname: other-skill\ndescription: Another one\nmetadata:\n  version: "1.2.0"\n---\nBody\n' }
+      files: {
+        'SKILL.md': '---\nname: other-skill\ndescription: Another one\nmetadata:\n  version: "1.2.0"\n---\nBody\n'
+      }
     })
     const files = pluginFiles([first, second], { npmPackage: '@atomic/example-plugin' })
     expect(JSON.parse(files['.claude-plugin/plugin.json'] as string)).toEqual({
@@ -89,7 +97,9 @@ describe('pluginFiles (multi-skill)', () => {
   it('rejects skills with mismatched versions in one plugin', async () => {
     const first = await resolveSkill({ files: { 'SKILL.md': SKILL_MD } })
     const second = await resolveSkill({
-      files: { 'SKILL.md': '---\nname: other-skill\ndescription: Another one\nmetadata:\n  version: "2.0.0"\n---\nBody\n' }
+      files: {
+        'SKILL.md': '---\nname: other-skill\ndescription: Another one\nmetadata:\n  version: "2.0.0"\n---\nBody\n'
+      }
     })
     expect(() => pluginFiles([first, second], { npmPackage: '@atomic/example-plugin' })).toThrow(/agree on a version/)
   })

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from 'zod/v4'
 import { type FieldDesc, fieldToZod, reflectDtoFields } from './schema.js'
 
@@ -10,8 +9,12 @@ const SUCCESS_KEYS = ['200', '201', '202', '204', '2XX', 'default']
 
 /** The 2xx (or first) `@ApiResponse` entry for a method, if any. */
 function successEntry(method: (...args: any[]) => any): { type?: unknown; isArray?: boolean } | undefined {
-  const responses = Reflect.getMetadata(API_RESPONSE, method) as Record<string, { type?: unknown; isArray?: boolean }> | undefined
-  if (!responses) { return undefined }
+  const responses = Reflect.getMetadata(API_RESPONSE, method) as
+    | Record<string, { type?: unknown; isArray?: boolean }>
+    | undefined
+  if (!responses) {
+    return undefined
+  }
   const key = SUCCESS_KEYS.find((k) => responses[k]) ?? Object.keys(responses)[0]
   return key ? responses[key] : undefined
 }
@@ -29,10 +32,14 @@ function successEntry(method: (...args: any[]) => any): { type?: unknown; isArra
 export function reflectResponseSchema(method: (...args: any[]) => any): z.ZodType | undefined {
   const entry = successEntry(method)
   const dtoType = entry?.type
-  if (typeof dtoType !== 'function') { return undefined }
+  if (typeof dtoType !== 'function') {
+    return undefined
+  }
 
   const schema = reflectDtoSchema(dtoType)
-  if (!schema) { return undefined }
+  if (!schema) {
+    return undefined
+  }
   return entry?.isArray ? z.array(schema) : schema
 }
 
@@ -44,7 +51,9 @@ export function reflectResponseSchema(method: (...args: any[]) => any): z.ZodTyp
  */
 export function reflectResponseFields(method: (...args: any[]) => any): Record<string, FieldDesc> | undefined {
   const dtoType = successEntry(method)?.type
-  if (typeof dtoType !== 'function') { return undefined }
+  if (typeof dtoType !== 'function') {
+    return undefined
+  }
   return reflectDtoFields(dtoType)
 }
 
@@ -55,11 +64,17 @@ export function reflectResponseFields(method: (...args: any[]) => any): Record<s
  * when given a DTO class instead of a Zod schema.
  */
 export function reflectDtoSchema(dtoType: unknown): z.ZodType | undefined {
-  if (typeof dtoType !== 'function') { return undefined }
+  if (typeof dtoType !== 'function') {
+    return undefined
+  }
   const fields = reflectDtoFields(dtoType)
   const names = Object.keys(fields)
-  if (names.length === 0) { return undefined }
+  if (names.length === 0) {
+    return undefined
+  }
   const shape: Record<string, z.ZodType> = {}
-  for (const name of names) { shape[name] = fieldToZod(fields[name]) }
+  for (const name of names) {
+    shape[name] = fieldToZod(fields[name])
+  }
   return z.object(shape)
 }

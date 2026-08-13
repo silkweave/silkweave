@@ -3,7 +3,9 @@ import { http } from '@silkweave/mcp/server'
 import z from 'zod/v4'
 
 // An 8x8 checkerboard PNG, pre-encoded so the example stays dependency-free.
-const DEMO_PNG = base64ToBytes('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAI0lEQVR42mNINvuYbPbx48vkjy+TkdkMOCUwhSBs3BJ0sAMAOwl44TYCiXQAAAAASUVORK5CYII=')
+const DEMO_PNG = base64ToBytes(
+  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAI0lEQVR42mNINvuYbPbx48vkjy+TkdkMOCUwhSBs3BJ0sAMAOwl44TYCiXQAAAAASUVORK5CYII='
+)
 
 const RenderBadgeAction = createAction({
   name: 'render-badge',
@@ -11,11 +13,12 @@ const RenderBadgeAction = createAction({
   kind: 'query',
   input: z.object({ label: z.string().default('badge').describe('File name label for the rendered badge.') }),
   output: binary({ mimeType: 'image/png' }),
-  run: async ({ label }) => resource(DEMO_PNG, {
-    mimeType: 'image/png',
-    name: `${label}.png`,
-    description: `Demo badge '${label}' (8x8 PNG checkerboard)`
-  })
+  run: async ({ label }) =>
+    resource(DEMO_PNG, {
+      mimeType: 'image/png',
+      name: `${label}.png`,
+      description: `Demo badge '${label}' (8x8 PNG checkerboard)`
+    })
 })
 
 const HelloAction = createAction({

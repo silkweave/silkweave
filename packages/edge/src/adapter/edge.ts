@@ -1,8 +1,36 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
-import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, PROTECTED_RESOURCE_WELL_KNOWN, resolveProtectedResourceMetadata, toResourceRequest, validateToken } from '@silkweave/auth'
-import { Action, AdapterGenerator, OnToolCall, SilkweaveContext, SilkweaveOptions, Skill, SkillDefinition, validateActionDisposition } from '@silkweave/core'
-import { emitInvalidArguments, filterErrorResponse, MARKETPLACE_PATH, prepareSkills, registerTools, rpcInfo, type FilterActions, type SkillServing, type SkillsMarketplaceOptions } from '@silkweave/mcp/tools'
+import {
+  AuthConfig,
+  generateProtectedResourceMetadata,
+  OAuthRequest,
+  OAuthResponse,
+  PROTECTED_RESOURCE_WELL_KNOWN,
+  resolveProtectedResourceMetadata,
+  toResourceRequest,
+  validateToken
+} from '@silkweave/auth'
+import {
+  Action,
+  AdapterGenerator,
+  OnToolCall,
+  SilkweaveContext,
+  SilkweaveOptions,
+  Skill,
+  SkillDefinition,
+  validateActionDisposition
+} from '@silkweave/core'
+import {
+  emitInvalidArguments,
+  filterErrorResponse,
+  MARKETPLACE_PATH,
+  prepareSkills,
+  registerTools,
+  rpcInfo,
+  type FilterActions,
+  type SkillServing,
+  type SkillsMarketplaceOptions
+} from '@silkweave/mcp/tools'
 
 export interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
@@ -76,7 +104,10 @@ function buildCorsHeaders(origin: string): Record<string, string> {
 
 /** A malformed OAuth request (e.g. non-JSON body) - surfaced as a 400, not a 500. */
 class OAuthRequestError extends Error {
-  constructor(public readonly code: string, message: string) {
+  constructor(
+    public readonly code: string,
+    message: string
+  ) {
     super(message)
     this.name = 'OAuthRequestError'
   }
@@ -84,7 +115,9 @@ class OAuthRequestError extends Error {
 
 /** Transport DNS-rebinding config, enabled only when host/origin allow-lists are set. */
 function dnsRebindingOptions(options: EdgeAdapterOptions): Record<string, unknown> {
-  if (!options.allowedHosts && !options.allowedOrigins) { return {} }
+  if (!options.allowedHosts && !options.allowedOrigins) {
+    return {}
+  }
   return {
     enableDnsRebindingProtection: true,
     ...(options.allowedHosts ? { allowedHosts: options.allowedHosts } : {}),
@@ -101,10 +134,13 @@ function edgeErrorResponse(error: unknown, corsHeaders: Record<string, string>):
     })
   }
   console.error('edge handler error:', error)
-  return new Response(JSON.stringify({ jsonrpc: '2.0', error: { code: -32_603, message: 'Internal server error' }, id: null }), {
-    status: 500,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  })
+  return new Response(
+    JSON.stringify({ jsonrpc: '2.0', error: { code: -32_603, message: 'Internal server error' }, id: null }),
+    {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  )
 }
 
 async function parseOAuthRequest(url: URL, request: Request): Promise<OAuthRequest> {
@@ -132,7 +168,9 @@ async function parseOAuthRequest(url: URL, request: Request): Promise<OAuthReque
 
 function oauthResponseToResponse(oauthRes: OAuthResponse): Response {
   const responseBody = oauthRes.body
-    ? (typeof oauthRes.body === 'string' ? oauthRes.body : JSON.stringify(oauthRes.body))
+    ? typeof oauthRes.body === 'string'
+      ? oauthRes.body
+      : JSON.stringify(oauthRes.body)
     : null
   return new Response(responseBody, { status: oauthRes.status, headers: oauthRes.headers })
 }
@@ -164,7 +202,11 @@ async function routeOAuth(
  * Public by construction (it only points at npm-published packages), so it is
  * served before the auth check, like `/.well-known/`.
  */
-function marketplaceResponse(request: Request, serving: SkillServing | undefined, corsHeaders: Record<string, string>): Response {
+function marketplaceResponse(
+  request: Request,
+  serving: SkillServing | undefined,
+  corsHeaders: Record<string, string>
+): Response {
   if (request.method !== 'GET') {
     return new Response('Method Not Allowed', { status: 405, headers: { ...corsHeaders, Allow: 'GET' } })
   }
@@ -185,9 +227,10 @@ function protectedResourceResponse(
   context: SilkweaveContext,
   corsHeaders: Record<string, string>
 ): Response {
-  const metadata = typeof auth.resourceUrl === 'string'
-    ? generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers!, auth.requiredScopes)
-    : resolveProtectedResourceMetadata(auth, toResourceRequest(context.fork({ request }))!, context)
+  const metadata =
+    typeof auth.resourceUrl === 'string'
+      ? generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers!, auth.requiredScopes)
+      : resolveProtectedResourceMetadata(auth, toResourceRequest(context.fork({ request }))!, context)
 
   if (!metadata) {
     return new Response(JSON.stringify({ error: 'not_found', error_description: 'Unknown protected resource' }), {
@@ -207,7 +250,9 @@ async function authenticateRequest(
   auth: AuthConfig | undefined,
   context: SilkweaveContext
 ): Promise<{ response: Response } | { context: SilkweaveContext }> {
-  if (!auth) { return { context } }
+  if (!auth) {
+    return { context }
+  }
   const result = await validateToken(request.headers.get('authorization'), auth, context.fork({ request }))
   if (result.error) {
     return {
@@ -228,7 +273,9 @@ async function applyActionFilter(
   rawBody: unknown,
   corsHeaders: Record<string, string>
 ): Promise<{ response: Response } | { actions: Action[] }> {
-  if (!filter) { return { actions: combined } }
+  if (!filter) {
+    return { actions: combined }
+  }
   try {
     return {
       actions: await filter(combined, {
@@ -261,16 +308,21 @@ function createEdgeMcpServer(
   serving: SkillServing | undefined
 ): McpServer {
   const skillsVisible = serving?.visible(actions) ?? false
-  const server = new McpServer({
-    name: options.name,
-    description: options.description,
-    version: options.version
-  }, {
-    capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
-    ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
-  })
+  const server = new McpServer(
+    {
+      name: options.name,
+      description: options.description,
+      version: options.version
+    },
+    {
+      capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
+      ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
+    }
+  )
   registerTools(server, actions, context, { onToolCall })
-  if (skillsVisible) { serving?.register(server) }
+  if (skillsVisible) {
+    serving?.register(server)
+  }
   return server
 }
 
@@ -305,7 +357,9 @@ function matchOAuthRoute(
   callbackPath: string
 ): Promise<Response> | Response | undefined {
   const methods = oauthPaths?.[url.pathname]
-  if (!methods) { return undefined }
+  if (!methods) {
+    return undefined
+  }
   if (!methods.includes(request.method)) {
     return new Response('Method not allowed', { status: 405 })
   }
@@ -330,7 +384,9 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   // A boot failure is surfaced through start() and every awaiting handler; the
   // bare rejection must not double as an unhandled rejection when no request
   // is in flight.
-  _ready.catch(() => { /* surfaced via start() / per-request await */ })
+  _ready.catch(() => {
+    /* surfaced via start() / per-request await */
+  })
 
   // Pre-compute valid paths for fast rejection of bogus requests
   const extraTransportPaths = Array.isArray(options.transportPaths) ? options.transportPaths : []
@@ -341,7 +397,8 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   }
   // A string resourceUrl has exactly one document; a resolver serves a family of
   // insertion-form paths, matched by prefix below rather than by exact set.
-  const resolverMetadata = Boolean(options.auth?.authorizationServers?.length) && typeof options.auth?.resourceUrl === 'function'
+  const resolverMetadata =
+    Boolean(options.auth?.authorizationServers?.length) && typeof options.auth?.resourceUrl === 'function'
   if (options.auth?.authorizationServers?.length && options.auth.resourceUrl) {
     validPaths.add(PROTECTED_RESOURCE_WELL_KNOWN)
   }
@@ -358,12 +415,12 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   // OAuth path → allowed methods (built once, not per-request)
   const oauthPaths: Record<string, string[]> | null = options.auth?.provider
     ? {
-      '/.well-known/oauth-authorization-server': ['GET'],
-      '/authorize': ['GET'],
-      [callbackPath]: ['GET'],
-      '/token': ['POST'],
-      '/register': ['POST']
-    }
+        '/.well-known/oauth-authorization-server': ['GET'],
+        '/authorize': ['GET'],
+        [callbackPath]: ['GET'],
+        '/token': ['POST'],
+        '/register': ['POST']
+      }
     : null
 
   const handleRequestInner = async (request: Request): Promise<Response> => {
@@ -390,13 +447,17 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     if (url.pathname === PROTECTED_RESOURCE_WELL_KNOWN || isResolverMetadata) {
       // A resolver needs the per-request context, which only exists once the
       // adapter has been registered; the string form needs nothing.
-      if (resolverMetadata) { await _ready }
+      if (resolverMetadata) {
+        await _ready
+      }
       return protectedResourceResponse(options.auth!, request, _context!, CORS_HEADERS)
     }
 
     // OAuth provider routes
     const oauthResponse = matchOAuthRoute(oauthPaths, url, request, options.auth!, callbackPath)
-    if (oauthResponse) { return oauthResponse }
+    if (oauthResponse) {
+      return oauthResponse
+    }
 
     // MCP transport (stateless): only POST carries JSON-RPC. A standing-stream
     // GET or a session-teardown DELETE has no session to act on - and the SDK's
@@ -417,21 +478,32 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     // defeats per-request filterActions (rpcInfo reflects only the first message
     // while the transport would execute every entry), so reject batches before
     // dispatch. Parsed once here and reused by the filter below.
-    const rawBody: unknown = await request.clone().json().catch(() => undefined)
+    const rawBody: unknown = await request
+      .clone()
+      .json()
+      .catch(() => undefined)
     if (Array.isArray(rawBody)) {
       return new Response(
-        JSON.stringify({ jsonrpc: '2.0', error: { code: -32_600, message: 'JSON-RPC batch requests are not supported' }, id: null }),
+        JSON.stringify({
+          jsonrpc: '2.0',
+          error: { code: -32_600, message: 'JSON-RPC batch requests are not supported' },
+          id: null
+        }),
         { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       )
     }
 
     const authed = await authenticateRequest(request, options.auth, _context!)
-    if ('response' in authed) { return authed.response }
+    if ('response' in authed) {
+      return authed.response
+    }
     const requestContext = authed.context
 
     const combined = _serving ? [..._actions, ..._serving.actions] : _actions
     const filtered = await applyActionFilter(options.filterActions, combined, request, rawBody, CORS_HEADERS)
-    if ('response' in filtered) { return filtered.response }
+    if ('response' in filtered) {
+      return filtered.response
+    }
     const activeActions = filtered.actions
 
     // Emit-only: the SDK rejects an invalid-arguments tools/call before the
@@ -472,7 +544,12 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
           _serving = await prepareSkills(options.skills, {
             extension: options.skillsExtension,
             ...(options.skillsMarketplace
-              ? { marketplace: { ...options.skillsMarketplace, name: options.skillsMarketplace.name ?? silkweaveOptions.name } }
+              ? {
+                  marketplace: {
+                    ...options.skillsMarketplace,
+                    name: options.skillsMarketplace.name ?? silkweaveOptions.name
+                  }
+                }
               : {})
           })
           _readyResolve()

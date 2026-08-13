@@ -4,7 +4,9 @@
  */
 export function normalizeBasePath(basePath: string): string {
   const trimmed = basePath.trim().replace(/\/+$/, '')
-  if (trimmed === '' || trimmed === '/') { return '' }
+  if (trimmed === '' || trimmed === '/') {
+    return ''
+  }
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
 }
 
@@ -33,7 +35,9 @@ export function rewriteRequestPath(request: Request, basePath: string, fallback 
       rest = rest.slice(base.length)
     }
   }
-  if (rest === '' || rest === '/') { rest = fallback }
+  if (rest === '' || rest === '/') {
+    rest = fallback
+  }
   url.pathname = rest
 
   const init: RequestInit & { duplex?: 'half' } = {

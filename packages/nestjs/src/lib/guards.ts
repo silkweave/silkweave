@@ -22,11 +22,10 @@ type GuardRef = Type<CanActivate> | CanActivate
  * Call this at tool-call time, not at discovery time: `APP_GUARD` instances
  * aren't populated until `app.init()` finishes.
  */
-export function collectGlobalGuards(
-  appConfig: ApplicationConfig,
-  allowList: Type<CanActivate>[]
-): CanActivate[] {
-  if (allowList.length === 0) { return [] }
+export function collectGlobalGuards(appConfig: ApplicationConfig, allowList: Type<CanActivate>[]): CanActivate[] {
+  if (allowList.length === 0) {
+    return []
+  }
   const requestWrappers = appConfig.getGlobalRequestGuards()
   // A request-scoped APP_GUARD has no static `.instance` (it's resolved per
   // request against a context id we don't have here), so it would be silently
@@ -40,10 +39,9 @@ export function collectGlobalGuards(
       )
     }
   }
-  const globals: CanActivate[] = [
-    ...appConfig.getGlobalGuards(),
-    ...requestWrappers.map((w) => w.instance)
-  ].filter((g): g is CanActivate => g != null)
+  const globals: CanActivate[] = [...appConfig.getGlobalGuards(), ...requestWrappers.map((w) => w.instance)].filter(
+    (g): g is CanActivate => g != null
+  )
   return globals.filter((g) => allowList.some((c) => g instanceof c))
 }
 
@@ -96,7 +94,9 @@ export async function runGuards(
   response: unknown,
   contextType: 'http' | 'rpc' = 'http'
 ): Promise<void> {
-  if (guards.length === 0) { return }
+  if (guards.length === 0) {
+    return
+  }
   const context = new SilkweaveExecutionContext([request, response], classRef, handler, contextType)
   for (const ref of guards) {
     const guard = await resolveGuard(ref, moduleRef)

@@ -74,7 +74,9 @@ const WhoAmIAction = createAction({
 let app: ReturnType<typeof edge> | null = null
 
 function getApp(env: Env): ReturnType<typeof edge> {
-  if (app) { return app }
+  if (app) {
+    return app
+  }
 
   const auth = google({
     clientId: env.GOOGLE_CLIENT_ID,

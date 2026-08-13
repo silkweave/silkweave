@@ -12,11 +12,13 @@ async function stubClient(): Promise<Client> {
   return {
     getServerCapabilities: () => ({ extensions: { 'io.modelcontextprotocol/skills': { directoryRead: false } } }),
     request: async () => ({
-      skills: [{
-        uri: 'skill://demo-skill/SKILL.md',
-        frontmatter: { name: 'demo-skill', description: 'A demo', metadata: { version: '2.0.0' } },
-        resources: [{ uri: 'skill://demo-skill/SKILL.md', digest }]
-      }]
+      skills: [
+        {
+          uri: 'skill://demo-skill/SKILL.md',
+          frontmatter: { name: 'demo-skill', description: 'A demo', metadata: { version: '2.0.0' } },
+          resources: [{ uri: 'skill://demo-skill/SKILL.md', digest }]
+        }
+      ]
     }),
     readResource: async ({ uri }: { uri: string }) => ({
       contents: [{ uri, mimeType: 'text/markdown', text: files[uri] }]

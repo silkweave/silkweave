@@ -1,9 +1,22 @@
 import { resource, SilkweaveError } from '@silkweave/core'
 import { describe, expect, it, vi } from 'vitest'
-import { errorToolResult, handleToolError, jsonToolResult, parseResourceMessage, resourceToolResult, smartToolResult } from './result.js'
+import {
+  errorToolResult,
+  handleToolError,
+  jsonToolResult,
+  parseResourceMessage,
+  resourceToolResult,
+  smartToolResult
+} from './result.js'
 
-interface TextBlock { type: 'text'; text: string }
-interface ResourceBlock { type: 'resource'; resource: { uri: string; mimeType: string; blob: string } }
+interface TextBlock {
+  type: 'text'
+  text: string
+}
+interface ResourceBlock {
+  type: 'resource'
+  resource: { uri: string; mimeType: string; blob: string }
+}
 
 describe('smartToolResult', () => {
   it('returns a single text block for a small string payload', () => {
@@ -60,7 +73,12 @@ describe('errorToolResult', () => {
     const result = errorToolResult(new SilkweaveError('nope', 'forbidden', 403))
     expect(result.isError).toBe(true)
     const [block] = result.content as [TextBlock]
-    expect(JSON.parse(block.text)).toEqual({ success: false, code: 'forbidden', name: 'SilkweaveError', message: 'nope' })
+    expect(JSON.parse(block.text)).toEqual({
+      success: false,
+      code: 'forbidden',
+      name: 'SilkweaveError',
+      message: 'nope'
+    })
   })
 })
 
@@ -69,7 +87,12 @@ describe('handleToolError', () => {
     const result = handleToolError(new SilkweaveError('denied', 'forbidden', 403))
     expect(result.isError).toBe(true)
     const [block] = result.content as [TextBlock]
-    expect(JSON.parse(block.text)).toEqual({ success: false, name: 'SilkweaveError', message: 'denied', code: 'forbidden' })
+    expect(JSON.parse(block.text)).toEqual({
+      success: false,
+      name: 'SilkweaveError',
+      message: 'denied',
+      code: 'forbidden'
+    })
   })
 
   it('maps a plain Error to a failed result without leaking a code, logging server-side only', () => {
@@ -85,7 +108,11 @@ describe('handleToolError', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const result = handleToolError('just a string')
     const [block] = result.content as [TextBlock]
-    expect(JSON.parse(block.text)).toEqual({ success: false, name: 'Unknown error', message: 'An unknown error occurred' })
+    expect(JSON.parse(block.text)).toEqual({
+      success: false,
+      name: 'Unknown error',
+      message: 'An unknown error occurred'
+    })
     spy.mockRestore()
   })
 })
@@ -101,7 +128,9 @@ describe('resourceToolResult', () => {
   })
 
   it('prepends the description as a text block', () => {
-    const result = resourceToolResult(resource(png, { mimeType: 'image/png', description: 'Screenshot of the dashboard' }))
+    const result = resourceToolResult(
+      resource(png, { mimeType: 'image/png', description: 'Screenshot of the dashboard' })
+    )
     expect(result.content).toHaveLength(2)
     expect(result.content[0]).toEqual({ type: 'text', text: 'Screenshot of the dashboard' })
     expect(result.content[1]).toMatchObject({ type: 'image' })
@@ -114,7 +143,9 @@ describe('resourceToolResult', () => {
 
   it('maps text-based media types to an embedded resource with text', () => {
     const result = resourceToolResult(resource('{"a":1}', { mimeType: 'application/json', name: 'data.json' }))
-    const [block] = result.content as [{ type: string; resource: { uri: string; mimeType: string; text?: string; blob?: string } }]
+    const [block] = result.content as [
+      { type: string; resource: { uri: string; mimeType: string; text?: string; blob?: string } }
+    ]
     expect(block.type).toBe('resource')
     expect(block.resource.text).toBe('{"a":1}')
     expect(block.resource.blob).toBeUndefined()
@@ -143,10 +174,14 @@ describe('resourceToolResult', () => {
 describe('parseResourceMessage', () => {
   it('decodes a base64 blob resource', () => {
     const blob = Buffer.from('hello world').toString('base64')
-    expect(parseResourceMessage({ type: 'resource', resource: { uri: 'mcp://x', mimeType: 'text/plain', blob } })).toBe('hello world')
+    expect(parseResourceMessage({ type: 'resource', resource: { uri: 'mcp://x', mimeType: 'text/plain', blob } })).toBe(
+      'hello world'
+    )
   })
 
   it('returns the text of a non-blob resource', () => {
-    expect(parseResourceMessage({ type: 'resource', resource: { uri: 'mcp://x', mimeType: 'text/plain', text: 'plain' } })).toBe('plain')
+    expect(
+      parseResourceMessage({ type: 'resource', resource: { uri: 'mcp://x', mimeType: 'text/plain', text: 'plain' } })
+    ).toBe('plain')
   })
 })

@@ -30,12 +30,14 @@ export function authMiddleware(auth: AuthConfig, context: SilkweaveContext): Req
   return async (req, res, next) => {
     const result = await validateToken(req.headers.authorization, auth, context.fork({ request: req }))
     if (result.error) {
-      for (const [key, value] of Object.entries(result.error.headers)) { res.header(key, value) }
+      for (const [key, value] of Object.entries(result.error.headers)) {
+        res.header(key, value)
+      }
       res.status(result.error.statusCode).json(result.error.body)
       return
     }
     if (result.auth) {
-      (req as Request & { [AUTH_REQUEST_KEY]?: AuthInfo })[AUTH_REQUEST_KEY] = result.auth
+      ;(req as Request & { [AUTH_REQUEST_KEY]?: AuthInfo })[AUTH_REQUEST_KEY] = result.auth
     }
     next()
   }

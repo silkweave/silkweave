@@ -2,7 +2,13 @@ import { Client } from '@modelcontextprotocol/sdk/client'
 import { UnauthorizedError, type OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
 import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js'
-import { ContentBlock, LoggingMessageNotificationSchema, ProgressNotificationSchema, Tool, ToolResultContent } from '@modelcontextprotocol/sdk/types.js'
+import {
+  ContentBlock,
+  LoggingMessageNotificationSchema,
+  ProgressNotificationSchema,
+  Tool,
+  ToolResultContent
+} from '@modelcontextprotocol/sdk/types.js'
 import { AdapterFactory, base64ToBytes, createConsoleLogger, isTextMimeType } from '@silkweave/core'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
@@ -45,7 +51,9 @@ interface JsonSchemaObject {
 }
 
 function coerce(value: unknown, type: JsonSchemaProperty['type']): unknown {
-  if (value === undefined) { return undefined }
+  if (value === undefined) {
+    return undefined
+  }
   if (type === 'number' || type === 'integer') {
     const n = Number(value)
     return Number.isNaN(n) ? value : n
@@ -54,9 +62,15 @@ function coerce(value: unknown, type: JsonSchemaProperty['type']): unknown {
   // on options), so booleans and json need coercing here too. Option values
   // never hit these branches - flags parse booleans and --json flags carry a
   // JSON.parse parser - so this only widens the positional path.
-  if (type === 'boolean' && typeof value === 'string') { return value === 'true' }
+  if (type === 'boolean' && typeof value === 'string') {
+    return value === 'true'
+  }
   if ((type === 'object' || type === 'array') && typeof value === 'string') {
-    try { return JSON.parse(value) } catch { return value }
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
   }
   return value
 }
@@ -108,20 +122,31 @@ function positionalKeys(tool: Tool, properties: Record<string, JsonSchemaPropert
 }
 
 /** Assemble the tool-call input from commander's option values and positionals. */
-function buildToolInput(properties: Record<string, JsonSchemaProperty>, argKeys: string[], positionals: unknown[], opts: Record<string, unknown>): Record<string, unknown> {
+function buildToolInput(
+  properties: Record<string, JsonSchemaProperty>,
+  argKeys: string[],
+  positionals: unknown[],
+  opts: Record<string, unknown>
+): Record<string, unknown> {
   const argSet = new Set(argKeys)
   const input: Record<string, unknown> = {}
   for (const key of Object.keys(properties)) {
-    if (argSet.has(key)) { continue }
+    if (argSet.has(key)) {
+      continue
+    }
     // Options register as kebab-case flags (--action-id) and Commander stores them
     // camelized (actionId) - read back via camelCase(key) so snake_case schema keys
     // (action_id) map too, not just single-word ones.
     const value = opts[camelCase(key)]
-    if (value !== undefined) { input[key] = coerce(value, properties[key]?.type) }
+    if (value !== undefined) {
+      input[key] = coerce(value, properties[key]?.type)
+    }
   }
   argKeys.forEach((key, index) => {
     const value = positionals[index]
-    if (value !== undefined) { input[key] = coerce(value, properties[key]?.type) }
+    if (value !== undefined) {
+      input[key] = coerce(value, properties[key]?.type)
+    }
   })
   return input
 }
@@ -144,7 +169,9 @@ function binaryPayload(block: ContentBlock): BinaryPayload | undefined {
   }
   if (block.type === 'resource' && 'blob' in block.resource) {
     const mimeType = block.resource.mimeType ?? 'application/octet-stream'
-    if (isTextMimeType(mimeType)) { return undefined }
+    if (isTextMimeType(mimeType)) {
+      return undefined
+    }
     // Server-side resource URIs end in `/<name>` when the action named the
     // artifact (`mcp://toolResult/<uuid>/shot.png`); a bare uuid tail is not a
     // usable file name.
@@ -172,14 +199,19 @@ function extensionFromMime(mimeType: string): string {
  */
 async function writeBinaryPayloads(binaries: BinaryPayload[], outputPath: string | undefined) {
   if (!outputPath && !process.stdout.isTTY) {
-    if (binaries.length > 1) { console.error(`(${binaries.length} binary parts - writing the first to stdout)`) }
-    if (!process.stdout.write(binaries[0].bytes)) { await once(process.stdout, 'drain') }
+    if (binaries.length > 1) {
+      console.error(`(${binaries.length} binary parts - writing the first to stdout)`)
+    }
+    if (!process.stdout.write(binaries[0].bytes)) {
+      await once(process.stdout, 'drain')
+    }
     return
   }
   for (const [index, bin] of binaries.entries()) {
-    const target = (index === 0 ? outputPath : undefined)
-      ?? bin.name
-      ?? `resource${index ? `-${index}` : ''}.${extensionFromMime(bin.mimeType)}`
+    const target =
+      (index === 0 ? outputPath : undefined) ??
+      bin.name ??
+      `resource${index ? `-${index}` : ''}.${extensionFromMime(bin.mimeType)}`
     await writeFile(target, bin.bytes)
     console.error(`Wrote ${bin.bytes.length} bytes (${bin.mimeType}) to ${target}`)
   }
@@ -197,9 +229,17 @@ export function attachNotificationLogging(client: Client) {
 }
 
 /** Register one remote tool as a commander subcommand. */
-export function registerToolCommand(program: Command, client: Client, tool: Tool, formatter: CLIFormatterFn, cliName: string) {
+export function registerToolCommand(
+  program: Command,
+  client: Client,
+  tool: Tool,
+  formatter: CLIFormatterFn,
+  cliName: string
+) {
   const command = program.command(kebabCase(tool.name))
-  if (tool.description) { command.description(tool.description) }
+  if (tool.description) {
+    command.description(tool.description)
+  }
   const schema = tool.inputSchema as JsonSchemaObject
   const properties = schema.properties ?? {}
   const requiredKeys = new Set(schema.required ?? [])
@@ -210,7 +250,9 @@ export function registerToolCommand(program: Command, client: Client, tool: Tool
   // slots line up with how the action handler reads them back (else the
   // values are cross-assigned).
   for (const key of Object.keys(properties)) {
-    if (argSet.has(key)) { continue }
+    if (argSet.has(key)) {
+      continue
+    }
     addCliOption(command, key, properties[key])
   }
   for (const key of argKeys) {
@@ -232,13 +274,13 @@ export function registerToolCommand(program: Command, client: Client, tool: Tool
       console.info(`${cliName} - ${tool.name}`)
       attachNotificationLogging(client)
     }
-    const response = await client.callTool({
+    const response = (await client.callTool({
       name: tool.name,
       arguments: buildToolInput(properties, argKeys, positionals, opts),
       _meta: { progressToken: randomUUID(), disposition: 'json' }
-    }) as ToolResultContent
+    })) as ToolResultContent
     const decoded = response.content.map((block) => ({ block, binary: binaryPayload(block) }))
-    const binaries = decoded.flatMap(({ binary }) => binary ? [binary] : [])
+    const binaries = decoded.flatMap(({ binary }) => (binary ? [binary] : []))
     const textContent = decoded.filter(({ binary }) => !binary).map(({ block }) => block)
     const outputPath = hasOutputOption ? (opts['output'] as string | undefined) : undefined
     // When the payload is piped through stdout, companion text (descriptions)
@@ -248,21 +290,30 @@ export function registerToolCommand(program: Command, client: Client, tool: Tool
       const text = formatter(message, index, messages)
       textStream.write(`${text}\n`)
     })
-    if (binaries.length) { await writeBinaryPayloads(binaries, outputPath) }
+    if (binaries.length) {
+      await writeBinaryPayloads(binaries, outputPath)
+    }
   })
 }
 
 /** Merge resolved silkweave `headers` over the caller's `requestInit.headers`. */
 export function mergeRequestInit(requestInit?: RequestInit, headers?: Record<string, string>): RequestInit | undefined {
-  if (!headers) { return requestInit }
+  if (!headers) {
+    return requestInit
+  }
   const merged = new Headers(requestInit?.headers)
-  for (const [key, value] of Object.entries(headers)) { merged.set(key, value) }
+  for (const [key, value] of Object.entries(headers)) {
+    merged.set(key, value)
+  }
   return { ...requestInit, headers: merged }
 }
 
 /** A short, legible message for a failed connect - auth failures called out explicitly. */
 export function connectErrorMessage(error: unknown, url: URL): string {
-  if (error instanceof UnauthorizedError || (error instanceof StreamableHTTPError && (error.code === 401 || error.code === 403))) {
+  if (
+    error instanceof UnauthorizedError ||
+    (error instanceof StreamableHTTPError && (error.code === 401 || error.code === 403))
+  ) {
     return `authentication failed for ${url.origin} - check your token`
   }
   return `cannot reach MCP server at ${url}: ${error instanceof Error ? error.message : String(error)}`
@@ -278,7 +329,14 @@ export const defaultFormatter: CLIFormatterFn = (message) => {
   }
 }
 
-export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = defaultFormatter, headers, requestInit, fetch: fetchImpl, authProvider }) => {
+export const cliProxy: AdapterFactory<CliProxyOptions> = ({
+  url,
+  formatter = defaultFormatter,
+  headers,
+  requestInit,
+  fetch: fetchImpl,
+  authProvider
+}) => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'cliProxy' })
     const program = new Command()
@@ -331,9 +389,13 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url, formatter = def
           return
         }
         await program.parseAsync()
-        if (connected) { await transport.close() }
+        if (connected) {
+          await transport.close()
+        }
       },
-      stop: async () => { /* noop */ }
+      stop: async () => {
+        /* noop */
+      }
     }
   }
 }

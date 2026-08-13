@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai'
 
 /**
@@ -83,19 +81,29 @@ export function silkweaveTransport<M extends UIMessage = UIMessage>(
         start(controller) {
           let closed = false
           const close = () => {
-            if (closed) { return }
+            if (closed) {
+              return
+            }
             closed = true
-            try { controller.close() } catch { /* already closed */ }
+            try {
+              controller.close()
+            } catch {
+              /* already closed */
+            }
           }
           subscription = subscribe(
             { messages: messages as M[], trigger, chatId, messageId, metadata, body, headers },
             {
               onData: (chunk) => {
-                if (closed) { return }
+                if (closed) {
+                  return
+                }
                 controller.enqueue(chunk as UIMessageChunk)
               },
               onError: (error) => {
-                if (closed) { return }
+                if (closed) {
+                  return
+                }
                 closed = true
                 controller.error(error)
               },

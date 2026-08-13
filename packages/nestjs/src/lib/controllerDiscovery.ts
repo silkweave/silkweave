@@ -1,7 +1,15 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { HttpException, Injectable, Logger, type CanActivate, type Type } from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { binary, emitToolCall, SilkweaveError, type Action, type ActionKind, type OnToolCall, type SilkweaveContext, type ToolAnnotations } from '@silkweave/core'
+import {
+  binary,
+  emitToolCall,
+  SilkweaveError,
+  type Action,
+  type ActionKind,
+  type OnToolCall,
+  type SilkweaveContext,
+  type ToolAnnotations
+} from '@silkweave/core'
 import { camelCase } from 'change-case'
 import { z } from 'zod/v4'
 import { collectGlobalGuards, collectGuards, runGuards } from './guards.js'
@@ -69,7 +77,7 @@ export class ControllerDiscovery {
     private readonly reflector: Reflector,
     private readonly moduleRef: ModuleRef,
     private readonly appConfig: ApplicationConfig
-  ) { }
+  ) {}
 
   /**
    * Walk every Nest provider/controller, find methods annotated with `@Mcp`
@@ -86,16 +94,24 @@ export class ControllerDiscovery {
     const discovered: Discovered[] = []
     for (const wrapper of this.discovery.getProviders().concat(this.discovery.getControllers())) {
       const { instance } = wrapper
-      if (!instance || typeof instance !== 'object') { continue }
+      if (!instance || typeof instance !== 'object') {
+        continue
+      }
       const proto = Object.getPrototypeOf(instance) as object | null
-      if (!proto) { continue }
+      if (!proto) {
+        continue
+      }
       const classRef = instance.constructor as Type<unknown>
       for (const methodName of this.scanner.getAllMethodNames(proto)) {
         const method = (proto as Record<string, unknown>)[methodName] as ((...args: unknown[]) => unknown) | undefined
-        if (typeof method !== 'function') { continue }
+        if (typeof method !== 'function') {
+          continue
+        }
         const mcp = this.reflector.get<McpMetadata>(MCP_METADATA, method)
         const trpc = this.reflector.get<TrpcMetadata>(TRPC_METADATA, method)
-        if (!mcp && !trpc) { continue }
+        if (!mcp && !trpc) {
+          continue
+        }
         discovered.push({ instance, classRef, method, methodName, mcp, trpc })
       }
     }
@@ -104,8 +120,12 @@ export class ControllerDiscovery {
     const actions: Action[] = []
     for (const d of discovered) {
       const shared = this.reflect(d, lookup)
-      if (d.mcp) { actions.push(this.mcpAction(d, shared, globalGuards, options.defaultResult)) }
-      if (d.trpc) { actions.push(this.trpcAction(d, shared, globalGuards, options.onToolCall)) }
+      if (d.mcp) {
+        actions.push(this.mcpAction(d, shared, globalGuards, options.defaultResult))
+      }
+      if (d.trpc) {
+        actions.push(this.trpcAction(d, shared, globalGuards, options.onToolCall))
+      }
     }
     return actions
   }
@@ -118,8 +138,17 @@ export class ControllerDiscovery {
     const operation = reflectOperation(d.method)
     const docFields = lookup ? openApiFields(lookup, route.method, route.openapiPath) : {}
 
-    const { shape, bindings, warnings } = buildInput(proto, d.methodName, route.pathParams, slots, operation.params, docFields)
-    for (const w of warnings) { logger.warn(`${d.classRef.name}.${d.methodName}: ${w}`) }
+    const { shape, bindings, warnings } = buildInput(
+      proto,
+      d.methodName,
+      route.pathParams,
+      slots,
+      operation.params,
+      docFields
+    )
+    for (const w of warnings) {
+      logger.warn(`${d.classRef.name}.${d.methodName}: ${w}`)
+    }
 
     return {
       route,
@@ -142,7 +171,9 @@ export class ControllerDiscovery {
       // Resolved at call time - `APP_GUARD` instances aren't populated until
       // `app.init()` finishes. Globals run before the route/class guards.
       const all = [...collectGlobalGuards(appConfig, globalGuards), ...guards]
-      if (all.length === 0) { return }
+      if (all.length === 0) {
+        return
+      }
       const request = context.getOptional<unknown>('request')
       const response = context.getOptional<unknown>('response') ?? null
       const hasRequest = request != null
@@ -153,11 +184,17 @@ export class ControllerDiscovery {
   }
 
   /** Synthesize the MCP-targeted action (unchanged behavior from v2.4). */
-  private mcpAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[], defaultResult?: 'json' | 'smart'): Action {
+  private mcpAction(
+    d: Discovered,
+    shared: Reflected,
+    globalGuards: Type<CanActivate>[],
+    defaultResult?: 'json' | 'smart'
+  ): Action {
     const meta = d.mcp!
     const shape = { ...shared.baseShape, ...inputShape(meta.input) }
     const name = meta.name ?? `${shared.base}.${d.methodName}`
-    const description = meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
+    const description =
+      meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
     const applyParamPipes = meta.pipes !== 'skip'
     const applyGuards = this.guardRunner(d, shared, globalGuards)
     const { method, instance } = d
@@ -215,9 +252,7 @@ export class ControllerDiscovery {
       description,
       input: z.object(shape),
       ...(disposition ? { disposition } : {}),
-      ...(resourceMeta
-        ? { output: binary(resourceMeta) }
-        : disposition === 'structured' && output ? { output } : {}),
+      ...(resourceMeta ? { output: binary(resourceMeta) } : disposition === 'structured' && output ? { output } : {}),
       ...(meta.tags ? { tags: meta.tags } : {}),
       ...(meta.args ? { args: meta.args } : {}),
       annotations: { ...verbAnnotations(shared.route.method), ...meta.annotations },
@@ -225,24 +260,38 @@ export class ControllerDiscovery {
       ...(streaming
         ? { chunk: z.unknown(), run: streamingRun(applyGuards, method, instance, bindings, applyParamPipes, false) }
         : {
-          run: async (input: object, context: SilkweaveContext): Promise<object> => {
-            await applyGuards(context, input)
-            const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
-            const response = context.getOptional<unknown>('response')
-            const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
-            const normalized = await normalizeControllerResult(result) as object | undefined
-            return normalized ?? {}
-          }
-        })
+            run: async (input: object, context: SilkweaveContext): Promise<object> => {
+              await applyGuards(context, input)
+              const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
+              const response = context.getOptional<unknown>('response')
+              const result = await invokeRebound(
+                method,
+                instance,
+                input as Record<string, unknown>,
+                bindings,
+                request,
+                response,
+                applyParamPipes
+              )
+              const normalized = (await normalizeControllerResult(result)) as object | undefined
+              return normalized ?? {}
+            }
+          })
     } as Action
   }
 
   /** Synthesize the tRPC-targeted action (kind/output/subscription + httpStatus errors). */
-  private trpcAction(d: Discovered, shared: Reflected, globalGuards: Type<CanActivate>[], onToolCall?: OnToolCall): Action {
+  private trpcAction(
+    d: Discovered,
+    shared: Reflected,
+    globalGuards: Type<CanActivate>[],
+    onToolCall?: OnToolCall
+  ): Action {
     const meta = d.trpc!
     const shape = { ...shared.baseShape, ...inputShape(meta.input) }
     const name = meta.name ?? `${shared.base}.${d.methodName}`
-    const description = meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
+    const description =
+      meta.description ?? shared.description ?? `${d.methodName} (${shared.route.method} /${shared.route.path})`
     const applyParamPipes = meta.pipes !== 'skip'
     const applyGuards = this.guardRunner(d, shared, globalGuards)
     const { method, instance } = d
@@ -267,13 +316,24 @@ export class ControllerDiscovery {
         input: z.object(shape),
         chunk: resolveSchema(meta.chunk) ?? z.unknown(),
         isEnabled,
-        run: streamingRun(applyGuards, method, instance, bindings, applyParamPipes, true, onToolCall ? { hook: onToolCall, name } : undefined)
+        run: streamingRun(
+          applyGuards,
+          method,
+          instance,
+          bindings,
+          applyParamPipes,
+          true,
+          onToolCall ? { hook: onToolCall, name } : undefined
+        )
       } as Action
     }
 
-    const kind: ActionKind = meta.kind === 'query' || meta.kind === 'mutation'
-      ? meta.kind
-      : (shared.route.method === 'GET' ? 'query' : 'mutation')
+    const kind: ActionKind =
+      meta.kind === 'query' || meta.kind === 'mutation'
+        ? meta.kind
+        : shared.route.method === 'GET'
+          ? 'query'
+          : 'mutation'
     // A resource route's output is core's binary() schema - the procedure
     // returns the SerializedResource envelope; it wins over `output`.
     const resourceMeta = resolveResourceMeta(meta.resource, d.method)
@@ -285,7 +345,7 @@ export class ControllerDiscovery {
     if (output && degraded.length > 0) {
       logger.warn(
         `${d.classRef.name}.${d.methodName}: tRPC output field(s) ${degraded.join(', ')} reflected to 'unknown' ` +
-        '(nested DTO or Dto[] - reflection is one level deep). Supply @Trpc({ output }) with a Zod schema for precise types.'
+          '(nested DTO or Dto[] - reflection is one level deep). Supply @Trpc({ output }) with a Zod schema for precise types.'
       )
     }
 
@@ -302,8 +362,16 @@ export class ControllerDiscovery {
           await applyGuards(context, input)
           const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
           const response = context.getOptional<unknown>('response')
-          const result = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes)
-          const normalized = await normalizeControllerResult(result) as object | undefined
+          const result = await invokeRebound(
+            method,
+            instance,
+            input as Record<string, unknown>,
+            bindings,
+            request,
+            response,
+            applyParamPipes
+          )
+          const normalized = (await normalizeControllerResult(result)) as object | undefined
           emitTrpcEvent(onToolCall, name, context, started, input)
           return normalized ?? {}
         } catch (error) {
@@ -331,15 +399,25 @@ function camelKey(name: string): string {
  * Emit a tRPC-side telemetry event (fire-and-forget). Gated to the `trpc`
  * adapter context so a `typegen`-driven evaluation never counts as a call.
  */
-function emitTrpcEvent(hook: OnToolCall | undefined, name: string, context: SilkweaveContext, started: number, args: unknown, error?: unknown): void {
-  if (!hook || context.getOptional<string>('adapter') !== 'trpc') { return }
-  const meta = error == null
-    ? {}
-    : error instanceof SilkweaveError
-      ? { errorCode: error.code, errorMessage: error.message }
-      : error instanceof Error
-        ? { errorCode: error.name, errorMessage: error.message }
-        : { errorCode: 'unknown' }
+function emitTrpcEvent(
+  hook: OnToolCall | undefined,
+  name: string,
+  context: SilkweaveContext,
+  started: number,
+  args: unknown,
+  error?: unknown
+): void {
+  if (!hook || context.getOptional<string>('adapter') !== 'trpc') {
+    return
+  }
+  const meta =
+    error == null
+      ? {}
+      : error instanceof SilkweaveError
+        ? { errorCode: error.code, errorMessage: error.message }
+        : error instanceof Error
+          ? { errorCode: error.name, errorMessage: error.message }
+          : { errorCode: 'unknown' }
   emitToolCall(hook, {
     action: name,
     tool: camelKey(name),
@@ -359,9 +437,15 @@ function emitTrpcEvent(hook: OnToolCall | undefined, name: string, context: Silk
  * `@Mcp({ annotations })` fields are merged over these by the caller.
  */
 function verbAnnotations(method: string): ToolAnnotations {
-  if (method === 'GET') { return { readOnlyHint: true, idempotentHint: true } }
-  if (method === 'PUT') { return { readOnlyHint: false, idempotentHint: true } }
-  if (method === 'DELETE') { return { readOnlyHint: false, destructiveHint: true, idempotentHint: true } }
+  if (method === 'GET') {
+    return { readOnlyHint: true, idempotentHint: true }
+  }
+  if (method === 'PUT') {
+    return { readOnlyHint: false, idempotentHint: true }
+  }
+  if (method === 'DELETE') {
+    return { readOnlyHint: false, destructiveHint: true, idempotentHint: true }
+  }
   return { readOnlyHint: false }
 }
 
@@ -381,12 +465,26 @@ function streamingRun(
       await applyGuards(context, input)
       const request = context.getOptional<{ headers?: Record<string, unknown> }>('request')
       const response = context.getOptional<unknown>('response')
-      const gen = await invokeRebound(method, instance, input as Record<string, unknown>, bindings, request, response, applyParamPipes) as AsyncIterable<unknown>
-      for await (const chunk of gen) { yield chunk }
-      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started, input) }
+      const gen = (await invokeRebound(
+        method,
+        instance,
+        input as Record<string, unknown>,
+        bindings,
+        request,
+        response,
+        applyParamPipes
+      )) as AsyncIterable<unknown>
+      for await (const chunk of gen) {
+        yield chunk
+      }
+      if (telemetry) {
+        emitTrpcEvent(telemetry.hook, telemetry.name, context, started, input)
+      }
     } catch (error) {
       const mapped = mapErrors ? toSilkweaveError(error) : error
-      if (telemetry) { emitTrpcEvent(telemetry.hook, telemetry.name, context, started, input, mapped) }
+      if (telemetry) {
+        emitTrpcEvent(telemetry.hook, telemetry.name, context, started, input, mapped)
+      }
       throw mapped
     }
   }
@@ -403,10 +501,15 @@ function resolveOutput(meta: TrpcMetadata, method: (...args: unknown[]) => unkno
  * is the caller's own typing and is never flagged.
  */
 function outputDegradedFields(meta: TrpcMetadata, method: (...args: unknown[]) => unknown): string[] {
-  if (meta.output != null && isZodSchema(meta.output)) { return [] }
-  const fields = typeof meta.output === 'function'
-    ? reflectDtoFields(meta.output)
-    : meta.output != null ? undefined : reflectResponseFields(method)
+  if (meta.output != null && isZodSchema(meta.output)) {
+    return []
+  }
+  const fields =
+    typeof meta.output === 'function'
+      ? reflectDtoFields(meta.output)
+      : meta.output != null
+        ? undefined
+        : reflectResponseFields(method)
   return fields ? unreflectedFields(fields) : []
 }
 
@@ -416,7 +519,9 @@ function outputDegradedFields(meta: TrpcMetadata, method: (...args: unknown[]) =
  * `safeParse` + `shape`, so a different zod copy's object still unwraps).
  */
 function inputShape(input: McpMetadata['input']): Record<string, z.ZodType> {
-  if (!input) { return {} }
+  if (!input) {
+    return {}
+  }
   const maybe = input as { safeParse?: unknown; shape?: unknown }
   if (typeof maybe.safeParse === 'function' && maybe.shape != null && typeof maybe.shape === 'object') {
     return maybe.shape as Record<string, z.ZodType>
@@ -429,18 +534,29 @@ function inputShape(input: McpMetadata['input']): Record<string, z.ZodType> {
  * through, a DTO class is reflected, and a raw shape is wrapped in `z.object`.
  */
 function resolveSchema(value: TrpcMetadata['output']): z.ZodType | undefined {
-  if (value == null) { return undefined }
-  if (isZodSchema(value)) { return value }
-  if (typeof value === 'function') { return reflectDtoSchema(value) }
+  if (value == null) {
+    return undefined
+  }
+  if (isZodSchema(value)) {
+    return value
+  }
+  if (typeof value === 'function') {
+    return reflectDtoSchema(value)
+  }
   return z.object(value)
 }
 
 function isZodSchema(value: unknown): value is z.ZodType {
-  return Boolean(value) && typeof value === 'object' && typeof (value as { safeParse?: unknown }).safeParse === 'function'
+  return (
+    Boolean(value) && typeof value === 'object' && typeof (value as { safeParse?: unknown }).safeParse === 'function'
+  )
 }
 
 function isAsyncGeneratorFn(fn: unknown): boolean {
-  return typeof fn === 'function' && (fn as { constructor?: { name?: string } }).constructor?.name === 'AsyncGeneratorFunction'
+  return (
+    typeof fn === 'function' &&
+    (fn as { constructor?: { name?: string } }).constructor?.name === 'AsyncGeneratorFunction'
+  )
 }
 
 /**
@@ -453,9 +569,8 @@ function toSilkweaveError(error: unknown): unknown {
   if (error instanceof HttpException) {
     const status = error.getStatus()
     const response = error.getResponse()
-    const raw = typeof response === 'string'
-      ? response
-      : (response as { message?: unknown })?.message ?? error.message
+    const raw =
+      typeof response === 'string' ? response : ((response as { message?: unknown })?.message ?? error.message)
     const message = Array.isArray(raw) ? raw.join(', ') : String(raw)
     return new SilkweaveError(message, 'http_error', status)
   }
@@ -484,7 +599,9 @@ function buildInput(
   for (const slot of slots) {
     const { binding, fields: contributed } = contributeSlot(slot, pathParams, designTypes)
     bindings[slot.index] = binding
-    for (const [name, desc] of Object.entries(contributed)) { addField(name, desc) }
+    for (const [name, desc] of Object.entries(contributed)) {
+      addField(name, desc)
+    }
     // A whole-DTO `@Body()`/`@Query()` that reflected to zero fields: the type
     // was unreflectable (an interface, or an intersection/union TypeScript
     // erases to `Object`/`Array` under `design:type`). Its fields are silently
@@ -493,8 +610,8 @@ function buildInput(
       const typeName = (designTypes[slot.index] as { name?: string } | undefined)?.name ?? 'unknown'
       warnings.push(
         `whole-${binding.source} parameter #${slot.index} (type '${typeName}') reflected no input fields. ` +
-        `If it is an intersection/union (e.g. 'A & B'), TypeScript erases it to '${typeName}' so the DTO is lost - ` +
-        'use a single DTO class or declare the fields via @Mcp/@Trpc({ input }).'
+          `If it is an intersection/union (e.g. 'A & B'), TypeScript erases it to '${typeName}' so the DTO is lost - ` +
+          'use a single DTO class or declare the fields via @Mcp/@Trpc({ input }).'
       )
     }
   }
@@ -502,23 +619,35 @@ function buildInput(
   // Layer operation-level (`@ApiParam`/`@ApiQuery`) then OpenAPI-document
   // metadata over the structural fields (later sources win per field).
   for (const [name, desc] of Object.entries(operationParams)) {
-    if (name in fields) { fields[name] = mergeField(fields[name], desc) }
+    if (name in fields) {
+      fields[name] = mergeField(fields[name], desc)
+    }
   }
   for (const [name, desc] of Object.entries(docFields)) {
-    if (name in fields) { fields[name] = mergeField(fields[name], desc) }
+    if (name in fields) {
+      fields[name] = mergeField(fields[name], desc)
+    }
   }
 
   const shape: Record<string, z.ZodType> = {}
-  for (const [name, desc] of Object.entries(fields)) { shape[name] = fieldToZod(desc) }
+  for (const [name, desc] of Object.entries(fields)) {
+    shape[name] = fieldToZod(desc)
+  }
 
   return { shape, bindings, warnings }
 }
 
 function designTypeAt(designTypes: unknown[], index: number): FieldDesc {
   const ctor = designTypes[index]
-  if (ctor === String) { return { type: 'string' } }
-  if (ctor === Number) { return { type: 'number' } }
-  if (ctor === Boolean) { return { type: 'boolean' } }
+  if (ctor === String) {
+    return { type: 'string' }
+  }
+  if (ctor === Number) {
+    return { type: 'number' }
+  }
+  if (ctor === Boolean) {
+    return { type: 'boolean' }
+  }
   return {}
 }
 
@@ -537,12 +666,19 @@ function paramContribution(slot: ParamSlot, pathParams: string[]): SlotContribut
     }
   }
   const fields: Record<string, FieldDesc> = {}
-  for (const p of pathParams) { fields[p] = { type: 'string', required: true } }
+  for (const p of pathParams) {
+    fields[p] = { type: 'string', required: true }
+  }
   return { binding: { kind: 'params', fields: pathParams }, fields }
 }
 
 /** A `@Query('x')`/`@Body('x')` scalar or a whole-DTO `@Query()`/`@Body()`. */
-function bodyOrQueryContribution(slot: ParamSlot, source: 'query' | 'body', requiredScalar: boolean, designTypes: unknown[]): SlotContribution {
+function bodyOrQueryContribution(
+  slot: ParamSlot,
+  source: 'query' | 'body',
+  requiredScalar: boolean,
+  designTypes: unknown[]
+): SlotContribution {
   if (slot.data) {
     return {
       binding: { kind: 'value', field: slot.data, source, metatype: slot.designType, pipes: slot.pipes },
@@ -559,9 +695,13 @@ function bodyOrQueryContribution(slot: ParamSlot, source: 'query' | 'body', requ
 /** Map one parameter slot to its input-field contribution and re-bind instruction. */
 function contributeSlot(slot: ParamSlot, pathParams: string[], designTypes: unknown[]): SlotContribution {
   switch (slot.paramtype) {
-    case PARAMTYPE.PARAM: return paramContribution(slot, pathParams)
-    case PARAMTYPE.QUERY: return bodyOrQueryContribution(slot, 'query', false, designTypes)
-    case PARAMTYPE.BODY: return bodyOrQueryContribution(slot, 'body', true, designTypes)
-    default: return { binding: specialBinding(slot.paramtype, slot.data) ?? { kind: 'missing' }, fields: {} }
+    case PARAMTYPE.PARAM:
+      return paramContribution(slot, pathParams)
+    case PARAMTYPE.QUERY:
+      return bodyOrQueryContribution(slot, 'query', false, designTypes)
+    case PARAMTYPE.BODY:
+      return bodyOrQueryContribution(slot, 'body', true, designTypes)
+    default:
+      return { binding: specialBinding(slot.paramtype, slot.data) ?? { kind: 'missing' }, fields: {} }
   }
 }

@@ -16,7 +16,9 @@ export async function readLockfile(target: string): Promise<SkillLockfile> {
     }
     return raw
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') { return emptyLockfile() }
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return emptyLockfile()
+    }
     throw error
   }
 }

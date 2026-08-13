@@ -4,7 +4,12 @@ import { buildLogLevels, createConsoleLogger, createLogger, LogLevels, type LogL
 /** A WritableStream stand-in that records every line written. */
 function captureStream(): { lines: string[]; stream: NodeJS.WritableStream } {
   const lines: string[] = []
-  const stream = { write: (chunk: string): boolean => { lines.push(String(chunk)); return true } } as unknown as NodeJS.WritableStream
+  const stream = {
+    write: (chunk: string): boolean => {
+      lines.push(String(chunk))
+      return true
+    }
+  } as unknown as NodeJS.WritableStream
   return { lines, stream }
 }
 
@@ -72,7 +77,10 @@ describe('buildLogLevels', () => {
     expect(Object.keys(levels).sort()).toEqual([...LogLevels].sort())
     levels.error('boom')
     levels.debug({ detail: true })
-    expect(calls).toEqual([['error', 'boom'], ['debug', { detail: true }]])
+    expect(calls).toEqual([
+      ['error', 'boom'],
+      ['debug', { detail: true }]
+    ])
   })
 })
 

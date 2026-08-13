@@ -10,6 +10,9 @@ export function fileBytes(data: Uint8Array | string): Uint8Array {
  */
 export async function sha256(data: Uint8Array | string): Promise<string> {
   const bytes = fileBytes(data)
-  const hash = await crypto.subtle.digest('SHA-256', bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)
+  const hash = await crypto.subtle.digest(
+    'SHA-256',
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+  )
   return `sha256:${[...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }

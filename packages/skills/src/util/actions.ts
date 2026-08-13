@@ -14,8 +14,9 @@ export const SKILL_ACTIONS_TAG = 'silkweave/skills'
 export function skillActions(skills: Skill[]): Action[] {
   const listSkills = createAction({
     name: 'list-skills',
-    description: 'List the agent skills this server provides (name, version, description, per-file content digests). '
-      + 'Fetch a skill\'s files with GetSkill, or install/update them locally with: npx silkweave skills sync --url <this server\'s MCP endpoint>',
+    description:
+      'List the agent skills this server provides (name, version, description, per-file content digests). ' +
+      "Fetch a skill's files with GetSkill, or install/update them locally with: npx silkweave skills sync --url <this server's MCP endpoint>",
     kind: 'query',
     tags: [SKILL_ACTIONS_TAG],
     input: z.object({}),
@@ -23,8 +24,9 @@ export function skillActions(skills: Skill[]): Action[] {
   })
   const getSkill = createAction({
     name: 'get-skill',
-    description: 'Fetch all files of one agent skill by name (as listed by ListSkills). '
-      + 'Text files ship as `text`, binary files as `base64`; verify each file against its `digest` when installing.',
+    description:
+      'Fetch all files of one agent skill by name (as listed by ListSkills). ' +
+      'Text files ship as `text`, binary files as `base64`; verify each file against its `digest` when installing.',
     kind: 'query',
     tags: [SKILL_ACTIONS_TAG],
     input: z.object({
@@ -33,7 +35,9 @@ export function skillActions(skills: Skill[]): Action[] {
     args: ['name'],
     run: async ({ name }) => {
       const skill = skills.find((candidate) => candidate.name === name)
-      if (!skill) { throw notFound(`Unknown skill '${name}'`) }
+      if (!skill) {
+        throw notFound(`Unknown skill '${name}'`)
+      }
       return skillPayload(skill)
     }
   })

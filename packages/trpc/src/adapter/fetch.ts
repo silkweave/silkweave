@@ -2,7 +2,13 @@ import { AuthConfig } from '@silkweave/auth'
 import { Adapter, AdapterGenerator, SilkweaveOptions } from '@silkweave/core'
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
 import { buildRouter, TrpcHandlerContext } from '../lib/buildRouter.js'
-import { authResponseMeta, createActionLogger, resolveIdentity, throwAuthError, type Authenticate } from '../lib/createContext.js'
+import {
+  authResponseMeta,
+  createActionLogger,
+  resolveIdentity,
+  throwAuthError,
+  type Authenticate
+} from '../lib/createContext.js'
 
 export interface TrpcFetchAdapterOptions {
   /** URL prefix stripped from incoming requests before tRPC routing. Default `/trpc`. */
@@ -43,14 +49,19 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
 
   let resolveReady!: () => void
   let rejectReady!: (error: unknown) => void
-  const ready = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
+  const ready = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve
+    rejectReady = reject
+  })
 
   let handler: FetchHandler | undefined
 
   // A boot failure rejects `ready` before any request has attached a handler,
   // which Node reports as an unhandled rejection. The real surfacing happens in
   // start() (which rethrows) and per-request below.
-  ready.catch(() => { /* surfaced via start() / per-request dispatch */ })
+  ready.catch(() => {
+    /* surfaced via start() / per-request dispatch */
+  })
 
   const adapter: AdapterGenerator = (_silkweaveOptions: SilkweaveOptions, baseContext): Adapter => {
     const context = baseContext.fork({ adapter: 'trpc' })
@@ -68,9 +79,7 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
         }
         const logger = createActionLogger()
 
-        const createContext = async (
-          opts: { req: Request }
-        ): Promise<TrpcHandlerContext> => {
+        const createContext = async (opts: { req: Request }): Promise<TrpcHandlerContext> => {
           const resolved = await resolveIdentity(
             options.authenticate,
             options.auth,
@@ -106,7 +115,9 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
 
         resolveReady()
       },
-      stop: async () => { /* no-op for fetch adapter */ }
+      stop: async () => {
+        /* no-op for fetch adapter */
+      }
     }
   }
 
@@ -114,10 +125,10 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
     try {
       await ready
     } catch {
-      return new Response(
-        JSON.stringify({ error: 'not_ready', message: 'tRPC adapter failed to start' }),
-        { status: 503, headers: { 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'not_ready', message: 'tRPC adapter failed to start' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
     return handler!(request)
   }

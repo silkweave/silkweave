@@ -13,7 +13,9 @@ function withCors(handler: NextRouteHandler): NextRouteHandler {
   return async (request) => {
     const response = await handler(request)
     const headers = new Headers(response.headers)
-    for (const [key, value] of Object.entries(CORS_HEADERS)) { headers.set(key, value) }
+    for (const [key, value] of Object.entries(CORS_HEADERS)) {
+      headers.set(key, value)
+    }
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
   }
 }
@@ -35,9 +37,13 @@ export function buildTrpcRoute(
 
   // Catch boot failures: an unhandled start() rejection would crash the Next
   // server. trpcFetch's handler serves a 503 until `_ready` resolves.
-  silkweave(identity).actions(actions).adapter(adapter).start().catch((error: unknown) => {
-    console.error('[silkweave/nextjs] tRPC adapter failed to start:', error)
-  })
+  silkweave(identity)
+    .actions(actions)
+    .adapter(adapter)
+    .start()
+    .catch((error: unknown) => {
+      console.error('[silkweave/nextjs] tRPC adapter failed to start:', error)
+    })
 
   const optionsHandler: NextRouteHandler = () =>
     Promise.resolve(new Response(null, { status: 204, headers: options.cors ? CORS_HEADERS : {} }))

@@ -34,10 +34,14 @@ export function buildValidationErrorEmitter(
   baseContext: SilkweaveContext,
   onToolCall: OnToolCall | undefined
 ): ((event: TrpcErrorEvent) => void) | undefined {
-  if (!onToolCall) { return undefined }
+  if (!onToolCall) {
+    return undefined
+  }
   const actionNameByKey = new Map(actions.map((action) => [camelCase(action.name), action.name]))
   return ({ error, path, input, ctx }) => {
-    if (!path || error.cause?.name !== 'ZodError') { return }
+    if (!path || error.cause?.name !== 'ZodError') {
+      return
+    }
     emitToolCall(onToolCall, {
       action: actionNameByKey.get(path) ?? path,
       tool: path,

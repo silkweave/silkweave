@@ -26,13 +26,17 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
   async function save<T>(namespace: string, id: string, data: T, expiresAt?: number) {
     const opts: { ex?: number } = {}
     const ttl = expiresAt != null ? ttlFromExpiry(expiresAt) : undefined
-    if (ttl != null) { opts.ex = ttl }
+    if (ttl != null) {
+      opts.ex = ttl
+    }
     await client.set(key(namespace, id), JSON.stringify(data), opts)
   }
 
   async function load<T>(namespace: string, id: string): Promise<T | undefined> {
     const raw = await client.get(key(namespace, id))
-    if (raw == null) { return undefined }
+    if (raw == null) {
+      return undefined
+    }
     return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T
   }
 
@@ -41,13 +45,25 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
   }
 
   return {
-    async saveAuthCode(code, data) { await save('auth-code', code, data, data.expiresAt) },
-    async getAuthCode(code) { return load('auth-code', code) },
-    async deleteAuthCode(code) { await remove('auth-code', code) },
+    async saveAuthCode(code, data) {
+      await save('auth-code', code, data, data.expiresAt)
+    },
+    async getAuthCode(code) {
+      return load('auth-code', code)
+    },
+    async deleteAuthCode(code) {
+      await remove('auth-code', code)
+    },
 
-    async savePendingAuth(state, data) { await save('pending-auth', state, data, data.expiresAt) },
-    async getPendingAuth(state) { return load('pending-auth', state) },
-    async deletePendingAuth(state) { await remove('pending-auth', state) },
+    async savePendingAuth(state, data) {
+      await save('pending-auth', state, data, data.expiresAt)
+    },
+    async getPendingAuth(state) {
+      return load('pending-auth', state)
+    },
+    async deletePendingAuth(state) {
+      await remove('pending-auth', state)
+    },
 
     async savePkceVerifier(state, verifier) {
       const expiresAt = Date.now() / 1000 + 600
@@ -57,13 +73,25 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
       const item = await load<{ verifier: string; expiresAt: number }>('pkce-verifier', state)
       return item?.verifier
     },
-    async deletePkceVerifier(state) { await remove('pkce-verifier', state) },
+    async deletePkceVerifier(state) {
+      await remove('pkce-verifier', state)
+    },
 
-    async saveClient(clientId, data) { await save('client', clientId, data) },
-    async getClient(clientId) { return load('client', clientId) },
+    async saveClient(clientId, data) {
+      await save('client', clientId, data)
+    },
+    async getClient(clientId) {
+      return load('client', clientId)
+    },
 
-    async saveRefreshToken(token, data) { await save('refresh-token', token, data, data.expiresAt) },
-    async getRefreshToken(token) { return load('refresh-token', token) },
-    async deleteRefreshToken(token) { await remove('refresh-token', token) }
+    async saveRefreshToken(token, data) {
+      await save('refresh-token', token, data, data.expiresAt)
+    },
+    async getRefreshToken(token) {
+      return load('refresh-token', token)
+    },
+    async deleteRefreshToken(token) {
+      await remove('refresh-token', token)
+    }
   }
 }

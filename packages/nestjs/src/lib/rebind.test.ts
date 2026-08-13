@@ -6,7 +6,11 @@ import { PARAMTYPE } from './reflect/params.js'
 async function rebind(
   bindings: Binding[],
   input: Record<string, unknown>,
-  opts: { request?: { headers?: Record<string, unknown>; ip?: unknown; hosts?: Record<string, unknown> }; response?: unknown; pipes?: boolean } = {}
+  opts: {
+    request?: { headers?: Record<string, unknown>; ip?: unknown; hosts?: Record<string, unknown> }
+    response?: unknown
+    pipes?: boolean
+  } = {}
 ): Promise<unknown[]> {
   const echo = (...args: unknown[]): unknown[] => args
   return (await invokeRebound(echo, {}, input, bindings, opts.request, opts.response, opts.pipes ?? false)) as unknown[]
@@ -37,7 +41,11 @@ describe('invokeRebound / resolveArg', () => {
   })
 
   it('reads a specific header case-insensitively', async () => {
-    const args = await rebind([{ kind: 'headers', data: 'X-Api-Key' }], {}, { request: { headers: { 'x-api-key': 'secret' } } })
+    const args = await rebind(
+      [{ kind: 'headers', data: 'X-Api-Key' }],
+      {},
+      { request: { headers: { 'x-api-key': 'secret' } } }
+    )
     expect(args[0]).toBe('secret')
   })
 
@@ -61,7 +69,9 @@ describe('invokeRebound / resolveArg', () => {
 
   it('resolves @Ip and @HostParam from the request', async () => {
     expect((await rebind([{ kind: 'ip' }], {}, { request: { ip: '1.2.3.4' } }))[0]).toBe('1.2.3.4')
-    expect((await rebind([{ kind: 'host', data: 'sub' }], {}, { request: { hosts: { sub: 'tenant' } } }))[0]).toBe('tenant')
+    expect((await rebind([{ kind: 'host', data: 'sub' }], {}, { request: { hosts: { sub: 'tenant' } } }))[0]).toBe(
+      'tenant'
+    )
   })
 
   it('resolves an unsupported slot (missing) to undefined', async () => {

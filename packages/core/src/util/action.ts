@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import z from 'zod/v4'
 import { SilkweaveContext } from './context.js'
 import { SilkweaveError } from './error.js'
@@ -153,18 +152,12 @@ export interface StreamingActionInput<I extends object, C, N extends string, K e
   toolResult?: (response: C[], context: SilkweaveContext) => ToolResult | undefined
 }
 
-export function createAction<
-  I extends object,
-  C,
-  N extends string,
-  K extends ActionKind = 'mutation'
->(action: StreamingActionInput<I, C, N, K>): StreamingActionInput<I, C, N, K>
-export function createAction<
-  I extends object,
-  O extends object,
-  N extends string,
-  K extends ActionKind = 'mutation'
->(action: NonStreamingActionInput<I, O, N, K>): NonStreamingActionInput<I, O, N, K>
+export function createAction<I extends object, C, N extends string, K extends ActionKind = 'mutation'>(
+  action: StreamingActionInput<I, C, N, K>
+): StreamingActionInput<I, C, N, K>
+export function createAction<I extends object, O extends object, N extends string, K extends ActionKind = 'mutation'>(
+  action: NonStreamingActionInput<I, O, N, K>
+): NonStreamingActionInput<I, O, N, K>
 export function createAction(action: Action): Action {
   return action
 }
@@ -193,7 +186,9 @@ export function validateActionDisposition(action: Action): void {
       'invalid_action'
     )
   }
-  if (action.disposition !== 'structured') { return }
+  if (action.disposition !== 'structured') {
+    return
+  }
   if (isBinarySchema(action.output)) {
     throw new SilkweaveError(
       `Action '${action.name}': disposition 'structured' cannot back a binary() output - there is no JSON outputSchema contract for binary data; use the default disposition instead`,

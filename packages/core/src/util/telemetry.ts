@@ -59,9 +59,13 @@ export type OnToolCall = (event: ToolCallEvent) => void | Promise<void>
  * async rejections are logged to stderr and never propagate to the call path.
  */
 export function emitToolCall(hook: OnToolCall | undefined, event: ToolCallEvent): void {
-  if (!hook) { return }
+  if (!hook) {
+    return
+  }
   try {
-    void Promise.resolve(hook(event)).catch((error: unknown) => { console.error('onToolCall hook error:', error) })
+    void Promise.resolve(hook(event)).catch((error: unknown) => {
+      console.error('onToolCall hook error:', error)
+    })
   } catch (error) {
     console.error('onToolCall hook error:', error)
   }

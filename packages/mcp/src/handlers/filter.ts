@@ -43,9 +43,12 @@ export type FilterActions = (actions: Action[], request: FilterRequest) => Actio
  * unrecognizable bodies (empty `method`).
  */
 export function rpcInfo(body: unknown): { method: string; toolName?: string } {
-  const message = (Array.isArray(body) ? body[0] : body) as { method?: unknown; params?: { name?: unknown } } | undefined
+  const message = (Array.isArray(body) ? body[0] : body) as
+    | { method?: unknown; params?: { name?: unknown } }
+    | undefined
   const method = typeof message?.method === 'string' ? message.method : ''
-  const toolName = method === 'tools/call' && typeof message?.params?.name === 'string' ? message.params.name : undefined
+  const toolName =
+    method === 'tools/call' && typeof message?.params?.name === 'string' ? message.params.name : undefined
   return { method, ...(toolName !== undefined ? { toolName } : {}) }
 }
 

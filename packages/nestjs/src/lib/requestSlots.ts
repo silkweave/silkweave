@@ -27,13 +27,24 @@ export interface RequestSlots {
 export function requestSlotFields(bindings: Binding[]): RequestSlots {
   const slots: RequestSlots = { params: [], query: [], body: [] }
   for (const b of bindings) {
-    if (b.kind === 'params') { slots.params.push(...b.fields) } else if (b.kind === 'object') { slots[b.source].push(...b.fields) } else if (b.kind === 'value') { slots[b.source === 'path' ? 'params' : b.source].push(b.field) }
+    if (b.kind === 'params') {
+      slots.params.push(...b.fields)
+    } else if (b.kind === 'object') {
+      slots[b.source].push(...b.fields)
+    } else if (b.kind === 'value') {
+      slots[b.source === 'path' ? 'params' : b.source].push(b.field)
+    }
   }
   return slots
 }
 
 /** Fill one request slot from the validated input, only adding absent keys. */
-function fillSlot(bag: Record<string, unknown>, fields: string[], input: Record<string, unknown>, stringify: boolean): void {
+function fillSlot(
+  bag: Record<string, unknown>,
+  fields: string[],
+  input: Record<string, unknown>,
+  stringify: boolean
+): void {
   for (const field of fields) {
     if (!(field in bag) && input[field] !== undefined) {
       bag[field] = stringify ? String(input[field]) : input[field]
@@ -52,9 +63,21 @@ function fillSlot(bag: Record<string, unknown>, fields: string[], input: Record<
  * decide identically over MCP and REST.
  */
 export function populateRequestSlots(request: unknown, slots: RequestSlots, input: Record<string, unknown>): void {
-  if (typeof request !== 'object' || request === null) { return }
-  const req = request as { params?: Record<string, unknown>; query?: Record<string, unknown>; body?: Record<string, unknown> }
-  if (slots.params.length > 0) { fillSlot((req.params ??= {}), slots.params, input, true) }
-  if (slots.query.length > 0) { fillSlot((req.query ??= {}), slots.query, input, true) }
-  if (slots.body.length > 0) { fillSlot((req.body ??= {}), slots.body, input, false) }
+  if (typeof request !== 'object' || request === null) {
+    return
+  }
+  const req = request as {
+    params?: Record<string, unknown>
+    query?: Record<string, unknown>
+    body?: Record<string, unknown>
+  }
+  if (slots.params.length > 0) {
+    fillSlot((req.params ??= {}), slots.params, input, true)
+  }
+  if (slots.query.length > 0) {
+    fillSlot((req.query ??= {}), slots.query, input, true)
+  }
+  if (slots.body.length > 0) {
+    fillSlot((req.body ??= {}), slots.body, input, false)
+  }
 }

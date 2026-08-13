@@ -1,6 +1,15 @@
 import { createMcpExpressApp, type CreateMcpExpressAppOptions } from '@modelcontextprotocol/sdk/server/express.js'
 import { AuthConfig } from '@silkweave/auth'
-import { Action, AdapterFactory, createContext, OnToolCall, SilkweaveContext, SilkweaveOptions, Skill, SkillDefinition } from '@silkweave/core'
+import {
+  Action,
+  AdapterFactory,
+  createContext,
+  OnToolCall,
+  SilkweaveContext,
+  SilkweaveOptions,
+  Skill,
+  SkillDefinition
+} from '@silkweave/core'
 import { CorsOptions } from 'cors'
 import express, { type Express } from 'express'
 import { Server } from 'http'
@@ -77,19 +86,35 @@ export function buildMcpExpressApp(
   actions: Action[],
   options: StartMcpHttpOptions
 ): Express {
-  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, skillsExtension, skillsMarketplace, transportPaths, ...mcpAppOptions } = options
+  const {
+    host,
+    auth,
+    cors: corsConfig,
+    sideloadResources = true,
+    resourceDir,
+    filterActions,
+    onToolCall,
+    skills,
+    skillsExtension,
+    skillsMarketplace,
+    transportPaths,
+    ...mcpAppOptions
+  } = options
   const app = createMcpExpressApp({ ...mcpAppOptions, host })
 
   const corsHandler = mcpCors(corsConfig ?? true)
-  if (corsHandler) { app.use(corsHandler) }
+  if (corsHandler) {
+    app.use(corsHandler)
+  }
 
   if (auth?.authorizationServers?.length && auth.resourceUrl) {
     // A resolver serves N resources, whose RFC 9728 documents live at the
     // insertion-form path `/.well-known/oauth-protected-resource/<resource path>`.
     // Express 5 optional-splat covers both that and the bare root document.
-    const wellKnownPath = typeof auth.resourceUrl === 'string'
-      ? '/.well-known/oauth-protected-resource'
-      : '/.well-known/oauth-protected-resource{/*resource}'
+    const wellKnownPath =
+      typeof auth.resourceUrl === 'string'
+        ? '/.well-known/oauth-protected-resource'
+        : '/.well-known/oauth-protected-resource{/*resource}'
     app.get(wellKnownPath, protectedResourceMetadata(auth, context))
   }
 
@@ -101,7 +126,13 @@ export function buildMcpExpressApp(
     app.get(oauth.callbackPath, oauth.callback)
     app.post('/token', ...oauth.token)
     app.post('/register', ...oauth.register)
-    oauthPaths = new Set(['/.well-known/oauth-authorization-server', '/authorize', oauth.callbackPath, '/token', '/register'])
+    oauthPaths = new Set([
+      '/.well-known/oauth-authorization-server',
+      '/authorize',
+      oauth.callbackPath,
+      '/token',
+      '/register'
+    ])
   }
 
   if (auth) {
@@ -109,7 +140,13 @@ export function buildMcpExpressApp(
     app.use((req, res, next) => {
       // The marketplace document is public by construction (it only points at
       // npm-published packages), so it bypasses auth like /.well-known/.
-      if (req.path.startsWith('/.well-known/') || oauthPaths.has(req.path) || (skillsMarketplace && req.path === MARKETPLACE_PATH)) { return next() }
+      if (
+        req.path.startsWith('/.well-known/') ||
+        oauthPaths.has(req.path) ||
+        (skillsMarketplace && req.path === MARKETPLACE_PATH)
+      ) {
+        return next()
+      }
       return guard(req, res, next)
     })
   }
@@ -118,7 +155,13 @@ export function buildMcpExpressApp(
     app.get('/resource/:id', sideloadResource({ resourceDir }))
   }
 
-  const transport = mcpTransport(silkweaveOptions, context, actions, { filterActions, onToolCall, skills, skillsExtension, skillsMarketplace })
+  const transport = mcpTransport(silkweaveOptions, context, actions, {
+    filterActions,
+    onToolCall,
+    skills,
+    skillsExtension,
+    skillsMarketplace
+  })
 
   if (skillsMarketplace) {
     app.get(MARKETPLACE_PATH, (_req, res) => {
@@ -160,7 +203,10 @@ export async function startMcpServer(
   const app = buildMcpExpressApp(silkweaveOptions, ctx, actions, options)
   return new Promise<Server>((resolve, reject) => {
     const server = app.listen(options.port, options.host, (error) => {
-      if (error) { reject(error); return }
+      if (error) {
+        reject(error)
+        return
+      }
       console.log(`MCP Streamable HTTP Server listening on http://${options.host}:${options.port}/mcp`)
       resolve(server)
     })
@@ -182,16 +228,21 @@ export const http: AdapterFactory<StartMcpHttpOptions> = (options) => {
         await (app.locals.mcpReady as Promise<void>)
         httpServer = await new Promise<Server>((resolve, reject) => {
           const s = app.listen(options.port, options.host, (error) => {
-            if (error) { reject(error); return }
+            if (error) {
+              reject(error)
+              return
+            }
             console.log(`MCP Streamable HTTP Server listening on http://${options.host}:${options.port}/mcp`)
             resolve(s)
           })
         })
       },
       stop: async () => {
-        if (!httpServer) { return }
+        if (!httpServer) {
+          return
+        }
         await new Promise<void>((resolve, reject) => {
-          httpServer!.close((err) => err ? reject(err) : resolve())
+          httpServer!.close((err) => (err ? reject(err) : resolve()))
         })
         httpServer = undefined
       }

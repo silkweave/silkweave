@@ -44,11 +44,16 @@ function describeDiff(diff: SkillDiff): string {
   const version = diff.remote?.version ?? diff.locked?.version
   const label = `${diff.name}${version ? ` ${version}` : ''}`
   switch (diff.status) {
-    case 'up-to-date': return `up-to-date  ${label}`
-    case 'missing': return `available   ${label}`
-    case 'outdated': return `outdated    ${diff.name} ${diff.locked?.version ?? '?'} -> ${diff.remote?.version ?? 'new content'}`
-    case 'held': return `held        ${diff.name} (pinned ${diff.locked?.pinned}; remote has ${diff.remote?.version ?? 'new content'})`
-    case 'orphaned': return `orphaned    ${diff.name} (no longer on the server; sync --prune removes it)`
+    case 'up-to-date':
+      return `up-to-date  ${label}`
+    case 'missing':
+      return `available   ${label}`
+    case 'outdated':
+      return `outdated    ${diff.name} ${diff.locked?.version ?? '?'} -> ${diff.remote?.version ?? 'new content'}`
+    case 'held':
+      return `held        ${diff.name} (pinned ${diff.locked?.pinned}; remote has ${diff.remote?.version ?? 'new content'})`
+    case 'orphaned':
+      return `orphaned    ${diff.name} (no longer on the server; sync --prune removes it)`
   }
 }
 
@@ -65,10 +70,14 @@ async function runSync(options: SkillsOptions, flags: SyncFlags): Promise<void> 
     const lockfile = await readLockfile(options.target)
     const server = url.toString()
     if (lockfile.server && lockfile.server !== server) {
-      console.warn(`warning: ${options.target} was last synced from ${lockfile.server} - one server per target is supported`)
+      console.warn(
+        `warning: ${options.target} was last synced from ${lockfile.server} - one server per target is supported`
+      )
     }
     const source = await skillSource(client)
-    if (source.kind === 'extension') { console.log('(consuming SEP-2640 skills extension)') }
+    if (source.kind === 'extension') {
+      console.log('(consuming SEP-2640 skills extension)')
+    }
     const manifest = await source.manifest()
     let diffs = diffSkills(manifest, lockfile)
     if (flags.names?.length) {
@@ -100,7 +109,9 @@ async function runSync(options: SkillsOptions, flags: SyncFlags): Promise<void> 
         console.log(`removed     ${diff.name}`)
       } else {
         if (diff.status === 'held' && flags.failOnHeld) {
-          console.error(`${diff.name} is pinned at ${diff.locked?.pinned} - \`silkweave skills unpin ${diff.name}\` first`)
+          console.error(
+            `${diff.name} is pinned at ${diff.locked?.pinned} - \`silkweave skills unpin ${diff.name}\` first`
+          )
           process.exit(1)
         }
         console.log(describeDiff(diff))
@@ -143,38 +154,61 @@ export function registerSkillsCommands(program: Command): void {
       await withClient(options, async (client) => {
         const lockfile = await readLockfile(options.target)
         const source = await skillSource(client)
-        const stale = diffSkills(await source.manifest(), lockfile)
-          .filter((diff) => diff.status !== 'up-to-date')
-        for (const diff of stale) { console.log(describeDiff(diff)) }
+        const stale = diffSkills(await source.manifest(), lockfile).filter((diff) => diff.status !== 'up-to-date')
+        for (const diff of stale) {
+          console.log(describeDiff(diff))
+        }
         if (stale.some((diff) => diff.status === 'missing' || diff.status === 'outdated')) {
           process.exitCode = 1
         }
       })
     })
 
-  skills.command('pack')
+  skills
+    .command('pack')
     .description('Pack skill directories into a skills-only Claude Code plugin, ready for npm publish')
     .argument('<dirs...>', 'skill directories containing SKILL.md (multiple dirs pack into one multi-skill plugin)')
-    .option('-p, --package <name>', 'npm package name (single-skill default: frontmatter metadata.npmPackage, else <skill-name>-skill; required for multiple skills)')
+    .option(
+      '-p, --package <name>',
+      'npm package name (single-skill default: frontmatter metadata.npmPackage, else <skill-name>-skill; required for multiple skills)'
+    )
     .option('-d, --description <text>', 'plugin description (defaults to the skill description, or a derived listing)')
-    .option('-o, --out <dir>', 'output directory (default: dist/<skill-name>-plugin, or dist/<plugin-name> for multiple skills)')
+    .option(
+      '-o, --out <dir>',
+      'output directory (default: dist/<skill-name>-plugin, or dist/<plugin-name> for multiple skills)'
+    )
     .option('--registry <url>', 'npm registry for the already-published check', DEFAULT_REGISTRY)
     .option('--force', 'pack even when this version is already published', false)
-    .action(async (dirs: string[], options: { package?: string; description?: string; out?: string; registry: string; force: boolean }) => {
-      try {
-        const result = await packSkill({ dirs, packageName: options.package, description: options.description, out: options.out, registry: options.registry, force: options.force })
-        for (const warning of result.warnings) { console.warn(`warning: ${warning}`) }
-        console.log(`packed      ${result.packageName}@${result.version} -> ${result.outDir}`)
-        console.log(`publish:    npm publish ${result.outDir} --access public`)
-        console.log('serve:      list it via the http()/edge() `skillsMarketplace` option, then')
-        console.log('            /plugin marketplace add https://<host>/.claude-plugin/marketplace.json')
-      } catch (error) {
-        console.error(error instanceof Error ? error.message : String(error))
-        process.exit(1)
+    .action(
+      async (
+        dirs: string[],
+        options: { package?: string; description?: string; out?: string; registry: string; force: boolean }
+      ) => {
+        try {
+          const result = await packSkill({
+            dirs,
+            packageName: options.package,
+            description: options.description,
+            out: options.out,
+            registry: options.registry,
+            force: options.force
+          })
+          for (const warning of result.warnings) {
+            console.warn(`warning: ${warning}`)
+          }
+          console.log(`packed      ${result.packageName}@${result.version} -> ${result.outDir}`)
+          console.log(`publish:    npm publish ${result.outDir} --access public`)
+          console.log('serve:      list it via the http()/edge() `skillsMarketplace` option, then')
+          console.log('            /plugin marketplace add https://<host>/.claude-plugin/marketplace.json')
+        } catch (error) {
+          console.error(error instanceof Error ? error.message : String(error))
+          process.exit(1)
+        }
       }
-    })
+    )
 
-  skills.command('pin')
+  skills
+    .command('pin')
     .description('Pin an installed skill - `sync` stops updating it')
     .argument('<name>', 'installed skill name')
     .argument('[version]', 'label recorded for the pin (defaults to the installed version)')
@@ -191,7 +225,8 @@ export function registerSkillsCommands(program: Command): void {
       console.log(`pinned      ${name} at ${entry.pinned}`)
     })
 
-  skills.command('unpin')
+  skills
+    .command('unpin')
     .description('Unpin a skill so `sync` updates it again')
     .argument('<name>', 'installed skill name')
     .option('--target <dir>', 'install directory', defaultTarget())

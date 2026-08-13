@@ -1,7 +1,31 @@
 import 'reflect-metadata'
-import { Body, Controller, Delete, ForbiddenException, Get, Header, Injectable, Param, Post, Put, StreamableFile, UseGuards, type CanActivate, type ExecutionContext } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Header,
+  Injectable,
+  Param,
+  Post,
+  Put,
+  StreamableFile,
+  UseGuards,
+  type CanActivate,
+  type ExecutionContext
+} from '@nestjs/common'
 import { ApplicationConfig, DiscoveryService, MetadataScanner, ModuleRef, Reflector } from '@nestjs/core'
-import { binarySchemaMeta, createContext, isActionResource, isBinarySchema, type Action, type ActionResource, type SilkweaveContext, type ToolCallEvent } from '@silkweave/core'
+import {
+  binarySchemaMeta,
+  createContext,
+  isActionResource,
+  isBinarySchema,
+  type Action,
+  type ActionResource,
+  type SilkweaveContext,
+  type ToolCallEvent
+} from '@silkweave/core'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { Mcp } from '../decorator/mcp.js'
@@ -14,7 +38,9 @@ const ALLOWED: Record<string, string[]> = { 'key-a': ['session-a'], 'key-b': ['s
 @Injectable()
 class ApiKeySessionGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<{ headers?: Record<string, unknown>; body?: Record<string, unknown> }>()
+    const req = context
+      .switchToHttp()
+      .getRequest<{ headers?: Record<string, unknown>; body?: Record<string, unknown> }>()
     const key = String(req.headers?.['x-api-key'] ?? '')
     const sessionId = String(req.body?.sessionId ?? '')
     if (!(ALLOWED[key] ?? []).includes(sessionId)) {
@@ -29,15 +55,33 @@ class MessagesController {
   @Post()
   @UseGuards(ApiKeySessionGuard)
   @Mcp({ description: 'Send a WhatsApp message' })
-  send(@Body('sessionId') sessionId: string, @Body('text') text: string): { sent: true; sessionId: string; text: string } {
+  send(
+    @Body('sessionId') sessionId: string,
+    @Body('text') text: string
+  ): { sent: true; sessionId: string; text: string } {
     return { sent: true, sessionId, text }
   }
 }
 
-function discoverController(controller: object, options: Parameters<ControllerDiscovery['discover']>[0] = {}): Action[] {
-  const discovery = { getProviders: () => [], getControllers: () => [{ instance: controller }] } as unknown as DiscoveryService
-  const moduleRef = { get: (ref: new () => unknown) => new ref(), create: (ref: new () => unknown) => new ref() } as unknown as ModuleRef
-  const cd = new ControllerDiscovery(discovery, new MetadataScanner(), new Reflector(), moduleRef, new ApplicationConfig())
+function discoverController(
+  controller: object,
+  options: Parameters<ControllerDiscovery['discover']>[0] = {}
+): Action[] {
+  const discovery = {
+    getProviders: () => [],
+    getControllers: () => [{ instance: controller }]
+  } as unknown as DiscoveryService
+  const moduleRef = {
+    get: (ref: new () => unknown) => new ref(),
+    create: (ref: new () => unknown) => new ref()
+  } as unknown as ModuleRef
+  const cd = new ControllerDiscovery(
+    discovery,
+    new MetadataScanner(),
+    new Reflector(),
+    moduleRef,
+    new ApplicationConfig()
+  )
   return cd.discover(options)
 }
 
@@ -76,19 +120,25 @@ describe('ControllerDiscovery (integration)', () => {
     expect(result).toEqual({ sent: true, sessionId: 'session-a', text: 'hi' })
   })
 
-  it('denies a key trying to reach another key\'s session (the acceptance scenario)', async () => {
+  it("denies a key trying to reach another key's session (the acceptance scenario)", async () => {
     const [action] = discover()
-    await expect(action.run({ sessionId: 'session-b', text: 'hi' }, mcpContext('key-a'))).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(action.run({ sessionId: 'session-b', text: 'hi' }, mcpContext('key-a'))).rejects.toBeInstanceOf(
+      ForbiddenException
+    )
   })
 
   it('denies an unknown api key', async () => {
     const [action] = discover()
-    await expect(action.run({ sessionId: 'session-a', text: 'hi' }, mcpContext('bogus'))).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(action.run({ sessionId: 'session-a', text: 'hi' }, mcpContext('bogus'))).rejects.toBeInstanceOf(
+      ForbiddenException
+    )
   })
 
   it('fails closed when the call carries no request at all (no header => denied)', async () => {
     const [action] = discover()
-    await expect(action.run({ sessionId: 'session-a', text: 'hi' }, mcpContext(null))).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(action.run({ sessionId: 'session-a', text: 'hi' }, mcpContext(null))).rejects.toBeInstanceOf(
+      ForbiddenException
+    )
   })
 })
 
@@ -96,19 +146,27 @@ describe('ControllerDiscovery (integration)', () => {
 class ThingsController {
   @Get()
   @Mcp()
-  list(): unknown[] { return [] }
+  list(): unknown[] {
+    return []
+  }
 
   @Put(':id')
   @Mcp()
-  replace(@Param('id') id: string): { id: string } { return { id } }
+  replace(@Param('id') id: string): { id: string } {
+    return { id }
+  }
 
   @Delete(':id')
   @Mcp()
-  remove(@Param('id') id: string): { id: string } { return { id } }
+  remove(@Param('id') id: string): { id: string } {
+    return { id }
+  }
 
   @Post('archive')
   @Mcp({ annotations: { destructiveHint: true } })
-  archive(): object { return {} }
+  archive(): object {
+    return {}
+  }
 }
 
 describe('ControllerDiscovery annotations', () => {
@@ -126,7 +184,11 @@ describe('ControllerDiscovery annotations', () => {
 
   it('derives destructive + idempotent from @Delete', () => {
     const actions = discoverController(new ThingsController())
-    expect(byName(actions, 'Things.remove').annotations).toEqual({ readOnlyHint: false, destructiveHint: true, idempotentHint: true })
+    expect(byName(actions, 'Things.remove').annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true
+    })
   })
 
   it('merges explicit @Mcp({ annotations }) over the verb-derived defaults', () => {
@@ -141,7 +203,9 @@ const userShape = { id: z.string(), label: z.string() }
 class StructuredController {
   @Get(':id')
   @Mcp({ result: 'structured', output: userShape })
-  get(@Param('id') id: string): { id: string; label: string } { return { id, label: 'Ada' } }
+  get(@Param('id') id: string): { id: string; label: string } {
+    return { id, label: 'Ada' }
+  }
 }
 
 @Controller('users')
@@ -149,14 +213,18 @@ class StructuredViaTrpcController {
   @Get(':id')
   @Mcp({ result: 'structured' })
   @Trpc({ output: userShape })
-  get(@Param('id') id: string): { id: string; label: string } { return { id, label: 'Ada' } }
+  get(@Param('id') id: string): { id: string; label: string } {
+    return { id, label: 'Ada' }
+  }
 }
 
 @Controller('users')
 class StructuredWithoutOutputController {
   @Get(':id')
   @Mcp({ result: 'structured' })
-  get(@Param('id') id: string): { id: string } { return { id } }
+  get(@Param('id') id: string): { id: string } {
+    return { id }
+  }
 }
 
 describe('ControllerDiscovery structured output', () => {
@@ -175,8 +243,9 @@ describe('ControllerDiscovery structured output', () => {
   })
 
   it('boot-errors on result: structured without an explicit output schema', () => {
-    expect(() => discoverController(new StructuredWithoutOutputController()))
-      .toThrow(/requires an explicit output schema/)
+    expect(() => discoverController(new StructuredWithoutOutputController())).toThrow(
+      /requires an explicit output schema/
+    )
   })
 })
 
@@ -185,21 +254,31 @@ class ReportsController {
   @Get()
   @Mcp()
   @Trpc()
-  list(): { rows: number } { return { rows: 3 } }
+  list(): { rows: number } {
+    return { rows: 3 }
+  }
 
   @Post('explode')
   @Trpc()
-  explode(): never { throw new ForbiddenException('no access') }
+  explode(): never {
+    throw new ForbiddenException('no access')
+  }
 
   @Post('echo')
   @Trpc()
-  echo(@Body('day') day: string): { day: string } { return { day } }
+  echo(@Body('day') day: string): { day: string } {
+    return { day }
+  }
 }
 
 describe('ControllerDiscovery telemetry (trpc wrapper)', () => {
   const setup = () => {
     const events: ToolCallEvent[] = []
-    const actions = discoverController(new ReportsController(), { onToolCall: (event) => { events.push(event) } })
+    const actions = discoverController(new ReportsController(), {
+      onToolCall: (event) => {
+        events.push(event)
+      }
+    })
     return { events, actions }
   }
   const trpcCtx = () => createContext({ adapter: 'trpc' })
@@ -217,7 +296,12 @@ describe('ControllerDiscovery telemetry (trpc wrapper)', () => {
     const { events, actions } = setup()
     const explode = actions.find((a) => a.name === 'Reports.explode')!
     await expect(explode.run({}, trpcCtx())).rejects.toThrow('no access')
-    expect(events[0]).toMatchObject({ ok: false, transport: 'trpc', errorCode: 'http_error', errorMessage: 'no access' })
+    expect(events[0]).toMatchObject({
+      ok: false,
+      transport: 'trpc',
+      errorCode: 'http_error',
+      errorMessage: 'no access'
+    })
   })
 
   it('carries the validated procedure input as args on success and error events', async () => {
@@ -250,26 +334,37 @@ class ExportsController {
   @Get('chart')
   @Mcp({ resource: { mimeType: 'image/png', name: 'chart.png', description: 'Rendered chart' } })
   @Trpc({ resource: { mimeType: 'image/png' } })
-  chart(): Uint8Array { return new Uint8Array([1, 2, 3]) }
+  chart(): Uint8Array {
+    return new Uint8Array([1, 2, 3])
+  }
 
   @Get('report')
   @Header('Content-Type', 'application/pdf')
   @Mcp()
-  report(): Uint8Array { return new Uint8Array([4]) }
+  report(): Uint8Array {
+    return new Uint8Array([4])
+  }
 
   @Get('data')
   @Header('Content-Type', 'application/json')
   @Mcp()
-  data(): { ok: boolean } { return { ok: true } }
+  data(): { ok: boolean } {
+    return { ok: true }
+  }
 
   @Get('stream')
   @Mcp({ resource: { mimeType: 'image/png' } })
-  stream(): StreamableFile { return new StreamableFile(Buffer.from([9, 8])) }
+  stream(): StreamableFile {
+    return new StreamableFile(Buffer.from([9, 8]))
+  }
 
   @Get('streamTyped')
   @Mcp()
   streamTyped(): StreamableFile {
-    return new StreamableFile(Buffer.from([7]), { type: 'application/pdf', disposition: 'attachment; filename="doc.pdf"' })
+    return new StreamableFile(Buffer.from([7]), {
+      type: 'application/pdf',
+      disposition: 'attachment; filename="doc.pdf"'
+    })
   }
 }
 
@@ -280,7 +375,11 @@ describe('ControllerDiscovery resource routes', () => {
   it('@Mcp({ resource }) yields a binary() output carrying the declared metadata', () => {
     const action = byName(actions(), 'Exports.chart')
     expect(isBinarySchema(action.output)).toBe(true)
-    expect(binarySchemaMeta(action.output)).toEqual({ mimeType: 'image/png', name: 'chart.png', description: 'Rendered chart' })
+    expect(binarySchemaMeta(action.output)).toEqual({
+      mimeType: 'image/png',
+      name: 'chart.png',
+      description: 'Rendered chart'
+    })
   })
 
   it('@Trpc({ resource }) also yields a binary() output on the trpc action', () => {
@@ -323,7 +422,9 @@ describe('ControllerDiscovery resource routes', () => {
     class BadController {
       @Get()
       @Mcp({ result: 'structured', resource: { mimeType: 'image/png' }, output: { x: z.string() } })
-      broken(): Uint8Array { return new Uint8Array(0) }
+      broken(): Uint8Array {
+        return new Uint8Array(0)
+      }
     }
     expect(() => discoverController(new BadController())).toThrow(/resource route/)
   })
@@ -333,7 +434,9 @@ describe('ControllerDiscovery resource routes', () => {
     class BadStreamController {
       @Get()
       @Mcp({ resource: { mimeType: 'image/png' } })
-      async *broken(): AsyncGenerator<number> { yield 1 }
+      async *broken(): AsyncGenerator<number> {
+        yield 1
+      }
     }
     expect(() => discoverController(new BadStreamController())).toThrow(/streaming/)
   })

@@ -13,11 +13,10 @@ const HelloAction = createAction({
 })
 
 await silkweave({ name: 'team-skills', description: 'Silkweave skills-over-MCP example (stdio)', version: '1.0.0' })
-  .adapter(stdio({
-    skills: [
-      defineSkill({ dir: skillDir('commit-message') }),
-      defineSkill({ dir: skillDir('release-checklist') })
-    ]
-  }))
+  .adapter(
+    stdio({
+      skills: [defineSkill({ dir: skillDir('commit-message') }), defineSkill({ dir: skillDir('release-checklist') })]
+    })
+  )
   .action(HelloAction)
   .start()

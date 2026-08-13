@@ -4,20 +4,30 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { buildValidationErrorEmitter, type TrpcErrorEvent } from './validationTelemetry.js'
 
-const actions = [{
-  name: 'Reports.echo',
-  description: 'echo',
-  input: z.object({ day: z.string() }),
-  run: async (input: object) => input
-} as Action]
+const actions = [
+  {
+    name: 'Reports.echo',
+    description: 'echo',
+    input: z.object({ day: z.string() }),
+    run: async (input: object) => input
+  } as Action
+]
 
 function collect() {
   const events: ToolCallEvent[] = []
-  return { events, onToolCall: (event: ToolCallEvent) => { events.push(event) } }
+  return {
+    events,
+    onToolCall: (event: ToolCallEvent) => {
+      events.push(event)
+    }
+  }
 }
 
 /** emitToolCall defers the hook through a resolved promise - flush it. */
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 0) })
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
 
 function zodValidationError(): TRPCError {
   const parsed = z.object({ day: z.string() }).safeParse({ day: 42 })
@@ -54,14 +64,20 @@ describe('buildValidationErrorEmitter', () => {
   it('prefers the per-request context when tRPC supplies one', async () => {
     const { events, onToolCall } = collect()
     const requestContext = createContext({ adapter: 'trpc' })
-    buildValidationErrorEmitter(actions, createContext(), onToolCall)!(errorEvent({ ctx: { silkweaveContext: requestContext } }))
+    buildValidationErrorEmitter(actions, createContext(), onToolCall)!(
+      errorEvent({ ctx: { silkweaveContext: requestContext } })
+    )
     await flush()
     expect(events[0].context).toBe(requestContext)
   })
 
   it('ignores resolver errors (SilkweaveError cause) - the action wrapper already emitted those', async () => {
     const { events, onToolCall } = collect()
-    const resolverError = new TRPCError({ code: 'FORBIDDEN', message: 'no access', cause: new SilkweaveError('no access', 'http_error', 403) })
+    const resolverError = new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'no access',
+      cause: new SilkweaveError('no access', 'http_error', 403)
+    })
     buildValidationErrorEmitter(actions, createContext(), onToolCall)!(errorEvent({ error: resolverError }))
     await flush()
     expect(events).toHaveLength(0)

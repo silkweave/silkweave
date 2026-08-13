@@ -3,7 +3,13 @@ import { Adapter, AdapterGenerator, SilkweaveOptions } from '@silkweave/core'
 import { createHTTPHandler } from '@trpc/server/adapters/standalone'
 import { IncomingMessage, ServerResponse } from 'http'
 import { buildRouter, TrpcHandlerContext } from '../lib/buildRouter.js'
-import { authResponseMeta, createActionLogger, resolveIdentity, throwAuthError, type Authenticate } from '../lib/createContext.js'
+import {
+  authResponseMeta,
+  createActionLogger,
+  resolveIdentity,
+  throwAuthError,
+  type Authenticate
+} from '../lib/createContext.js'
 
 export interface TrpcNodeAdapterOptions {
   /**
@@ -67,14 +73,19 @@ export function trpcNode(options: TrpcNodeAdapterOptions = {}): TrpcNodeAdapter 
 
   let resolveReady!: () => void
   let rejectReady!: (error: unknown) => void
-  const ready = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
+  const ready = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve
+    rejectReady = reject
+  })
 
   let handler: NodeHandler | undefined
 
   // A boot failure rejects `ready` before any request has attached a handler,
   // which Node reports as an unhandled rejection. The real surfacing happens in
   // start() (which rethrows) and per-request below.
-  ready.catch(() => { /* surfaced via start() / per-request dispatch */ })
+  ready.catch(() => {
+    /* surfaced via start() / per-request dispatch */
+  })
 
   const adapter: AdapterGenerator = (_silkweaveOptions: SilkweaveOptions, baseContext): Adapter => {
     const context = baseContext.fork({ adapter: 'trpc' })
@@ -92,9 +103,10 @@ export function trpcNode(options: TrpcNodeAdapterOptions = {}): TrpcNodeAdapter 
         }
         const logger = createActionLogger()
 
-        const createContext = async (
-          opts: { req: IncomingMessage; res: ServerResponse }
-        ): Promise<TrpcHandlerContext> => {
+        const createContext = async (opts: {
+          req: IncomingMessage
+          res: ServerResponse
+        }): Promise<TrpcHandlerContext> => {
           const resolved = await resolveIdentity(
             options.authenticate,
             options.auth,
@@ -121,13 +133,17 @@ export function trpcNode(options: TrpcNodeAdapterOptions = {}): TrpcNodeAdapter 
         handler = createHTTPHandler({ router, basePath: endpoint, createContext, responseMeta: authResponseMeta })
         resolveReady()
       },
-      stop: async () => { /* no-op - the host owns the server */ }
+      stop: async () => {
+        /* no-op - the host owns the server */
+      }
     }
   }
 
   const dispatch: NodeHandler = (req, res) => {
     ready.then(
-      () => { handler!(req, res) },
+      () => {
+        handler!(req, res)
+      },
       () => {
         res.statusCode = 503
         res.setHeader('Content-Type', 'application/json')

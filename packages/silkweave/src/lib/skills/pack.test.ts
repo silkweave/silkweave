@@ -18,12 +18,15 @@ let root: string
 let skillDir: string
 
 /** A registry stub: 404 (unpublished), a published 1.0.0, or a network failure. */
-const registry = (versions?: string[]) => (async () => {
-  if (!versions) { throw new TypeError('fetch failed') }
-  return versions.length
-    ? new Response(JSON.stringify({ versions: Object.fromEntries(versions.map((v) => [v, {}])) }))
-    : new Response('{}', { status: 404 })
-}) as unknown as typeof fetch
+const registry = (versions?: string[]) =>
+  (async () => {
+    if (!versions) {
+      throw new TypeError('fetch failed')
+    }
+    return versions.length
+      ? new Response(JSON.stringify({ versions: Object.fromEntries(versions.map((v) => [v, {}])) }))
+      : new Response('{}', { status: 404 })
+  }) as unknown as typeof fetch
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'silkweave-pack-'))
@@ -43,8 +46,15 @@ describe('packSkill', () => {
 
     const packageJson = JSON.parse(await readFile(join(out, 'package.json'), 'utf-8')) as Record<string, unknown>
     expect(packageJson).toMatchObject({ name: 'deploy-checklist-skill', version: '1.0.0' })
-    const pluginJson = JSON.parse(await readFile(join(out, '.claude-plugin', 'plugin.json'), 'utf-8')) as Record<string, unknown>
-    expect(pluginJson).toEqual({ name: 'deploy-checklist', version: '1.0.0', description: 'Walk the release checklist before deploying' })
+    const pluginJson = JSON.parse(await readFile(join(out, '.claude-plugin', 'plugin.json'), 'utf-8')) as Record<
+      string,
+      unknown
+    >
+    expect(pluginJson).toEqual({
+      name: 'deploy-checklist',
+      version: '1.0.0',
+      description: 'Walk the release checklist before deploying'
+    })
     expect(await readFile(join(out, 'skills', 'deploy-checklist', 'SKILL.md'), 'utf-8')).toContain('Deploy checklist')
     expect(await readFile(join(out, 'skills', 'deploy-checklist', 'references', 'steps.md'), 'utf-8')).toBe('# Steps\n')
   })
@@ -83,20 +93,25 @@ describe('packSkill', () => {
     const out = join(root, 'named')
     const result = await packSkill({ dirs: [skillDir], out, packageName: '@atomic/skill-deploy', fetch: registry([]) })
     expect(result.packageName).toBe('@atomic/skill-deploy')
-    await expect(packSkill({ dirs: [skillDir], out, packageName: 'Not Valid!', fetch: registry([]) })).rejects.toThrow(/not a valid npm package name/)
+    await expect(packSkill({ dirs: [skillDir], out, packageName: 'Not Valid!', fetch: registry([]) })).rejects.toThrow(
+      /not a valid npm package name/
+    )
   })
 
   it('packs multiple skills into one multi-skill plugin', async () => {
     const secondDir = join(root, 'greet')
     await mkdir(secondDir, { recursive: true })
-    await writeFile(join(secondDir, 'SKILL.md'), `---
+    await writeFile(
+      join(secondDir, 'SKILL.md'),
+      `---
 name: greet
 description: Greet politely
 metadata:
   version: "1.0.0"
 ---
 Body
-`)
+`
+    )
     const out = join(root, 'multi')
     // No --package: multi-skill packs cannot derive a name.
     await expect(packSkill({ dirs: [skillDir, secondDir], out, fetch: registry([]) })).rejects.toThrow(/--package/)
@@ -108,7 +123,10 @@ Body
       fetch: registry([])
     })
     expect(result).toMatchObject({ packageName: '@atomic/example-plugin', version: '1.0.0' })
-    const pluginJson = JSON.parse(await readFile(join(out, '.claude-plugin', 'plugin.json'), 'utf-8')) as Record<string, unknown>
+    const pluginJson = JSON.parse(await readFile(join(out, '.claude-plugin', 'plugin.json'), 'utf-8')) as Record<
+      string,
+      unknown
+    >
     expect(pluginJson).toEqual({
       name: 'example-plugin',
       version: '1.0.0',

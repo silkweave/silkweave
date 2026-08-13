@@ -15,7 +15,8 @@ interface ProxyOptions extends RemoteOptions {
  * via `_meta['silkweave/args']` render as positionals here too.
  */
 export function registerProxyCommand(program: Command): void {
-  program.command('proxy')
+  program
+    .command('proxy')
     .description('Expose a remote MCP server as a CLI - its tools become subcommands')
     .passThroughOptions()
     .argument('<url>', 'MCP endpoint URL, e.g. https://host:8080/mcp')

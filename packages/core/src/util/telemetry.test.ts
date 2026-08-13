@@ -20,19 +20,27 @@ describe('emitToolCall', () => {
   })
 
   it('is a no-op without a hook', () => {
-    expect(() => { emitToolCall(undefined, event()) }).not.toThrow()
+    expect(() => {
+      emitToolCall(undefined, event())
+    }).not.toThrow()
   })
 
   it('swallows and logs sync throws', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => { })
-    expect(() => { emitToolCall(() => { throw new Error('down') }, event()) }).not.toThrow()
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(() => {
+      emitToolCall(() => {
+        throw new Error('down')
+      }, event())
+    }).not.toThrow()
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
   })
 
   it('swallows and logs async rejections', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => { })
-    emitToolCall(async () => { throw new Error('down') }, event())
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    emitToolCall(async () => {
+      throw new Error('down')
+    }, event())
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()

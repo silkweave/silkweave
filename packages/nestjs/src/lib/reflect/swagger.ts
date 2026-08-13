@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { FieldDesc } from './schema.js'
 import { swaggerParamToField } from './schema.js'
 
@@ -22,16 +21,20 @@ export interface OperationMeta {
 export function reflectOperation(method: (...args: any[]) => any): OperationMeta {
   const operation = Reflect.getMetadata(API_OPERATION, method) as Record<string, any> | undefined
   const description = operation
-    ? (typeof operation['summary'] === 'string' && operation['summary']
+    ? typeof operation['summary'] === 'string' && operation['summary']
       ? operation['summary']
-      : (typeof operation['description'] === 'string' ? operation['description'] : undefined))
+      : typeof operation['description'] === 'string'
+        ? operation['description']
+        : undefined
     : undefined
 
   const parameters = (Reflect.getMetadata(API_PARAMETERS, method) as Array<Record<string, any>> | undefined) ?? []
   const params: Record<string, FieldDesc> = {}
   for (const p of parameters) {
     const name = typeof p['name'] === 'string' ? p['name'] : undefined
-    if (!name) { continue }
+    if (!name) {
+      continue
+    }
     params[name] = swaggerParamToField(p)
   }
 

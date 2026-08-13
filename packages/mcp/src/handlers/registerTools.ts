@@ -2,9 +2,31 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
-import { Action, ActionRun, binarySchemaMeta, createLogger, emitToolCall, isStreamingAction, OnToolCall, resourceBytes, runStreamingAction, SilkweaveContext, SilkweaveError, toActionResource, ToolCallEvent, type ActionResource } from '@silkweave/core'
+import {
+  Action,
+  ActionRun,
+  binarySchemaMeta,
+  createLogger,
+  emitToolCall,
+  isStreamingAction,
+  OnToolCall,
+  resourceBytes,
+  runStreamingAction,
+  SilkweaveContext,
+  SilkweaveError,
+  toActionResource,
+  ToolCallEvent,
+  type ActionResource
+} from '@silkweave/core'
 import { capitalCase, pascalCase } from 'change-case'
-import { errorToolResult, handleToolError, jsonToolResult, resourceToolResult, smartToolResult, structuredToolResult } from '../util/result.js'
+import {
+  errorToolResult,
+  handleToolError,
+  jsonToolResult,
+  resourceToolResult,
+  smartToolResult,
+  structuredToolResult
+} from '../util/result.js'
 
 type LogStream = NonNullable<Parameters<typeof createLogger>[0]>['stream']
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>
@@ -37,7 +59,9 @@ export interface RegisterToolsOptions {
  * REST. Returns `undefined` when no HTTP request info is available.
  */
 export function requestFromExtra(requestInfo: { headers?: unknown; url?: { toString(): string } } | undefined) {
-  if (!requestInfo) { return undefined }
+  if (!requestInfo) {
+    return undefined
+  }
   return { headers: requestInfo.headers ?? {}, url: requestInfo.url?.toString(), params: {}, query: {}, body: {} }
 }
 
@@ -49,7 +73,9 @@ function createToolLogger(extra: ToolExtra, stream: LogStream) {
       extra.sendNotification({ method: 'notifications/message', params: { level, data } })
     },
     onProgress: ({ progress, total, message }) => {
-      if (!extra._meta?.progressToken) { return }
+      if (!extra._meta?.progressToken) {
+        return
+      }
       extra.sendNotification({
         method: 'notifications/progress',
         params: { progress, total, message, progressToken: extra._meta.progressToken }
@@ -59,17 +85,27 @@ function createToolLogger(extra: ToolExtra, stream: LogStream) {
 }
 
 /** Run the action, streaming chunks as progress notifications when a token is set. */
-async function runAction(action: Action, input: object, context: SilkweaveContext, extra: ToolExtra): Promise<object | object[]> {
+async function runAction(
+  action: Action,
+  input: object,
+  context: SilkweaveContext,
+  extra: ToolExtra
+): Promise<object | object[]> {
   const progressToken = extra._meta?.progressToken
   if (isStreamingAction(action)) {
-    return runStreamingAction(action, input, context, progressToken
-      ? async (chunk, index) => {
-        await extra.sendNotification({
-          method: 'notifications/progress',
-          params: { progressToken, progress: index + 1, message: JSON.stringify(chunk) }
-        })
-      }
-      : undefined)
+    return runStreamingAction(
+      action,
+      input,
+      context,
+      progressToken
+        ? async (chunk, index) => {
+            await extra.sendNotification({
+              method: 'notifications/progress',
+              params: { progressToken, progress: index + 1, message: JSON.stringify(chunk) }
+            })
+          }
+        : undefined
+    )
   }
   return (action.run as ActionRun<object, object>)(input, context)
 }
@@ -87,10 +123,12 @@ function structuredResult(action: Action, result: object | object[]) {
   const parsed = action.output!.safeParse(result)
   if (!parsed.success) {
     const fields = [...new Set(parsed.error.issues.map((issue) => issue.path.join('.') || '(root)'))].join(', ')
-    return errorToolResult(new SilkweaveError(
-      `Output validation failed for '${action.name}' at: ${fields}. The tool returned a shape that does not match its declared output schema - this is a server-side bug, not an input problem; retrying with different arguments will not help.`,
-      'output_validation_error'
-    ))
+    return errorToolResult(
+      new SilkweaveError(
+        `Output validation failed for '${action.name}' at: ${fields}. The tool returned a shape that does not match its declared output schema - this is a server-side bug, not an input problem; retrying with different arguments will not help.`,
+        'output_validation_error'
+      )
+    )
   }
   // The SDK independently re-parses `structuredContent` against the same schema.
   // A non-idempotent output schema (a field-level `.transform()`) yields data
@@ -98,16 +136,22 @@ function structuredResult(action: Action, result: object | object[]) {
   // error. Detect it here and degrade to a clear isError result (SDK-exempt)
   // instead - structured contracts must be idempotent (no transforms).
   if (!action.output!.safeParse(parsed.data).success) {
-    return errorToolResult(new SilkweaveError(
-      `Output schema for '${action.name}' is not idempotent (a field-level .transform()?) and cannot back a 'structured' contract - use disposition 'json' or remove the transform.`,
-      'output_schema_not_structurable'
-    ))
+    return errorToolResult(
+      new SilkweaveError(
+        `Output schema for '${action.name}' is not idempotent (a field-level .transform()?) and cannot back a 'structured' contract - use disposition 'json' or remove the transform.`,
+        'output_schema_not_structurable'
+      )
+    )
   }
   return structuredToolResult(parsed.data as object)
 }
 
 /** MCP-only telemetry fields, computed only when a hook is registered. */
-function resultMeta(result: object | object[], formatted: { content?: { type: string }[] }, res?: ActionResource): Pick<ToolCallEvent, 'resultBytes' | 'sideloaded'> {
+function resultMeta(
+  result: object | object[],
+  formatted: { content?: { type: string }[] },
+  res?: ActionResource
+): Pick<ToolCallEvent, 'resultBytes' | 'sideloaded'> {
   return {
     // Actual UTF-8 byte count (String.length counts UTF-16 code units, which
     // understates multibyte payloads). TextEncoder keeps this edge-safe. A
@@ -121,26 +165,42 @@ function resultMeta(result: object | object[], formatted: { content?: { type: st
 
 /** Error identity for telemetry: a SilkweaveError's `code`, else the error's name. */
 function errorMeta(error: unknown): Pick<ToolCallEvent, 'errorCode' | 'errorMessage'> {
-  if (error instanceof SilkweaveError) { return { errorCode: error.code, errorMessage: error.message } }
-  if (error instanceof Error) { return { errorCode: error.name, errorMessage: error.message } }
+  if (error instanceof SilkweaveError) {
+    return { errorCode: error.code, errorMessage: error.message }
+  }
+  if (error instanceof Error) {
+    return { errorCode: error.name, errorMessage: error.message }
+  }
   return { errorCode: 'unknown' }
 }
 
 /** Format via the action's `toolResult` hook, else resource mapping, else the resolved disposition. */
-function formatToolResult(action: Action, result: object | object[], context: SilkweaveContext, disposition: unknown, res: ActionResource | undefined) {
+function formatToolResult(
+  action: Action,
+  result: object | object[],
+  context: SilkweaveContext,
+  disposition: unknown,
+  res: ActionResource | undefined
+) {
   if (action.toolResult) {
     // core's dependency-free ToolResult is structurally the SDK CallToolResult;
     // narrow it back at the SDK boundary.
     const response = action.toolResult(result, context) as CallToolResult | undefined
-    if (response) { return response }
+    if (response) {
+      return response
+    }
   }
   // A structured action's output schema is a contract fixed at tools/list
   // time - a client's `_meta.disposition` cannot demote it.
-  if (action.disposition === 'structured') { return structuredResult(action, result) }
+  if (action.disposition === 'structured') {
+    return structuredResult(action, result)
+  }
   // A resource result (resource()/File/Blob/bytes) has its own mime-driven
   // mapping; `_meta.disposition` has nothing to demote it to - json/smart
   // would stringify bytes into garbage - so it always wins over both.
-  if (res) { return resourceToolResult(res) }
+  if (res) {
+    return resourceToolResult(res)
+  }
   return disposition === 'smart' ? smartToolResult(result) : jsonToolResult(result)
 }
 
@@ -162,51 +222,66 @@ export function registerTools(
 ) {
   const stream = options.logStream ?? process.stderr
   for (const action of actions) {
-    server.registerTool(pascalCase(action.name), {
-      title: capitalCase(action.name),
-      description: action.description,
-      inputSchema: action.input,
-      // Derived base (query ⇒ read-only), explicit annotations merged over.
-      annotations: { readOnlyHint: action.kind === 'query', ...action.annotations },
-      // Only structured actions declare an outputSchema contract - the SDK
-      // enforces it server-side and SDK clients enforce it independently, so
-      // forwarding is strictly opt-in via disposition.
-      ...(action.disposition === 'structured' && action.output ? { outputSchema: action.output } : {}),
-      // Positional-argument intent for silkweave-aware CLI clients (cliProxy
-      // renders these input fields as positional arguments, in order).
-      // Spec-legal tool _meta, ignored by every other client.
-      ...(action.args?.length ? { _meta: { 'silkweave/args': action.args } } : {})
-    }, async (input, extra) => {
-      const logger = createToolLogger(extra, stream)
-      // `auth` (when present) is carried on `context` by the transport's
-      // per-request fork; this fork inherits it - no AsyncLocalStorage needed.
-      const actionContext = context.fork({
-        logger,
-        extra,
-        request: requestFromExtra(extra.requestInfo)
-      })
-      // Client-sent `_meta.disposition` wins; otherwise fall back to the
-      // action's configured default (`json` when neither is set).
-      const disposition = extra._meta?.disposition ?? action.disposition
-      // `input` is the SDK-parsed (post-zod) input - defaults applied, unknown
-      // keys stripped - so telemetry `args` matches what the action ran with.
-      const base = { action: action.name, tool: pascalCase(action.name), transport: 'mcp' as const, args: input as unknown, context: actionContext }
-      const started = Date.now()
-      try {
-        const result = await runAction(action, input, actionContext, extra)
-        const res = await toActionResource(result, binarySchemaMeta(action.output))
-        const formatted = formatToolResult(action, result, actionContext, disposition, res)
-        emitToolCall(options.onToolCall, {
-          ...base,
-          durationMs: Date.now() - started,
-          ok: formatted.isError !== true,
-          ...(options.onToolCall ? resultMeta(result, formatted, res) : {})
+    server.registerTool(
+      pascalCase(action.name),
+      {
+        title: capitalCase(action.name),
+        description: action.description,
+        inputSchema: action.input,
+        // Derived base (query ⇒ read-only), explicit annotations merged over.
+        annotations: { readOnlyHint: action.kind === 'query', ...action.annotations },
+        // Only structured actions declare an outputSchema contract - the SDK
+        // enforces it server-side and SDK clients enforce it independently, so
+        // forwarding is strictly opt-in via disposition.
+        ...(action.disposition === 'structured' && action.output ? { outputSchema: action.output } : {}),
+        // Positional-argument intent for silkweave-aware CLI clients (cliProxy
+        // renders these input fields as positional arguments, in order).
+        // Spec-legal tool _meta, ignored by every other client.
+        ...(action.args?.length ? { _meta: { 'silkweave/args': action.args } } : {})
+      },
+      async (input, extra) => {
+        const logger = createToolLogger(extra, stream)
+        // `auth` (when present) is carried on `context` by the transport's
+        // per-request fork; this fork inherits it - no AsyncLocalStorage needed.
+        const actionContext = context.fork({
+          logger,
+          extra,
+          request: requestFromExtra(extra.requestInfo)
         })
-        return formatted
-      } catch (error) {
-        emitToolCall(options.onToolCall, { ...base, durationMs: Date.now() - started, ok: false, ...errorMeta(error) })
-        return handleToolError(error)
+        // Client-sent `_meta.disposition` wins; otherwise fall back to the
+        // action's configured default (`json` when neither is set).
+        const disposition = extra._meta?.disposition ?? action.disposition
+        // `input` is the SDK-parsed (post-zod) input - defaults applied, unknown
+        // keys stripped - so telemetry `args` matches what the action ran with.
+        const base = {
+          action: action.name,
+          tool: pascalCase(action.name),
+          transport: 'mcp' as const,
+          args: input as unknown,
+          context: actionContext
+        }
+        const started = Date.now()
+        try {
+          const result = await runAction(action, input, actionContext, extra)
+          const res = await toActionResource(result, binarySchemaMeta(action.output))
+          const formatted = formatToolResult(action, result, actionContext, disposition, res)
+          emitToolCall(options.onToolCall, {
+            ...base,
+            durationMs: Date.now() - started,
+            ok: formatted.isError !== true,
+            ...(options.onToolCall ? resultMeta(result, formatted, res) : {})
+          })
+          return formatted
+        } catch (error) {
+          emitToolCall(options.onToolCall, {
+            ...base,
+            durationMs: Date.now() - started,
+            ok: false,
+            ...errorMeta(error)
+          })
+          return handleToolError(error)
+        }
       }
-    })
+    )
   }
 }

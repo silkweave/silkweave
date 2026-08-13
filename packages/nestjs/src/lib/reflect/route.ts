@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants.js'
 
 /**
@@ -28,7 +27,9 @@ export interface RouteInfo {
 }
 
 function normalizeSegment(value: unknown): string {
-  if (typeof value !== 'string') { return '' }
+  if (typeof value !== 'string') {
+    return ''
+  }
   return value.replace(/^\/+/, '').replace(/\/+$/, '')
 }
 

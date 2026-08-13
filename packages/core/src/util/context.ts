@@ -17,7 +17,9 @@ export function createContext(store: Record<string, unknown> = {}): SilkweaveCon
     },
     get: <T>(key: string): T => {
       const value = store[key]
-      if (value == null) { throw new Error(`Invalid context key: ${key}`) }
+      if (value == null) {
+        throw new Error(`Invalid context key: ${key}`)
+      }
       return value as T
     },
     getOptional: <T>(key: string): T | undefined => {

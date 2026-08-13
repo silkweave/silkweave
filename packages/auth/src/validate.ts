@@ -35,7 +35,9 @@ export interface ValidateResult {
  * header is in hand.
  */
 function challengeUrl(config: AuthConfig, resource: string | undefined): string | undefined {
-  if (typeof config.resourceUrl === 'string') { return `${config.resourceUrl}/.well-known/oauth-protected-resource` }
+  if (typeof config.resourceUrl === 'string') {
+    return `${config.resourceUrl}/.well-known/oauth-protected-resource`
+  }
   return resource ? protectedResourceMetadataUrl(resource) : undefined
 }
 
@@ -51,7 +53,9 @@ export async function validateToken(
   const token = extractBearerToken(authorizationHeader)
 
   if (!token) {
-    if (!required) { return {} }
+    if (!required) {
+      return {}
+    }
     return buildChallengeResult(resourceMetadataUrl)
   }
 
@@ -111,7 +115,9 @@ export async function validateToken(
  * a present-but-mismatched `aud` is rejected.
  */
 function audienceMatches(tokenAud: unknown, expected: string | string[]): boolean {
-  if (tokenAud === undefined || tokenAud === null) { return true }
+  if (tokenAud === undefined || tokenAud === null) {
+    return true
+  }
   const have = Array.isArray(tokenAud) ? tokenAud : [tokenAud]
   const want = Array.isArray(expected) ? expected : [expected]
   return have.some((a) => want.includes(a as string))
@@ -130,11 +136,7 @@ function buildChallengeResult(resourceMetadataUrl?: string): ValidateResult {
   }
 }
 
-function buildErrorResult(
-  err: AuthError,
-  resourceMetadataUrl?: string,
-  scope?: string
-): ValidateResult {
+function buildErrorResult(err: AuthError, resourceMetadataUrl?: string, scope?: string): ValidateResult {
   return {
     error: {
       statusCode: err.statusCode,

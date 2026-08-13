@@ -1,6 +1,10 @@
 /* WebGL silk background - runs in a Web Worker via OffscreenCanvas */
 
-let gl, canvas, uRes, uTime, animId = 0
+let gl,
+  canvas,
+  uRes,
+  uTime,
+  animId = 0
 const startTime = performance.now()
 
 const VS = `
@@ -116,7 +120,10 @@ self.onmessage = function (e) {
       break
 
     case 'pause':
-      if (animId) { cancelAnimationFrame(animId); animId = 0 }
+      if (animId) {
+        cancelAnimationFrame(animId)
+        animId = 0
+      }
       break
 
     case 'resume':

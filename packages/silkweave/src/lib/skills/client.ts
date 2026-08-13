@@ -4,7 +4,7 @@ import type { SkillManifestEntry, SkillPayload } from '@silkweave/skills'
 
 /** Parse a JSON tool result, surfacing `isError` results as legible failures. */
 async function callJsonTool<T>(client: Client, name: string, args: Record<string, unknown>): Promise<T> {
-  const result = await client.callTool({ name, arguments: args, _meta: { disposition: 'json' } }) as ToolResultContent
+  const result = (await client.callTool({ name, arguments: args, _meta: { disposition: 'json' } })) as ToolResultContent
   const text = result.content.find((block) => block.type === 'text')?.text
   if (result.isError) {
     throw new Error(text ?? `${name} failed`)

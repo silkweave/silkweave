@@ -1,8 +1,47 @@
 import type { FastifyCorsOptions } from '@fastify/cors'
-import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, PROTECTED_RESOURCE_WELL_KNOWN, resolveProtectedResourceMetadata, toResourceRequest, validateToken } from '@silkweave/auth'
-import { Action, actionMethod, ActionStreamRun, AdapterFactory, binarySchemaMeta, buildLogLevels, HttpMethod, isBinarySchema, isStreamingAction, Logger, LogLevel, methodHasBody, pathParamNames, resolveActionInput, resourceBytes, runStreamingAction, SilkweaveContext, SilkweaveError, toActionResource, validateActionRouting, type ActionResource } from '@silkweave/core'
+import {
+  AuthConfig,
+  AuthInfo,
+  generateProtectedResourceMetadata,
+  OAuthRequest,
+  OAuthResponse,
+  PROTECTED_RESOURCE_WELL_KNOWN,
+  resolveProtectedResourceMetadata,
+  toResourceRequest,
+  validateToken
+} from '@silkweave/auth'
+import {
+  Action,
+  actionMethod,
+  ActionStreamRun,
+  AdapterFactory,
+  binarySchemaMeta,
+  buildLogLevels,
+  HttpMethod,
+  isBinarySchema,
+  isStreamingAction,
+  Logger,
+  LogLevel,
+  methodHasBody,
+  pathParamNames,
+  resolveActionInput,
+  resourceBytes,
+  runStreamingAction,
+  SilkweaveContext,
+  SilkweaveError,
+  toActionResource,
+  validateActionRouting,
+  type ActionResource
+} from '@silkweave/core'
 import { once } from 'events'
-import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import {
+  FastifyBaseLogger,
+  FastifyHttpOptions,
+  fastify as fastifyInstance,
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest
+} from 'fastify'
 import { Server } from 'http'
 import z from 'zod/v4'
 
@@ -37,7 +76,9 @@ function toOAuthReq(request: FastifyRequest): OAuthRequest {
 }
 
 function sendOAuth(reply: FastifyReply, oauthRes: OAuthResponse) {
-  for (const [key, value] of Object.entries(oauthRes.headers)) { reply.header(key, value) }
+  for (const [key, value] of Object.entries(oauthRes.headers)) {
+    reply.header(key, value)
+  }
   return reply.status(oauthRes.status).send(oauthRes.body)
 }
 
@@ -47,13 +88,7 @@ function mountOAuthRoutes(instance: FastifyInstance, auth: AuthConfig): Set<stri
   // so the callback route must match the configured callbackPath, not a hardcoded one.
   const callbackPath = auth.callbackPath ?? '/auth/callback'
 
-  const paths = new Set([
-    '/.well-known/oauth-authorization-server',
-    '/authorize',
-    callbackPath,
-    '/token',
-    '/register'
-  ])
+  const paths = new Set(['/.well-known/oauth-authorization-server', '/authorize', callbackPath, '/token', '/register'])
 
   instance.get('/.well-known/oauth-authorization-server', async (_req, reply) => {
     return sendOAuth(reply, provider.metadata())
@@ -74,10 +109,17 @@ function mountOAuthRoutes(instance: FastifyInstance, auth: AuthConfig): Set<stri
   return paths
 }
 
-function mountAuthMiddleware(instance: FastifyInstance, auth: AuthConfig, oauthPaths: Set<string>, context: SilkweaveContext) {
+function mountAuthMiddleware(
+  instance: FastifyInstance,
+  auth: AuthConfig,
+  oauthPaths: Set<string>,
+  context: SilkweaveContext
+) {
   instance.decorateRequest('__silkweave_auth', undefined)
   instance.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
-    if (request.url.startsWith('/.well-known/') || oauthPaths.has(request.url.split('?')[0])) { return }
+    if (request.url.startsWith('/.well-known/') || oauthPaths.has(request.url.split('?')[0])) {
+      return
+    }
     const result = await validateToken(request.headers.authorization, auth, context.fork({ request }))
     if (result.error) {
       for (const [key, value] of Object.entries(result.error.headers)) {
@@ -86,7 +128,7 @@ function mountAuthMiddleware(instance: FastifyInstance, auth: AuthConfig, oauthP
       return reply.status(result.error.statusCode).send(result.error.body)
     }
     if (result.auth) {
-      (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth = result.auth
+      ;(request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth = result.auth
     }
   })
 }
@@ -94,9 +136,15 @@ function mountAuthMiddleware(instance: FastifyInstance, auth: AuthConfig, oauthP
 type StreamFormat = 'sse' | 'ndjson'
 
 function pickStreamFormat(acceptHeader: string | undefined): StreamFormat | null {
-  if (!acceptHeader) { return null }
-  if (acceptHeader.includes('text/event-stream')) { return 'sse' }
-  if (acceptHeader.includes('application/x-ndjson') || acceptHeader.includes('application/ndjson')) { return 'ndjson' }
+  if (!acceptHeader) {
+    return null
+  }
+  if (acceptHeader.includes('text/event-stream')) {
+    return 'sse'
+  }
+  if (acceptHeader.includes('application/x-ndjson') || acceptHeader.includes('application/ndjson')) {
+    return 'ndjson'
+  }
   return null
 }
 
@@ -132,25 +180,39 @@ async function streamAction(
   // its finally/cleanup would never run, and response/context stay pinned. Track
   // 'close' and race the drain against it so we bail and tear the generator down.
   const gone = { value: raw.destroyed || raw.writableEnded }
-  const onClose = () => { gone.value = true }
+  const onClose = () => {
+    gone.value = true
+  }
   raw.on('close', onClose)
   const closed = once(raw, 'close')
   try {
     for await (const chunk of iter) {
-      if (gone.value) { break }
+      if (gone.value) {
+        break
+      }
       if (!raw.write(encodeChunk(format, chunk))) {
         await Promise.race([once(raw, 'drain'), closed])
-        if (gone.value) { break }
+        if (gone.value) {
+          break
+        }
       }
     }
-    if (!gone.value && format === 'sse') { raw.write('event: done\ndata: {}\n\n') }
+    if (!gone.value && format === 'sse') {
+      raw.write('event: done\ndata: {}\n\n')
+    }
   } catch (error) {
-    if (!gone.value) { raw.write(encodeStreamError(format, error)) }
+    if (!gone.value) {
+      raw.write(encodeStreamError(format, error))
+    }
   } finally {
     raw.off('close', onClose)
     // Ask the generator to run its finally/cleanup (release DB handles etc).
-    await iter.return?.().catch(() => { /* generator cleanup best-effort */ })
-    if (!raw.writableEnded) { raw.end() }
+    await iter.return?.().catch(() => {
+      /* generator cleanup best-effort */
+    })
+    if (!raw.writableEnded) {
+      raw.end()
+    }
   }
 }
 
@@ -160,7 +222,9 @@ function createActionLogger(instance: FastifyInstance): Logger {
       const pinoLevel = PINO_LEVEL_MAP[level] ?? 'info'
       instance.log[pinoLevel](data)
     }),
-    progress: ({ progress, total, message }) => { instance.log.trace({ progress, total }, message) }
+    progress: ({ progress, total, message }) => {
+      instance.log.trace({ progress, total }, message)
+    }
   }
 }
 
@@ -176,7 +240,10 @@ interface ObjectSchema {
  * validation, type coercion, and default-filling then apply per source, and the
  * three are merged back into a single input by `resolveActionInput` at runtime.
  */
-function splitInputSchema(action: Action, method: HttpMethod): {
+function splitInputSchema(
+  action: Action,
+  method: HttpMethod
+): {
   params?: ObjectSchema
   querystring?: ObjectSchema
   body?: ObjectSchema
@@ -198,10 +265,14 @@ function splitInputSchema(action: Action, method: HttpMethod): {
       params.required.push(key)
     } else if (!hasBody || queryKeys.has(key)) {
       querystring.properties[key] = prop
-      if (required.has(key)) { querystring.required.push(key) }
+      if (required.has(key)) {
+        querystring.required.push(key)
+      }
     } else {
       body.properties[key] = prop
-      if (required.has(key)) { body.required.push(key) }
+      if (required.has(key)) {
+        body.required.push(key)
+      }
     }
   }
 
@@ -226,8 +297,12 @@ function headerSafe(value: string): string {
  */
 function sendResource(reply: FastifyReply, res: ActionResource) {
   reply.header('Content-Type', res.mimeType)
-  if (res.name) { reply.header('Content-Disposition', `inline; filename="${headerSafe(res.name)}"`) }
-  if (res.description) { reply.header('Content-Description', headerSafe(res.description)) }
+  if (res.name) {
+    reply.header('Content-Disposition', `inline; filename="${headerSafe(res.name)}"`)
+  }
+  if (res.description) {
+    reply.header('Content-Description', headerSafe(res.description))
+  }
   return reply.send(Buffer.from(resourceBytes(res)))
 }
 
@@ -258,7 +333,9 @@ async function registerScalarDocs(instance: FastifyInstance): Promise<void> {
   const scalar = await import('@scalar/fastify-api-reference').catch((error: unknown) => {
     const code = (error as { code?: string }).code
     if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
-      instance.log.info('@scalar/fastify-api-reference is not installed - skipping the API reference UI. Install it to enable the docs UI.')
+      instance.log.info(
+        '@scalar/fastify-api-reference is not installed - skipping the API reference UI. Install it to enable the docs UI.'
+      )
       return null
     }
     throw error
@@ -288,7 +365,13 @@ function errorHandler(instance: FastifyInstance) {
 }
 
 /** Register one action as a Fastify route (validation, streaming, resource, and JSON paths). */
-function registerActionRoute(instance: FastifyInstance, action: Action, context: SilkweaveContext, logger: Logger, hasAuth: boolean) {
+function registerActionRoute(
+  instance: FastifyInstance,
+  action: Action,
+  context: SilkweaveContext,
+  logger: Logger,
+  hasAuth: boolean
+) {
   validateActionRouting(action)
   const method = actionMethod(action)
   const url = action.path ? `/${action.path.replace(/^\//, '')}` : `/${action.name}`
@@ -305,17 +388,21 @@ function registerActionRoute(instance: FastifyInstance, action: Action, context:
       response: responseSchema(action)
     },
     handler: async (request, reply) => {
-      const authInfo = hasAuth ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth : undefined
+      const authInfo = hasAuth
+        ? (request as FastifyRequest & { __silkweave_auth?: AuthInfo }).__silkweave_auth
+        : undefined
       const actionContext = context.fork({ logger, request, ...(authInfo ? { auth: authInfo } : {}) })
       // Fastify's AJV only validates the JSON-Schema projection, which
       // cannot express Zod refinements/transforms. Parse the merged input
       // so .refine()/.email()/.transform() are enforced here as they are
       // over MCP/tRPC/CLI (a ZodError becomes a 400 via setErrorHandler).
-      const input = action.input.parse(resolveActionInput(action, {
-        params: request.params as Record<string, string | undefined>,
-        query: request.query as Record<string, unknown>,
-        body: request.body
-      }))
+      const input = action.input.parse(
+        resolveActionInput(action, {
+          params: request.params as Record<string, string | undefined>,
+          query: request.query as Record<string, unknown>,
+          body: request.body
+        })
+      )
       if (streaming) {
         const format = pickStreamFormat(request.headers.accept)
         if (format) {
@@ -324,17 +411,28 @@ function registerActionRoute(instance: FastifyInstance, action: Action, context:
         }
         return runStreamingAction(action, input, actionContext)
       }
-      const result = await (action.run as (input: object, context: SilkweaveContext) => Promise<object>)(input, actionContext)
+      const result = await (action.run as (input: object, context: SilkweaveContext) => Promise<object>)(
+        input,
+        actionContext
+      )
       // A resource result (resource()/File/Blob/bytes) leaves as raw
       // bytes with mime headers instead of JSON.
       const res = await toActionResource(result, binarySchemaMeta(action.output))
-      if (res) { return sendResource(reply, res) }
+      if (res) {
+        return sendResource(reply, res)
+      }
       return result
     }
   })
 }
 
-export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, auth, cors: corsConfig, ...fastifyOptions }) => {
+export const fastify: AdapterFactory<FastifyAdapterOptions> = ({
+  host,
+  port,
+  auth,
+  cors: corsConfig,
+  ...fastifyOptions
+}) => {
   const instance = fastifyInstance(fastifyOptions)
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'fastify' })
@@ -358,7 +456,11 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
         await registerScalarDocs(instance)
 
         if (auth?.authorizationServers?.length && typeof auth.resourceUrl === 'string') {
-          const metadata = generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers, auth.requiredScopes)
+          const metadata = generateProtectedResourceMetadata(
+            auth.resourceUrl,
+            auth.authorizationServers,
+            auth.requiredScopes
+          )
           instance.get(PROTECTED_RESOURCE_WELL_KNOWN, () => metadata)
         } else if (auth?.authorizationServers?.length && typeof auth.resourceUrl === 'function') {
           // A resolver serves a family of insertion-form documents, one per
@@ -390,7 +492,9 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
         }
         await instance.listen({ host, port })
       },
-      stop: async () => { await instance.close() }
+      stop: async () => {
+        await instance.close()
+      }
     }
   }
 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants.js'
 
 /**
@@ -42,15 +41,20 @@ export interface ParamSlot {
  */
 export function readParamSlots(classRef: any, methodName: string, proto: any): ParamSlot[] {
   const raw = Reflect.getMetadata(ROUTE_ARGS_METADATA, classRef, methodName) as
-    Record<string, { index: number; data?: unknown; pipes?: unknown[] }> | undefined
-  if (!raw) { return [] }
+    | Record<string, { index: number; data?: unknown; pipes?: unknown[] }>
+    | undefined
+  if (!raw) {
+    return []
+  }
   const designTypes = (Reflect.getMetadata('design:paramtypes', proto, methodName) as unknown[] | undefined) ?? []
 
   const slots: ParamSlot[] = []
   for (const key of Object.keys(raw)) {
     const entry = raw[key]
     const paramtype = Number(key.split(':')[0])
-    if (Number.isNaN(paramtype)) { continue }
+    if (Number.isNaN(paramtype)) {
+      continue
+    }
     slots.push({
       paramtype,
       index: entry.index,

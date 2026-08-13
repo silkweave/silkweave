@@ -56,8 +56,12 @@ export function skillEntry(skill: Skill): SkillEntryWire {
  */
 export async function aggregateDigest(files: { path: string; digest: string }[]): Promise<string> {
   const sorted = [...files].sort((a, b) => {
-    if (a.path === 'SKILL.md') { return -1 }
-    if (b.path === 'SKILL.md') { return 1 }
+    if (a.path === 'SKILL.md') {
+      return -1
+    }
+    if (b.path === 'SKILL.md') {
+      return 1
+    }
     return a.path.localeCompare(b.path)
   })
   return sha256(sorted.map((file) => `${file.path} ${file.digest}`).join('\n'))

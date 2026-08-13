@@ -8,7 +8,10 @@ export interface SideloadResource {
   size: number
 }
 
-export async function createSideloadResource(buffer: Buffer, { name, contentType }: Pick<SideloadResource, 'name' | 'contentType'>) {
+export async function createSideloadResource(
+  buffer: Buffer,
+  { name, contentType }: Pick<SideloadResource, 'name' | 'contentType'>
+) {
   const id = randomUUID()
   const resource: SideloadResource = { id, name, contentType, size: buffer.length }
   await Promise.all([

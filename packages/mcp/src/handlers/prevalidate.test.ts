@@ -15,7 +15,12 @@ function action(overrides: Partial<Action> = {}): Action {
 
 function collect() {
   const events: ToolCallEvent[] = []
-  return { events, onToolCall: (event: ToolCallEvent) => { events.push(event) } }
+  return {
+    events,
+    onToolCall: (event: ToolCallEvent) => {
+      events.push(event)
+    }
+  }
 }
 
 function toolCall(name: string, args: unknown): object {
@@ -23,7 +28,10 @@ function toolCall(name: string, args: unknown): object {
 }
 
 /** emitToolCall defers the hook through a resolved promise - flush it. */
-const flush = () => new Promise((resolve) => { setTimeout(resolve, 0) })
+const flush = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
 
 describe('emitInvalidArguments', () => {
   it('emits an INVALID_ARGUMENTS event with the raw offered input', async () => {
@@ -51,7 +59,9 @@ describe('emitInvalidArguments', () => {
     const { events, onToolCall } = collect()
     await emitInvalidArguments(
       { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'HelloWorld' } },
-      [action()], createContext(), onToolCall
+      [action()],
+      createContext(),
+      onToolCall
     )
     await flush()
     expect(events).toHaveLength(1)
@@ -88,18 +98,33 @@ describe('emitInvalidArguments', () => {
 
   it('is a no-op without a hook', async () => {
     const throwing = action({
-      input: new Proxy({}, { get: () => { throw new Error('should not be touched') } }) as unknown as Action['input']
+      input: new Proxy(
+        {},
+        {
+          get: () => {
+            throw new Error('should not be touched')
+          }
+        }
+      ) as unknown as Action['input']
     })
-    await expect(emitInvalidArguments(toolCall('HelloWorld', {}), [throwing], createContext(), undefined)).resolves.toBeUndefined()
+    await expect(
+      emitInvalidArguments(toolCall('HelloWorld', {}), [throwing], createContext(), undefined)
+    ).resolves.toBeUndefined()
   })
 
   it('swallows unexpected internal errors - telemetry can never fail the call path', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { events, onToolCall } = collect()
     const broken = action({
-      input: { safeParseAsync: () => { throw new Error('boom') } } as unknown as Action['input']
+      input: {
+        safeParseAsync: () => {
+          throw new Error('boom')
+        }
+      } as unknown as Action['input']
     })
-    await expect(emitInvalidArguments(toolCall('HelloWorld', {}), [broken], createContext(), onToolCall)).resolves.toBeUndefined()
+    await expect(
+      emitInvalidArguments(toolCall('HelloWorld', {}), [broken], createContext(), onToolCall)
+    ).resolves.toBeUndefined()
     expect(events).toHaveLength(0)
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()

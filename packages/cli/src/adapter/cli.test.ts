@@ -10,7 +10,9 @@ import { cli } from './cli.js'
  */
 async function runCommand(base: Action, argv: string[]): Promise<object> {
   let resolveInput!: (input: object) => void
-  const received = new Promise<object>((resolve) => { resolveInput = resolve })
+  const received = new Promise<object>((resolve) => {
+    resolveInput = resolve
+  })
   const wrapped = {
     ...base,
     run: async (input: object) => {
@@ -41,24 +43,33 @@ function action(overrides: Partial<Action>): Action {
 
 describe('cli option key mapping', () => {
   it('maps kebab-case flags back to snake_case input keys', async () => {
-    const input = await runCommand(action({
-      input: z.object({ action_id: z.string(), dry_run: z.boolean().optional() })
-    }), ['do-thing', '--action-id', 'abc', '--dry-run'])
+    const input = await runCommand(
+      action({
+        input: z.object({ action_id: z.string(), dry_run: z.boolean().optional() })
+      }),
+      ['do-thing', '--action-id', 'abc', '--dry-run']
+    )
     expect(input).toEqual({ action_id: 'abc', dry_run: true })
   })
 
   it('maps kebab-case flags back to camelCase input keys', async () => {
-    const input = await runCommand(action({
-      input: z.object({ spaceId: z.string(), limit: z.number().optional() })
-    }), ['do-thing', '--space-id', 's1', '--limit', '5'])
+    const input = await runCommand(
+      action({
+        input: z.object({ spaceId: z.string(), limit: z.number().optional() })
+      }),
+      ['do-thing', '--space-id', 's1', '--limit', '5']
+    )
     expect(input).toEqual({ spaceId: 's1', limit: 5 })
   })
 
   it('still binds positional arguments declared via action.args', async () => {
-    const input = await runCommand(action({
-      input: z.object({ name: z.string(), loud: z.boolean().optional() }),
-      args: ['name']
-    }), ['do-thing', 'world', '--loud'])
+    const input = await runCommand(
+      action({
+        input: z.object({ name: z.string(), loud: z.boolean().optional() }),
+        args: ['name']
+      }),
+      ['do-thing', 'world', '--loud']
+    )
     expect(input).toEqual({ name: 'world', loud: true })
   })
 })
@@ -68,9 +79,12 @@ describe('cli union options', () => {
   // takes down every command including --help. This is the regression guard
   // that needs no invocation at all.
   it('builds the command table for an action with a union input', async () => {
-    const input = await runCommand(action({
-      input: z.object({ cost: z.union([z.number(), z.array(z.number())]).optional() })
-    }), ['do-thing'])
+    const input = await runCommand(
+      action({
+        input: z.object({ cost: z.union([z.number(), z.array(z.number())]).optional() })
+      }),
+      ['do-thing']
+    )
     expect(input).toEqual({})
   })
 
@@ -81,29 +95,43 @@ describe('cli union options', () => {
   })
 
   it('keeps a non-JSON string arm intact instead of throwing on it', async () => {
-    const input = await runCommand(action({
-      input: z.object({ tag: z.union([z.string(), z.array(z.string())]).optional() })
-    }), ['do-thing', '--tag', 'alpha'])
+    const input = await runCommand(
+      action({
+        input: z.object({ tag: z.union([z.string(), z.array(z.string())]).optional() })
+      }),
+      ['do-thing', '--tag', 'alpha']
+    )
     expect(input).toEqual({ tag: 'alpha' })
   })
 
   it('does not coerce a union of string literals', async () => {
-    const input = await runCommand(action({
-      input: z.object({ mode: z.union([z.literal('1'), z.literal('2')]).optional() })
-    }), ['do-thing', '--mode', '1'])
+    const input = await runCommand(
+      action({
+        input: z.object({ mode: z.union([z.literal('1'), z.literal('2')]).optional() })
+      }),
+      ['do-thing', '--mode', '1']
+    )
     expect(input).toEqual({ mode: '1' })
   })
 
   it('parses a union of non-string literals back off the string', async () => {
-    const input = await runCommand(action({
-      input: z.object({ level: z.union([z.literal(1), z.literal(2)]).optional() })
-    }), ['do-thing', '--level', '2'])
+    const input = await runCommand(
+      action({
+        input: z.object({ level: z.union([z.literal(1), z.literal(2)]).optional() })
+      }),
+      ['do-thing', '--level', '2']
+    )
     expect(input).toEqual({ level: 2 })
   })
 
   it('names the offending field when a type is unsupported', async () => {
-    await expect(runCommand(action({
-      input: z.object({ when: z.date() })
-    }), ['do-thing'])).rejects.toThrow('option "when": unsupported zod type date')
+    await expect(
+      runCommand(
+        action({
+          input: z.object({ when: z.date() })
+        }),
+        ['do-thing']
+      )
+    ).rejects.toThrow('option "when": unsupported zod type date')
   })
 })

@@ -13,7 +13,9 @@ export const MCP_REQUIRED_HEADERS = ['WWW-Authenticate', 'Last-Event-Id', 'Mcp-P
  * a `CorsOptions` object to override.
  */
 export function mcpCors(corsConfig: CorsOptions | boolean = true): RequestHandler | null {
-  if (corsConfig === false) { return null }
+  if (corsConfig === false) {
+    return null
+  }
   const userConfig = corsConfig === true ? {} : corsConfig
   const userExposed = userConfig.exposedHeaders
   const exposedHeaders = [

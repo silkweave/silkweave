@@ -12,8 +12,7 @@ export async function GET(context: APIContext) {
 
   return rss({
     title: 'Silkweave Blog',
-    description:
-      'Design notes and deep dives on building MCP servers, adapters, and AI tooling with Silkweave.',
+    description: 'Design notes and deep dives on building MCP servers, adapters, and AI tooling with Silkweave.',
     site: context.site ?? 'https://www.silkweave.dev',
     items: posts.map((post) => ({
       title: post.data.title,

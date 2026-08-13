@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from 'zod/v4'
 
 // Emits TypeScript type expressions as plain strings - no dependency on the
@@ -86,7 +85,14 @@ const typeHandlers: Record<string, TypeHandler> = {
  */
 export function serializedResourceType(level = 0): string {
   const p = pad(level + 1)
-  const members = ['kind: \'resource\'', 'mimeType: string', 'name?: string', 'description?: string', 'text?: string', 'base64?: string']
+  const members = [
+    "kind: 'resource'",
+    'mimeType: string',
+    'name?: string',
+    'description?: string',
+    'text?: string',
+    'base64?: string'
+  ]
   return `{\n${members.map((member) => `${p}${member}`).join('\n')}\n${pad(level)}}`
 }
 
@@ -121,19 +127,27 @@ function objectMemberLines(def: any, level: number): string[] {
 function needsParensAsElement(schema: z.ZodTypeAny): boolean {
   const def = (schema as any)._zod.def
   switch (def.type) {
-    case 'union': return (def.options as unknown[]).length > 1
+    case 'union':
+      return (def.options as unknown[]).length > 1
     case 'intersection':
     case 'optional':
-    case 'nullable': return true
-    case 'literal': return (def.values as unknown[]).length > 1
-    case 'enum': return Object.keys(def.entries).length > 1
+    case 'nullable':
+      return true
+    case 'literal':
+      return (def.values as unknown[]).length > 1
+    case 'enum':
+      return Object.keys(def.entries).length > 1
     case 'default':
     case 'prefault':
     case 'catch':
-    case 'readonly': return needsParensAsElement(def.innerType)
-    case 'pipe': return needsParensAsElement(def.out)
-    case 'lazy': return needsParensAsElement(def.getter())
-    default: return false
+    case 'readonly':
+      return needsParensAsElement(def.innerType)
+    case 'pipe':
+      return needsParensAsElement(def.out)
+    case 'lazy':
+      return needsParensAsElement(def.getter())
+    default:
+      return false
   }
 }
 
@@ -146,7 +160,7 @@ function identifierOrString(name: string): string {
 function literalToTs(value: unknown): string {
   switch (typeof value) {
     case 'string':
-      return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`
+      return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`
     case 'number':
     case 'boolean':
       return String(value)

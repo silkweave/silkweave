@@ -53,8 +53,8 @@
     }
 
     window.addEventListener('resize', () => {
-      const { width, height } = getDimensions()
-      worker.postMessage({ type: 'resize', width, height })
+      const { width: nextWidth, height: nextHeight } = getDimensions()
+      worker.postMessage({ type: 'resize', width: nextWidth, height: nextHeight })
     })
 
     new IntersectionObserver(([entry]) => {

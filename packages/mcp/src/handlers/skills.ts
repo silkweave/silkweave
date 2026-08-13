@@ -70,10 +70,16 @@ export interface SkillsMarketplaceOptions {
   registry?: string
 }
 
-export async function prepareSkills(entries?: (Skill | SkillDefinition)[], options: PrepareSkillsOptions = {}): Promise<SkillServing | undefined> {
+export async function prepareSkills(
+  entries?: (Skill | SkillDefinition)[],
+  options: PrepareSkillsOptions = {}
+): Promise<SkillServing | undefined> {
   if (!entries?.length) {
     if (options.marketplace) {
-      throw new SilkweaveError('skillsMarketplace requires the `skills` option - there is nothing to list', 'invalid_skill')
+      throw new SilkweaveError(
+        'skillsMarketplace requires the `skills` option - there is nothing to list',
+        'invalid_skill'
+      )
     }
     return undefined
   }
@@ -100,7 +106,9 @@ export async function prepareSkills(entries?: (Skill | SkillDefinition)[], optio
     ...(marketplace ? { marketplace } : {}),
     register: (server) => {
       mcpModule.registerSkillResources(server, skills)
-      if (options.extension) { mcpModule.registerSkillExtension(server, skills) }
+      if (options.extension) {
+        mcpModule.registerSkillExtension(server, skills)
+      }
     },
     visible: (active) => actions.every((action) => active.includes(action))
   }

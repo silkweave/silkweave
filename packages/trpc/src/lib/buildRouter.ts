@@ -1,5 +1,13 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
-import { Action, ActionRun, ActionStreamRun, binarySchemaMeta, isStreamingAction, serializeResource, SilkweaveContext, toActionResource } from '@silkweave/core'
+import {
+  Action,
+  ActionRun,
+  ActionStreamRun,
+  binarySchemaMeta,
+  isStreamingAction,
+  serializeResource,
+  SilkweaveContext,
+  toActionResource
+} from '@silkweave/core'
 import { initTRPC } from '@trpc/server'
 import { camelCase } from 'change-case'
 import { mapError } from './errors.js'
@@ -11,10 +19,20 @@ export interface TrpcHandlerContext {
 /** A streaming action becomes a `.subscription()` yielding its chunks directly. */
 function subscriptionProcedure(base: any, action: Action) {
   const streamRun = action.run as ActionStreamRun<object, unknown>
-  return base.subscription(async function* ({ input, ctx, signal }: { input: unknown; ctx: TrpcHandlerContext; signal?: AbortSignal }) {
+  return base.subscription(async function* ({
+    input,
+    ctx,
+    signal
+  }: {
+    input: unknown
+    ctx: TrpcHandlerContext
+    signal?: AbortSignal
+  }) {
     try {
       for await (const chunk of streamRun(input as object, ctx.silkweaveContext)) {
-        if (signal?.aborted) { return }
+        if (signal?.aborted) {
+          return
+        }
         yield chunk
       }
     } catch (error) {

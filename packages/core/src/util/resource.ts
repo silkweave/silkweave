@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import z from 'zod/v4'
 
 // Symbol.for (not a private Symbol) so two copies of @silkweave/core in one
@@ -67,10 +66,12 @@ export function isActionResource(value: unknown): value is ActionResource {
 
 /** Synchronous "could this result be a resource?" check (no Blob reads). */
 export function isResourceLike(value: unknown): value is ResourceLike {
-  return isActionResource(value)
-    || value instanceof Uint8Array
-    || value instanceof ArrayBuffer
-    || (typeof Blob !== 'undefined' && value instanceof Blob)
+  return (
+    isActionResource(value) ||
+    value instanceof Uint8Array ||
+    value instanceof ArrayBuffer ||
+    (typeof Blob !== 'undefined' && value instanceof Blob)
+  )
 }
 
 /**
@@ -86,7 +87,9 @@ export async function toActionResource(
   value: unknown,
   defaults: BinarySchemaMeta = {}
 ): Promise<ActionResource | undefined> {
-  if (isActionResource(value)) { return value }
+  if (isActionResource(value)) {
+    return value
+  }
   if (typeof Blob !== 'undefined' && value instanceof Blob) {
     const name = (typeof (value as File).name === 'string' ? (value as File).name : undefined) ?? defaults.name
     return resource(await value.arrayBuffer(), {
@@ -112,12 +115,14 @@ export async function toActionResource(
  */
 export function isTextMimeType(mimeType: string): boolean {
   const type = mimeType.split(';')[0].trim().toLowerCase()
-  return type.startsWith('text/')
-    || type === 'application/json'
-    || type === 'application/xml'
-    || type === 'application/javascript'
-    || type.endsWith('+json')
-    || type.endsWith('+xml')
+  return (
+    type.startsWith('text/') ||
+    type === 'application/json' ||
+    type === 'application/xml' ||
+    type === 'application/javascript' ||
+    type.endsWith('+json') ||
+    type.endsWith('+xml')
+  )
 }
 
 /** The resource's payload as bytes (text encoded as UTF-8). */
@@ -144,7 +149,9 @@ export function bytesToBase64(bytes: Uint8Array): string {
 export function base64ToBytes(base64: string): Uint8Array {
   const raw = atob(base64)
   const bytes = new Uint8Array(raw.length)
-  for (let i = 0; i < raw.length; i += 1) { bytes[i] = raw.charCodeAt(i) }
+  for (let i = 0; i < raw.length; i += 1) {
+    bytes[i] = raw.charCodeAt(i)
+  }
   return bytes
 }
 
@@ -168,9 +175,7 @@ export function serializeResource(res: ActionResource): SerializedResource {
     mimeType: res.mimeType,
     ...(res.name ? { name: res.name } : {}),
     ...(res.description ? { description: res.description } : {}),
-    ...(isTextMimeType(res.mimeType)
-      ? { text: resourceText(res) }
-      : { base64: bytesToBase64(resourceBytes(res)) })
+    ...(isTextMimeType(res.mimeType) ? { text: resourceText(res) } : { base64: bytesToBase64(resourceBytes(res)) })
   }
 }
 
@@ -199,9 +204,9 @@ export interface BinarySchemaMeta {
  * `ResourceLike` values (so `output: binary(...)` slots into the existing
  * `Action.output` position), plus the silkweave metadata brand.
  */
-export type BinarySchema = z.ZodType<ActionResource | Blob | Uint8Array | ArrayBuffer>
-  & { shape: Record<string, z.ZodTypeAny> }
-  & { [BINARY_SCHEMA_BRAND]: BinarySchemaMeta }
+export type BinarySchema = z.ZodType<ActionResource | Blob | Uint8Array | ArrayBuffer> & {
+  shape: Record<string, z.ZodTypeAny>
+} & { [BINARY_SCHEMA_BRAND]: BinarySchemaMeta }
 
 /**
  * Declare an action's output as a binary/text resource:
@@ -244,5 +249,5 @@ export function isBinarySchema(schema: unknown): schema is BinarySchema {
 
 /** The `binary()` metadata of an action's output schema, or `{}` when not binary. */
 export function binarySchemaMeta(schema: unknown): BinarySchemaMeta {
-  return isBinarySchema(schema) ? (schema as any)[BINARY_SCHEMA_BRAND] as BinarySchemaMeta : {}
+  return isBinarySchema(schema) ? ((schema as any)[BINARY_SCHEMA_BRAND] as BinarySchemaMeta) : {}
 }

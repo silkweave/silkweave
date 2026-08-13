@@ -39,12 +39,20 @@ export interface PackResult {
  * Published versions of a package, or `undefined` when the registry cannot be
  * reached (offline packing stays possible - the caller warns instead).
  */
-async function publishedVersions(packageName: string, registry: string, fetchImpl: typeof fetch): Promise<string[] | undefined> {
+async function publishedVersions(
+  packageName: string,
+  registry: string,
+  fetchImpl: typeof fetch
+): Promise<string[] | undefined> {
   try {
     const response = await fetchImpl(`${registry.replace(/\/$/, '')}/${packageName.replace('/', '%2f')}`)
-    if (response.status === 404) { return [] }
-    if (!response.ok) { return undefined }
-    const body = await response.json() as { versions?: Record<string, unknown> }
+    if (response.status === 404) {
+      return []
+    }
+    if (!response.ok) {
+      return undefined
+    }
+    const body = (await response.json()) as { versions?: Record<string, unknown> }
     return Object.keys(body.versions ?? {})
   } catch {
     return undefined
@@ -114,7 +122,9 @@ export async function packSkill(options: PackOptions): Promise<PackResult> {
     }
     warnings.push(`${packageName}@${version} is already published - packed anyway (--force)`)
   }
-  const outDir = resolve(options.out ?? join('dist', single ? `${single.name}-plugin` : pluginNameForPackage(packageName)))
+  const outDir = resolve(
+    options.out ?? join('dist', single ? `${single.name}-plugin` : pluginNameForPackage(packageName))
+  )
   await prepareOutDir(outDir)
   for (const [path, data] of Object.entries(files)) {
     const destination = join(outDir, path)

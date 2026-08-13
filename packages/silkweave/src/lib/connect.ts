@@ -16,11 +16,16 @@ export interface RemoteOptions {
 export function remoteHeaders(options: RemoteOptions): Record<string, string> {
   const headers: Record<string, string> = {}
   const token = options.token ?? process.env['SILKWEAVE_TOKEN']
-  if (token) { headers['authorization'] = token.includes(' ') ? token : `Bearer ${token}` }
+  if (token) {
+    headers['authorization'] = token.includes(' ') ? token : `Bearer ${token}`
+  }
   for (const entry of options.header ?? []) {
-    const separator = entry.includes('=') && (!entry.includes(':') || entry.indexOf('=') < entry.indexOf(':')) ? '=' : ':'
+    const separator =
+      entry.includes('=') && (!entry.includes(':') || entry.indexOf('=') < entry.indexOf(':')) ? '=' : ':'
     const index = entry.indexOf(separator)
-    if (index < 1) { throw new Error(`Invalid --header '${entry}' - expected key=value`) }
+    if (index < 1) {
+      throw new Error(`Invalid --header '${entry}' - expected key=value`)
+    }
     headers[entry.slice(0, index).trim().toLowerCase()] = entry.slice(index + 1).trim()
   }
   return headers

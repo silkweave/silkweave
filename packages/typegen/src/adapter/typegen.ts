@@ -22,8 +22,12 @@ export function renderTypegen(actions: Parameters<typeof generateDts>[0], format
   // `generateTrpcRouter` emits a top-level `import` line, so it must come
   // first when both blocks are produced.
   const blocks: string[] = []
-  if (format === 'trpc-router' || format === 'all') { blocks.push(generateTrpcRouter(actions)) }
-  if (format === 'interfaces' || format === 'all') { blocks.push(generateDts(actions)) }
+  if (format === 'trpc-router' || format === 'all') {
+    blocks.push(generateTrpcRouter(actions))
+  }
+  if (format === 'interfaces' || format === 'all') {
+    blocks.push(generateDts(actions))
+  }
   return blocks.join('\n')
 }
 
@@ -40,7 +44,9 @@ export const typegen: AdapterFactory<TypegenAdapterOptions> = ({ path, format = 
         await writeFile(target, output, 'utf-8')
         console.info(`typegen: wrote ${actions.length} action types to ${target}`)
       },
-      stop: async () => { /* noop */ }
+      stop: async () => {
+        /* noop */
+      }
     }
   }
 }

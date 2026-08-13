@@ -41,11 +41,12 @@ export const releases: Release[] = [
   {
     version: '5.1.0',
     date: '2026-08-13',
-    summary: 'Multi-resource OAuth - one authorization server fronting N protected resources, each with its own token audience - plus trpcNode() for mounting on a Node server you already own, and cookie-shaped authentication for the tRPC adapters.',
+    summary:
+      'Multi-resource OAuth - one authorization server fronting N protected resources, each with its own token audience - plus trpcNode() for mounting on a Node server you already own, and cookie-shaped authentication for the tRPC adapters.',
     changes: [
       {
         type: 'feature',
-        text: 'AuthConfig.resourceUrl accepts a resolver, not just a string: map each request to the protected resource it addresses and one server can front N tenants behind a single authorization server. Use pathResolver({ origin, match }) to get the canonical-origin guarantee structurally - identifiers are built from your configured origin, never the request\'s, so a spoofed Host cannot steer the advertised metadata URL or the expected audience. Adapters mount the RFC 9728 path-insertion well-known route (/.well-known/oauth-protected-resource/<tenant>) automatically.'
+        text: "AuthConfig.resourceUrl accepts a resolver, not just a string: map each request to the protected resource it addresses and one server can front N tenants behind a single authorization server. Use pathResolver({ origin, match }) to get the canonical-origin guarantee structurally - identifiers are built from your configured origin, never the request's, so a spoofed Host cannot steer the advertised metadata URL or the expected audience. Adapters mount the RFC 9728 path-insertion well-known route (/.well-known/oauth-protected-resource/<tenant>) automatically."
       },
       {
         type: 'feature',
@@ -53,7 +54,7 @@ export const releases: Release[] = [
       },
       {
         type: 'improvement',
-        text: 'Tightened token verification for multi-resource deployments: verifyToken now returns aud and iss, which makes validateToken\'s per-request audience binding the real confused-deputy defence rather than a no-op, and requires a single non-empty string aud (rejecting missing and array forms). Single-resource configs keep the historical issuer+audience pin byte-identical.'
+        text: "Tightened token verification for multi-resource deployments: verifyToken now returns aud and iss, which makes validateToken's per-request audience binding the real confused-deputy defence rather than a no-op, and requires a single non-empty string aud (rejecting missing and array forms). Single-resource configs keep the historical issuer+audience pin byte-identical."
       },
       {
         type: 'fix',
@@ -61,11 +62,11 @@ export const releases: Release[] = [
       },
       {
         type: 'feature',
-        text: 'trpcNode(): mount tRPC on a node:http server you already own, instead of binding a port or converting to Web Standard Request/Response by hand. This matters beyond convenience - an app whose browser talks tRPC and whose agent talks MCP usually needs both on one origin, because a browser cannot put an Authorization header on a WebSocket upgrade, so the only credential a tab can present is a per-origin cookie. Returns { adapter, handler }, ready-gated with a 503 on boot failure, and configures no CORS since a mounted handler does not own its host\'s response headers.'
+        text: "trpcNode(): mount tRPC on a node:http server you already own, instead of binding a port or converting to Web Standard Request/Response by hand. This matters beyond convenience - an app whose browser talks tRPC and whose agent talks MCP usually needs both on one origin, because a browser cannot put an Authorization header on a WebSocket upgrade, so the only credential a tab can present is a per-origin cookie. Returns { adapter, handler }, ready-gated with a 503 on boot failure, and configures no CORS since a mounted handler does not own its host's response headers."
       },
       {
         type: 'feature',
-        text: 'authenticate on every tRPC adapter: resolve the caller from the request itself (a session cookie, typically) instead of a bearer token. Returning null falls through to the bearer path, so one endpoint serves a cookie-bearing browser and a token-bearing agent, and the resolved identity lands on the same auth context key the MCP adapters use - so one action\'s run() serves both callers unchanged. Note it bypasses every validateToken check (expiry/issuer/audience/scopes) and inherits a browser CSRF threat model; see the docs before reaching for it.'
+        text: "authenticate on every tRPC adapter: resolve the caller from the request itself (a session cookie, typically) instead of a bearer token. Returning null falls through to the bearer path, so one endpoint serves a cookie-bearing browser and a token-bearing agent, and the resolved identity lands on the same auth context key the MCP adapters use - so one action's run() serves both callers unchanged. Note it bypasses every validateToken check (expiry/issuer/audience/scopes) and inherits a browser CSRF threat model; see the docs before reaching for it."
       },
       {
         type: 'fix',
@@ -92,7 +93,8 @@ export const releases: Release[] = [
   {
     version: '5.0.0',
     date: '2026-07-21',
-    summary: 'Skills over MCP: serve Agent Skills (SKILL.md) from any Silkweave MCP server - versioned, digest-verified, installable with one command - and the silkweave package becomes the CLI that installs them.',
+    summary:
+      'Skills over MCP: serve Agent Skills (SKILL.md) from any Silkweave MCP server - versioned, digest-verified, installable with one command - and the silkweave package becomes the CLI that installs them.',
     changes: [
       {
         type: 'breaking',
@@ -134,7 +136,8 @@ export const releases: Release[] = [
   {
     version: '4.4.0',
     date: '2026-07-20',
-    summary: 'Binary resources: one action can now return a screenshot, PDF, or JSON artifact - delivered as an MCP image block the model can see, raw bytes over REST, a typed envelope over tRPC, and a file (or clean pipe) from the CLI.',
+    summary:
+      'Binary resources: one action can now return a screenshot, PDF, or JSON artifact - delivered as an MCP image block the model can see, raw bytes over REST, a typed envelope over tRPC, and a file (or clean pipe) from the CLI.',
     changes: [
       {
         type: 'feature',
@@ -158,7 +161,7 @@ export const releases: Release[] = [
       },
       {
         type: 'feature',
-        text: '@silkweave/nestjs resource routes: @Mcp({ resource })/@Trpc({ resource }) declare a controller route\'s result a resource; a reflected non-JSON @Header(\'Content-Type\', ...) flips an existing endpoint automatically with a bare @Mcp(), and returned StreamableFiles are collected to bytes (explicit type/disposition wins as a named resource).',
+        text: "@silkweave/nestjs resource routes: @Mcp({ resource })/@Trpc({ resource }) declare a controller route's result a resource; a reflected non-JSON @Header('Content-Type', ...) flips an existing endpoint automatically with a bare @Mcp(), and returned StreamableFiles are collected to bytes (explicit type/disposition wins as a named resource).",
         commit: 'd3d75e8'
       }
     ]
@@ -166,16 +169,17 @@ export const releases: Release[] = [
   {
     version: '4.3.0',
     date: '2026-07-20',
-    summary: 'cliProxy grows up: authenticate against gated MCP servers without monkey-patching fetch, and let tools declare CLI positional arguments that cross the wire.',
+    summary:
+      'cliProxy grows up: authenticate against gated MCP servers without monkey-patching fetch, and let tools declare CLI positional arguments that cross the wire.',
     changes: [
       {
         type: 'feature',
-        text: 'cliProxy auth passthrough: headers (a record or a lazy sync/async thunk resolved once per invocation), requestInit, fetch, and authProvider are forwarded to the SDK\'s StreamableHTTPClientTransport - no more globalThis.fetch monkey-patching to send a bearer token.',
+        text: "cliProxy auth passthrough: headers (a record or a lazy sync/async thunk resolved once per invocation), requestInit, fetch, and authProvider are forwarded to the SDK's StreamableHTTPClientTransport - no more globalThis.fetch monkey-patching to send a bearer token.",
         commit: 'dbaf296'
       },
       {
         type: 'feature',
-        text: 'Positional CLI arguments over the wire: Action.args is published in the MCP tool\'s _meta as silkweave/args (spec-legal, ignored by other clients) and cliProxy renders those fields as positionals in declared order - required as <arg>, optional as [arg]. @silkweave/nestjs gains the matching @Mcp({ args }) option, boot-validated against the reflected input shape.',
+        text: "Positional CLI arguments over the wire: Action.args is published in the MCP tool's _meta as silkweave/args (spec-legal, ignored by other clients) and cliProxy renders those fields as positionals in declared order - required as <arg>, optional as [arg]. @silkweave/nestjs gains the matching @Mcp({ args }) option, boot-validated against the reflected input shape.",
         commit: 'dbaf296'
       },
       {
@@ -188,7 +192,8 @@ export const releases: Release[] = [
   {
     version: '4.2.0',
     date: '2026-07-17',
-    summary: 'Telemetry: every ToolCallEvent now carries the call\'s input (args), and argument-validation failures - previously invisible - emit events too.',
+    summary:
+      "Telemetry: every ToolCallEvent now carries the call's input (args), and argument-validation failures - previously invisible - emit events too.",
     changes: [
       {
         type: 'feature',
@@ -197,7 +202,7 @@ export const releases: Release[] = [
       },
       {
         type: 'feature',
-        text: 'Argument-validation failures now emit telemetry (ok: false, stable errorCode INVALID_ARGUMENTS, args = the raw offered input). The MCP SDK rejects an invalid tools/call before the handler runs, so http()/mcpTransport()/edge() pre-validate emit-only (the wire response is unchanged - the SDK still produces its native rejection); the NestJS trpc() adapter emits the same events from tRPC\'s onError seam. A misbehaving agent hammering wrong schemas is now visible in metrics.',
+        text: "Argument-validation failures now emit telemetry (ok: false, stable errorCode INVALID_ARGUMENTS, args = the raw offered input). The MCP SDK rejects an invalid tools/call before the handler runs, so http()/mcpTransport()/edge() pre-validate emit-only (the wire response is unchanged - the SDK still produces its native rejection); the NestJS trpc() adapter emits the same events from tRPC's onError seam. A misbehaving agent hammering wrong schemas is now visible in metrics.",
         commit: '3e4a88a'
       }
     ]
@@ -205,7 +210,8 @@ export const releases: Release[] = [
   {
     version: '4.1.0',
     date: '2026-07-16',
-    summary: '@silkweave/typegen drops its typescript peer dependency - it now emits .d.ts text directly, so nothing links the TypeScript compiler at server boot (works on the native tsgo/TS7 toolchain).',
+    summary:
+      '@silkweave/typegen drops its typescript peer dependency - it now emits .d.ts text directly, so nothing links the TypeScript compiler at server boot (works on the native tsgo/TS7 toolchain).',
     changes: [
       {
         type: 'improvement',
@@ -239,15 +245,16 @@ export const releases: Release[] = [
   {
     version: '4.0.0',
     date: '2026-07-13',
-    summary: 'Dependency-boundary cleanup from the post-3.2 audit: every package now installs only what it actually uses. Breaking, but the migration is mostly a few import-path and install changes.',
+    summary:
+      'Dependency-boundary cleanup from the post-3.2 audit: every package now installs only what it actually uses. Breaking, but the migration is mostly a few import-path and install changes.',
     changes: [
       {
         type: 'breaking',
-        text: 'The Express http() server moved off the @silkweave/mcp root to the @silkweave/mcp/server subpath. Update `import { http } from \'@silkweave/mcp\'` to `\'@silkweave/mcp/server\'` (same for mcpTransport, oauthRoutes, protectedResourceMetadata, sideloadResource, mcpCors, authMiddleware). The root now carries only the express-free surface (stdio, registerTools, result helpers, filterActions), so stdio-only and serverless consumers no longer pull express/cors.'
+        text: "The Express http() server moved off the @silkweave/mcp root to the @silkweave/mcp/server subpath. Update `import { http } from '@silkweave/mcp'` to `'@silkweave/mcp/server'` (same for mcpTransport, oauthRoutes, protectedResourceMetadata, sideloadResource, mcpCors, authMiddleware). The root now carries only the express-free surface (stdio, registerTools, result helpers, filterActions), so stdio-only and serverless consumers no longer pull express/cors."
       },
       {
         type: 'breaking',
-        text: '@silkweave/core no longer depends on @modelcontextprotocol/sdk (it now has zero runtime dependencies). The action toolResult hook is typed against a new dependency-free core `ToolResult` type instead of the SDK\'s CallToolResult - structurally identical, so most code is unaffected. A CLI/Fastify/tRPC/typegen-only install no longer drags in the entire MCP HTTP server stack.'
+        text: "@silkweave/core no longer depends on @modelcontextprotocol/sdk (it now has zero runtime dependencies). The action toolResult hook is typed against a new dependency-free core `ToolResult` type instead of the SDK's CallToolResult - structurally identical, so most code is unaffected. A CLI/Fastify/tRPC/typegen-only install no longer drags in the entire MCP HTTP server stack."
       },
       {
         type: 'breaking',
@@ -266,7 +273,8 @@ export const releases: Release[] = [
   {
     version: '3.2.1',
     date: '2026-07-13',
-    summary: 'Security and correctness patch batch from the post-3.2 deep audit. No API breaks - upgrade recommended for anyone using auth, the edge/HTTP transports, or the tRPC/CLI/Fastify adapters.',
+    summary:
+      'Security and correctness patch batch from the post-3.2 deep audit. No API breaks - upgrade recommended for anyone using auth, the edge/HTTP transports, or the tRPC/CLI/Fastify adapters.',
     changes: [
       {
         type: 'fix',
@@ -301,16 +309,17 @@ export const releases: Release[] = [
   {
     version: '3.2.0',
     date: '2026-07-13',
-    summary: 'MCP tools get first-class quality signals: annotations, typed output contracts, per-request filtering, and a telemetry hook.',
+    summary:
+      'MCP tools get first-class quality signals: annotations, typed output contracts, per-request filtering, and a telemetry hook.',
     changes: [
       {
         type: 'breaking',
-        text: 'MCP tool results now default to compact JSON (jsonToolResult) instead of smart embedded-resource splitting. Restore the old behavior per action with disposition: \'smart\', per tool with @Mcp({ result: \'smart\' }), or module-wide with defaultResult: \'smart\' in @silkweave/nestjs. A client\'s _meta.disposition still overrides either default.',
+        text: "MCP tool results now default to compact JSON (jsonToolResult) instead of smart embedded-resource splitting. Restore the old behavior per action with disposition: 'smart', per tool with @Mcp({ result: 'smart' }), or module-wide with defaultResult: 'smart' in @silkweave/nestjs. A client's _meta.disposition still overrides either default.",
         commit: 'a9edf71'
       },
       {
         type: 'feature',
-        text: 'Structured output: disposition: \'structured\' declares the action\'s output Zod schema as the tool\'s MCP outputSchema - agents see the result shape in tools/list before calling - and ships the schema-parsed result as structuredContent. Extra fields are stripped before shipping (so returning a wider object is safe against the SDK\'s two-sided validation), and a genuine mismatch degrades to an agent-legible isError result naming the failing fields. In NestJS, @Mcp({ result: \'structured\', output }) requires an explicit schema - reflected @ApiOkResponse schemas are deliberately rejected as hard contracts.',
+        text: "Structured output: disposition: 'structured' declares the action's output Zod schema as the tool's MCP outputSchema - agents see the result shape in tools/list before calling - and ships the schema-parsed result as structuredContent. Extra fields are stripped before shipping (so returning a wider object is safe against the SDK's two-sided validation), and a genuine mismatch degrades to an agent-legible isError result naming the failing fields. In NestJS, @Mcp({ result: 'structured', output }) requires an explicit schema - reflected @ApiOkResponse schemas are deliberately rejected as hard contracts.",
         commit: 'a9edf71'
       },
       {
@@ -342,7 +351,7 @@ export const releases: Release[] = [
     changes: [
       {
         type: 'improvement',
-        text: 'The @silkweave/logger package is gone - its structured logger (createLogger, buildLogLevels) and the Logger/LogLevel types now live in @silkweave/core, where they belong (the logger is the shape of the context.get(\'logger\') key every action receives) and add zero dependencies. Import them from @silkweave/core; the silkweave/logger umbrella subpath still works unchanged.',
+        text: "The @silkweave/logger package is gone - its structured logger (createLogger, buildLogLevels) and the Logger/LogLevel types now live in @silkweave/core, where they belong (the logger is the shape of the context.get('logger') key every action receives) and add zero dependencies. Import them from @silkweave/core; the silkweave/logger umbrella subpath still works unchanged.",
         commit: 'efa818d'
       },
       {
@@ -360,7 +369,8 @@ export const releases: Release[] = [
   {
     version: '3.0.0',
     date: '2026-06-21',
-    summary: 'A stateless, web-standard, agent-first 3.0: sessionless MCP transport, a leaner auth and dependency surface, and the Vercel adapter generalised into a portable edge adapter.',
+    summary:
+      'A stateless, web-standard, agent-first 3.0: sessionless MCP transport, a leaner auth and dependency surface, and the Vercel adapter generalised into a portable edge adapter.',
     changes: [
       {
         type: 'breaking',
@@ -389,7 +399,7 @@ export const releases: Release[] = [
       },
       {
         type: 'feature',
-        text: 'Action linter guardrail: silkweave().start() warns at dev time about agent-hostile action definitions (missing or throwaway descriptions, undescribed input params) - the cheap mistakes that quietly degrade an agent\'s tool use. Disable with SilkweaveOptions.lint: false.',
+        text: "Action linter guardrail: silkweave().start() warns at dev time about agent-hostile action definitions (missing or throwaway descriptions, undescribed input params) - the cheap mistakes that quietly degrade an agent's tool use. Disable with SilkweaveOptions.lint: false.",
         commit: 'ad52cc9'
       },
       {
@@ -407,21 +417,22 @@ export const releases: Release[] = [
   {
     version: '2.6.1',
     date: '2026-06-18',
-    summary: 'Slimmer dependency tree - pino dropped entirely, and the CLI proxy no longer leaks into the MCP server path.',
+    summary:
+      'Slimmer dependency tree - pino dropped entirely, and the CLI proxy no longer leaks into the MCP server path.',
     changes: [
       {
         type: 'improvement',
-        text: 'Dropped pino entirely. @silkweave/logger\'s createLogger() is now a zero-dependency structured logger (JSON lines to a stream, with a level threshold and onLog/onProgress callbacks) - same API, no behaviour change for the stdio/http/vercel adapters. The package\'s only hard dependency is now zod.',
+        text: "Dropped pino entirely. @silkweave/logger's createLogger() is now a zero-dependency structured logger (JSON lines to a stream, with a level threshold and onLog/onProgress callbacks) - same API, no behaviour change for the stdio/http/vercel adapters. The package's only hard dependency is now zod.",
         commit: '6528d3b'
       },
       {
         type: 'improvement',
-        text: '@silkweave/core no longer depends on @silkweave/logger (it never imported it - the logger reaches actions via context.get(\'logger\')). The @Mcp()/@Trpc() decorator import path in @silkweave/nestjs now pulls neither pino nor @clack/prompts on boot.',
+        text: "@silkweave/core no longer depends on @silkweave/logger (it never imported it - the logger reaches actions via context.get('logger')). The @Mcp()/@Trpc() decorator import path in @silkweave/nestjs now pulls neither pino nor @clack/prompts on boot.",
         commit: '6528d3b'
       },
       {
         type: 'breaking',
-        text: 'The cliProxy adapter moved from the @silkweave/mcp root to the dedicated @silkweave/mcp/cli-proxy subpath, so importing the stdio/http servers no longer bundles the CLI client\'s commander + @clack/prompts. Update imports: import { cliProxy } from \'@silkweave/mcp/cli-proxy\'.',
+        text: "The cliProxy adapter moved from the @silkweave/mcp root to the dedicated @silkweave/mcp/cli-proxy subpath, so importing the stdio/http servers no longer bundles the CLI client's commander + @clack/prompts. Update imports: import { cliProxy } from '@silkweave/mcp/cli-proxy'.",
         commit: '6528d3b'
       },
       {
@@ -485,7 +496,7 @@ export const releases: Release[] = [
       },
       {
         type: 'breaking',
-        text: 'NestJS adapter imports moved to subpaths: import { mcp } from \'@silkweave/nestjs/mcp\' (likewise /trpc, /typegen) instead of from \'@silkweave/nestjs\'. The @Mcp/@Trpc decorators and SilkweaveModule stay on the root. Add the adapter package(s) you use - @silkweave/mcp, @silkweave/trpc, @silkweave/typegen - as dependencies.',
+        text: "NestJS adapter imports moved to subpaths: import { mcp } from '@silkweave/nestjs/mcp' (likewise /trpc, /typegen) instead of from '@silkweave/nestjs'. The @Mcp/@Trpc decorators and SilkweaveModule stay on the root. Add the adapter package(s) you use - @silkweave/mcp, @silkweave/trpc, @silkweave/typegen - as dependencies.",
         commit: '6b01553'
       }
     ]
@@ -512,7 +523,7 @@ export const releases: Release[] = [
     changes: [
       {
         type: 'feature',
-        text: 'Configurable MCP result format - set @Mcp({ result: \'json\' }) (or an action’s disposition) to return compact JSON instead of the default smart embedded-resource output. Clients can still override per call.',
+        text: "Configurable MCP result format - set @Mcp({ result: 'json' }) (or an action’s disposition) to return compact JSON instead of the default smart embedded-resource output. Clients can still override per call.",
         commit: '1eeab3e'
       }
     ]
@@ -552,7 +563,8 @@ export const releases: Release[] = [
   {
     version: '2.0.0',
     date: '2026-06-15',
-    summary: 'The NestJS adapter is now additive controller reflection - a breaking rework of how Nest routes become MCP tools.',
+    summary:
+      'The NestJS adapter is now additive controller reflection - a breaking rework of how Nest routes become MCP tools.',
     changes: [
       {
         type: 'breaking',
@@ -646,7 +658,8 @@ export const releases: Release[] = [
     version: '1.0.0',
     date: '2026-04-08',
     unreleased: true,
-    summary: 'The original prototype - a proof of concept for defining an Action once and running it across transports.',
+    summary:
+      'The original prototype - a proof of concept for defining an Action once and running it across transports.',
     changes: [
       {
         type: 'feature',

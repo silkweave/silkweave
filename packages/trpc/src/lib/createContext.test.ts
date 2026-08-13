@@ -57,14 +57,18 @@ describe('resolveIdentity', () => {
   it('maps a thrown SilkweaveError to a TRPCError with the right code', async () => {
     // A raw throw out of createContext is swallowed by @trpc/server and would
     // surface as an opaque 500.
-    const authenticate: Authenticate<Request> = () => { throw new SilkweaveError('nope', 'forbidden', 403) }
+    const authenticate: Authenticate<Request> = () => {
+      throw new SilkweaveError('nope', 'forbidden', 403)
+    }
     await expect(resolveIdentity(authenticate, undefined, req, null, context)).rejects.toSatisfy(
       (error: unknown) => error instanceof TRPCError && error.code === 'FORBIDDEN'
     )
   })
 
   it('maps an unexpected throw to INTERNAL_SERVER_ERROR', async () => {
-    const authenticate: Authenticate<Request> = () => { throw new Error('db down') }
+    const authenticate: Authenticate<Request> = () => {
+      throw new Error('db down')
+    }
     await expect(resolveIdentity(authenticate, undefined, req, null, context)).rejects.toSatisfy(
       (error: unknown) => error instanceof TRPCError && error.code === 'INTERNAL_SERVER_ERROR'
     )
@@ -87,7 +91,7 @@ describe('context key parity', () => {
     // "Invalid context key: auth" under one transport and work under the other.
     const authenticate: Authenticate<Request> = () => session
     const resolved = await resolveIdentity(authenticate, undefined, req, null, context)
-    const forked = context.fork({ ...(resolved.kind === 'ok' && resolved.authInfo ? { auth: resolved.authInfo } : {}) })
+    const forked = context.fork(resolved.kind === 'ok' && resolved.authInfo ? { auth: resolved.authInfo } : {})
     expect(forked.get<AuthInfo>('auth')).toBe(session)
   })
 })

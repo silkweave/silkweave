@@ -1,4 +1,9 @@
-import { AuthConfig, generateProtectedResourceMetadata, resolveProtectedResourceMetadata, toResourceRequest } from '@silkweave/auth'
+import {
+  AuthConfig,
+  generateProtectedResourceMetadata,
+  resolveProtectedResourceMetadata,
+  toResourceRequest
+} from '@silkweave/auth'
 import { SilkweaveContext } from '@silkweave/core'
 import { type RequestHandler } from 'express'
 
@@ -14,16 +19,22 @@ import { type RequestHandler } from 'express'
  */
 export function protectedResourceMetadata(auth: AuthConfig, context?: SilkweaveContext): RequestHandler {
   if (!auth.resourceUrl || !auth.authorizationServers?.length) {
-    throw new Error('@silkweave/mcp protectedResourceMetadata(): auth.resourceUrl and auth.authorizationServers are required')
+    throw new Error(
+      '@silkweave/mcp protectedResourceMetadata(): auth.resourceUrl and auth.authorizationServers are required'
+    )
   }
 
   if (typeof auth.resourceUrl === 'string') {
     const metadata = generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers, auth.requiredScopes)
-    return (_req, res) => { res.json(metadata) }
+    return (_req, res) => {
+      res.json(metadata)
+    }
   }
 
   if (!context) {
-    throw new Error('@silkweave/mcp protectedResourceMetadata(): a SilkweaveContext is required when auth.resourceUrl is a resolver')
+    throw new Error(
+      '@silkweave/mcp protectedResourceMetadata(): a SilkweaveContext is required when auth.resourceUrl is a resolver'
+    )
   }
 
   return (req, res) => {

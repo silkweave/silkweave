@@ -10,7 +10,9 @@ const PATH_PARAM_RE = /:([A-Za-z0-9_]+)/g
  * otherwise `kind: 'query'` maps to `GET` and everything else to `POST`.
  */
 export function actionMethod(action: Pick<Action, 'method' | 'kind'>): HttpMethod {
-  if (action.method) { return action.method }
+  if (action.method) {
+    return action.method
+  }
   return action.kind === 'query' ? 'GET' : 'POST'
 }
 
@@ -21,7 +23,9 @@ export function methodHasBody(method: HttpMethod): boolean {
 
 /** Extract the `:param` placeholder names from a route path template. */
 export function pathParamNames(path: string | undefined): string[] {
-  if (!path) { return [] }
+  if (!path) {
+    return []
+  }
   return [...path.matchAll(PATH_PARAM_RE)].map((match) => match[1])
 }
 
@@ -57,7 +61,9 @@ export function validateActionRouting(action: Action): void {
  * failed coercion returns the original value so Zod surfaces a proper error.
  */
 function coerceScalar(field: z.ZodTypeAny | undefined, value: unknown): unknown {
-  if (!field || typeof value !== 'string') { return value }
+  if (!field || typeof value !== 'string') {
+    return value
+  }
   const [base] = unwrap(field)
   const type = (base as { def?: { type?: string } }).def?.type
   if (type === 'number') {
@@ -65,12 +71,20 @@ function coerceScalar(field: z.ZodTypeAny | undefined, value: unknown): unknown 
     return value.trim() === '' || Number.isNaN(num) ? value : num
   }
   if (type === 'boolean') {
-    if (value === 'true') { return true }
-    if (value === 'false') { return false }
+    if (value === 'true') {
+      return true
+    }
+    if (value === 'false') {
+      return false
+    }
     return value
   }
   if (type === 'bigint') {
-    try { return BigInt(value) } catch { return value }
+    try {
+      return BigInt(value)
+    } catch {
+      return value
+    }
   }
   return value
 }
@@ -113,15 +127,21 @@ export function resolveActionInput(action: Action, sources: ActionInputSources):
   }
 
   for (const [key, raw] of Object.entries(query)) {
-    if (raw === undefined) { continue }
-    const declared = hasBody ? queryKeys.has(key) : (key in shape && !pathParams.has(key))
-    if (!declared) { continue }
+    if (raw === undefined) {
+      continue
+    }
+    const declared = hasBody ? queryKeys.has(key) : key in shape && !pathParams.has(key)
+    if (!declared) {
+      continue
+    }
     merged[key] = Array.isArray(raw) ? raw : coerceScalar(shape[key], raw)
   }
 
   for (const key of pathParams) {
     const raw = params[key]
-    if (raw === undefined) { continue }
+    if (raw === undefined) {
+      continue
+    }
     merged[key] = coerceScalar(shape[key], raw)
   }
 

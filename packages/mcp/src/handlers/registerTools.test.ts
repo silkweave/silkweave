@@ -66,15 +66,19 @@ describe('registerTools positional args _meta', () => {
   })
 })
 
-interface TextBlock { type: 'text'; text: string }
+interface TextBlock {
+  type: 'text'
+  text: string
+}
 
 describe('registerTools structured output', () => {
-  const structured = () => action({
-    name: 'users.get',
-    disposition: 'structured',
-    output: z.object({ id: z.string(), label: z.string() }),
-    run: async () => ({ id: 'u1', label: 'Ada', extra: 'dropped' })
-  })
+  const structured = () =>
+    action({
+      name: 'users.get',
+      disposition: 'structured',
+      output: z.object({ id: z.string(), label: z.string() }),
+      run: async () => ({ id: 'u1', label: 'Ada', extra: 'dropped' })
+    })
 
   it('forwards outputSchema to tools/list only for structured actions', async () => {
     const client = await connect([structured(), action({})])
@@ -118,7 +122,11 @@ describe('registerTools structured output', () => {
       run: async () => ({ blob })
     })
     const client = await connect([big])
-    const result = await client.callTool({ name: 'UsersBig', arguments: { name: 'x' }, _meta: { disposition: 'smart' } })
+    const result = await client.callTool({
+      name: 'UsersBig',
+      arguments: { name: 'x' },
+      _meta: { disposition: 'smart' }
+    })
     expect(result.structuredContent).toEqual({ blob })
     // No smart sideloading: the text mirror carries the full JSON payload.
     expect((result.content as TextBlock[])[0].type).toBe('text')
@@ -138,7 +146,11 @@ describe('registerTools default disposition (json)', () => {
 
   it('a client _meta.disposition of smart opts back into sideloading', async () => {
     const client = await connect([action({ run: async () => big })])
-    const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' }, _meta: { disposition: 'smart' } })
+    const result = await client.callTool({
+      name: 'HelloWorld',
+      arguments: { name: 'x' },
+      _meta: { disposition: 'smart' }
+    })
     const content = result.content as { type: string }[]
     expect(content.some((block) => block.type === 'resource')).toBe(true)
   })
@@ -153,12 +165,13 @@ describe('registerTools default disposition (json)', () => {
 
 describe('registerTools resource results', () => {
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
-  const screenshot = (overrides: Partial<Action> = {}) => action({
-    name: 'take.screenshot',
-    output: binary({ mimeType: 'image/png' }),
-    run: async () => resource(png, { mimeType: 'image/png', description: 'Screenshot of example.com' }),
-    ...overrides
-  })
+  const screenshot = (overrides: Partial<Action> = {}) =>
+    action({
+      name: 'take.screenshot',
+      output: binary({ mimeType: 'image/png' }),
+      run: async () => resource(png, { mimeType: 'image/png', description: 'Screenshot of example.com' }),
+      ...overrides
+    })
 
   it('delivers a resource() image as text description + image block', async () => {
     const client = await connect([screenshot()])
@@ -178,9 +191,11 @@ describe('registerTools resource results', () => {
   })
 
   it('normalizes a returned File - its own name and type win', async () => {
-    const client = await connect([screenshot({
-      run: async () => new File(['{"report":true}'], 'report.json', { type: 'application/json' })
-    })])
+    const client = await connect([
+      screenshot({
+        run: async () => new File(['{"report":true}'], 'report.json', { type: 'application/json' })
+      })
+    ])
     const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
     const [block] = result.content as [{ type: string; resource: { uri: string; text: string } }]
     expect(block.type).toBe('resource')
@@ -196,24 +211,39 @@ describe('registerTools resource results', () => {
 
   it('a client _meta.disposition cannot demote a resource result', async () => {
     const client = await connect([screenshot()])
-    const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' }, _meta: { disposition: 'smart' } })
+    const result = await client.callTool({
+      name: 'TakeScreenshot',
+      arguments: { name: 'x' },
+      _meta: { disposition: 'smart' }
+    })
     const content = result.content as { type: string }[]
     expect(content.some((block) => block.type === 'image')).toBe(true)
   })
 
   it('a toolResult hook still wins over resource mapping', async () => {
-    const client = await connect([screenshot({
-      toolResult: () => ({ content: [{ type: 'text', text: 'hooked' }] })
-    })])
+    const client = await connect([
+      screenshot({
+        toolResult: () => ({ content: [{ type: 'text', text: 'hooked' }] })
+      })
+    ])
     const result = await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
     expect(result.content).toEqual([{ type: 'text', text: 'hooked' }])
   })
 
   it('telemetry counts payload bytes and does not report sideloaded', async () => {
     const events: ToolCallEvent[] = []
-    const client = await connect([screenshot({
-      run: async () => resource(png, { mimeType: 'application/pdf' })
-    })], { onToolCall: (event) => { events.push(event) } })
+    const client = await connect(
+      [
+        screenshot({
+          run: async () => resource(png, { mimeType: 'application/pdf' })
+        })
+      ],
+      {
+        onToolCall: (event) => {
+          events.push(event)
+        }
+      }
+    )
     await client.callTool({ name: 'TakeScreenshot', arguments: { name: 'x' } })
     expect(events[0]).toMatchObject({ ok: true, resultBytes: png.length, sideloaded: false })
   })
@@ -222,7 +252,12 @@ describe('registerTools resource results', () => {
 describe('registerTools onToolCall telemetry', () => {
   const collect = () => {
     const events: ToolCallEvent[] = []
-    return { events, onToolCall: (event: ToolCallEvent) => { events.push(event) } }
+    return {
+      events,
+      onToolCall: (event: ToolCallEvent) => {
+        events.push(event)
+      }
+    }
   }
 
   it('emits one event per successful call with result metadata', async () => {
@@ -255,7 +290,11 @@ describe('registerTools onToolCall telemetry', () => {
 
   it('carries args on thrown-error events too', async () => {
     const { events, onToolCall } = collect()
-    const failing = action({ run: async () => { throw new SilkweaveError('nope', 'forbidden', 403) } })
+    const failing = action({
+      run: async () => {
+        throw new SilkweaveError('nope', 'forbidden', 403)
+      }
+    })
     const client = await connect([failing], { onToolCall })
     await client.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
     expect(events[0]).toMatchObject({ ok: false, args: { name: 'Ada' } })
@@ -271,7 +310,11 @@ describe('registerTools onToolCall telemetry', () => {
 
   it('emits ok: false with the SilkweaveError code when the action throws', async () => {
     const { events, onToolCall } = collect()
-    const failing = action({ run: async () => { throw new SilkweaveError('nope', 'forbidden', 403) } })
+    const failing = action({
+      run: async () => {
+        throw new SilkweaveError('nope', 'forbidden', 403)
+      }
+    })
     const client = await connect([failing], { onToolCall })
     const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
     expect(result.isError).toBe(true)
@@ -280,14 +323,18 @@ describe('registerTools onToolCall telemetry', () => {
   })
 
   it('never fails or slows the call when the hook throws or rejects', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const client = await connect([action({})], {
-      onToolCall: () => { throw new Error('telemetry down') }
+      onToolCall: () => {
+        throw new Error('telemetry down')
+      }
     })
     const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
     expect(result.isError).toBeUndefined()
     const asyncClient = await connect([action({})], {
-      onToolCall: async () => { throw new Error('telemetry down') }
+      onToolCall: async () => {
+        throw new Error('telemetry down')
+      }
     })
     const asyncResult = await asyncClient.callTool({ name: 'HelloWorld', arguments: { name: 'Ada' } })
     expect(asyncResult.isError).toBeUndefined()

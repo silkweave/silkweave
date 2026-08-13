@@ -25,15 +25,24 @@ let port: number
 
 beforeAll(async () => {
   const app = express()
-  const transport = mcpTransport({ name: 'test', description: 'test', version: '0.0.0' }, createContext({ adapter: 'http' }), actions, {
-    filterActions: (all, request) => {
-      seen.push(request)
-      const role = request.headers['x-role']
-      if (role === 'boom') { throw new Error('db down') }
-      if (role !== 'reader' && role !== 'writer') { throw new SilkweaveError('invalid api key', 'invalid_key', 401) }
-      return role === 'reader' ? all.filter((a) => a.tags?.includes('read')) : all
+  const transport = mcpTransport(
+    { name: 'test', description: 'test', version: '0.0.0' },
+    createContext({ adapter: 'http' }),
+    actions,
+    {
+      filterActions: (all, request) => {
+        seen.push(request)
+        const role = request.headers['x-role']
+        if (role === 'boom') {
+          throw new Error('db down')
+        }
+        if (role !== 'reader' && role !== 'writer') {
+          throw new SilkweaveError('invalid api key', 'invalid_key', 401)
+        }
+        return role === 'reader' ? all.filter((a) => a.tags?.includes('read')) : all
+      }
     }
-  })
+  )
   app.post('/mcp', express.json(), transport.post)
   server = app.listen(0)
   port = (server.address() as AddressInfo).port
@@ -69,7 +78,10 @@ describe('mcpTransport filterActions', () => {
   it('passes the JSON-RPC method and toolName to the filter', async () => {
     seen.length = 0
     await rpc(list, { 'x-role': 'reader' })
-    await rpc({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'LeadsList', arguments: {} } }, { 'x-role': 'reader' })
+    await rpc(
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'LeadsList', arguments: {} } },
+      { 'x-role': 'reader' }
+    )
     expect(seen[0]).toMatchObject({ method: 'tools/list', url: '/mcp' })
     expect(seen[0].toolName).toBeUndefined()
     expect(seen[1]).toMatchObject({ method: 'tools/call', toolName: 'LeadsList' })
@@ -78,7 +90,7 @@ describe('mcpTransport filterActions', () => {
   it('surfaces a thrown SilkweaveError as its statusCode, never an empty tool list', async () => {
     const res = await rpc(list, { 'x-role': 'intruder' })
     expect(res.status).toBe(401)
-    const body = await res.json() as { error: { message: string }; id: number }
+    const body = (await res.json()) as { error: { message: string }; id: number }
     expect(body.error.message).toBe('invalid api key')
     expect(body.id).toBe(1)
   })
@@ -86,7 +98,7 @@ describe('mcpTransport filterActions', () => {
   it('maps any other filter throw to a 500 internal error', async () => {
     const res = await rpc(list, { 'x-role': 'boom' })
     expect(res.status).toBe(500)
-    const body = await res.json() as { error: { message: string } }
+    const body = (await res.json()) as { error: { message: string } }
     expect(body.error.message).toBe('Internal server error')
   })
 
@@ -99,7 +111,7 @@ describe('mcpTransport filterActions', () => {
     ]
     const res = await rpc(batch, { 'x-role': 'reader' })
     expect(res.status).toBe(400)
-    const body = await res.json() as { error: { message: string } }
+    const body = (await res.json()) as { error: { message: string } }
     expect(body.error.message).toMatch(/batch/i)
   })
 })
@@ -117,9 +129,16 @@ describe('mcpTransport onToolCall telemetry', () => {
 
   beforeAll(async () => {
     const app = express()
-    const transport = mcpTransport({ name: 'test', description: 'test', version: '0.0.0' }, createContext({ adapter: 'http' }), [strict], {
-      onToolCall: (event) => { events.push(event) }
-    })
+    const transport = mcpTransport(
+      { name: 'test', description: 'test', version: '0.0.0' },
+      createContext({ adapter: 'http' }),
+      [strict],
+      {
+        onToolCall: (event) => {
+          events.push(event)
+        }
+      }
+    )
     app.post('/mcp', express.json(), transport.post)
     hookServer = app.listen(0)
     hookPort = (hookServer.address() as AddressInfo).port
@@ -131,7 +150,12 @@ describe('mcpTransport onToolCall telemetry', () => {
     return fetch(`http://127.0.0.1:${hookPort}/mcp`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'LeadsGet', arguments: args } })
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 5,
+        method: 'tools/call',
+        params: { name: 'LeadsGet', arguments: args }
+      })
     })
   }
 
@@ -170,7 +194,12 @@ describe('mcpTransport methodNotAllowed', () => {
 
   beforeAll(async () => {
     const app = express()
-    const transport = mcpTransport({ name: 'test', description: 'test', version: '0.0.0' }, createContext({ adapter: 'http' }), [testAction('a', [])], {})
+    const transport = mcpTransport(
+      { name: 'test', description: 'test', version: '0.0.0' },
+      createContext({ adapter: 'http' }),
+      [testAction('a', [])],
+      {}
+    )
     app.post('/mcp', express.json(), transport.post)
     app.get('/mcp', transport.methodNotAllowed)
     app.delete('/mcp', transport.methodNotAllowed)
@@ -187,6 +216,6 @@ describe('mcpTransport methodNotAllowed', () => {
     const res = await fetch(`http://127.0.0.1:${mnaPort}/mcp`, { method })
     expect(res.status).toBe(405)
     expect(res.headers.get('allow')).toBe('POST')
-    expect((await res.json() as { error: { message: string } }).error.message).toContain('POST-only')
+    expect(((await res.json()) as { error: { message: string } }).error.message).toContain('POST-only')
   })
 })

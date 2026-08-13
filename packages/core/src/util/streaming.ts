@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Action, ActionStreamRun, isStreamingAction } from './action.js'
 import { SilkweaveContext } from './context.js'
 
@@ -27,7 +26,9 @@ export async function runStreamingAction<C>(
   let index = 0
   for await (const chunk of iter) {
     chunks.push(chunk)
-    if (onChunk) { await onChunk(chunk, index) }
+    if (onChunk) {
+      await onChunk(chunk, index)
+    }
     index += 1
   }
   return chunks

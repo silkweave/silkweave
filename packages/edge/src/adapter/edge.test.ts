@@ -36,14 +36,20 @@ const list = { jsonrpc: '2.0', id: 1, method: 'tools/list' }
 describe('edge filterActions', () => {
   const filterActions: EdgeAdapterOptions['filterActions'] = (all, request) => {
     const role = request.headers['x-role']
-    if (role !== 'reader' && role !== 'writer') { throw new SilkweaveError('invalid api key', 'invalid_key', 401) }
+    if (role !== 'reader' && role !== 'writer') {
+      throw new SilkweaveError('invalid api key', 'invalid_key', 401)
+    }
     return role === 'reader' ? all.filter((a) => a.tags?.includes('read')) : all
   }
 
   it('computes the tool list per request', async () => {
     const app = await startEdge({ filterActions })
-    const reader = await (await app.handler(post(list, { 'x-role': 'reader' }))).json() as { result: { tools: { name: string }[] } }
-    const writer = await (await app.handler(post(list, { 'x-role': 'writer' }))).json() as { result: { tools: { name: string }[] } }
+    const reader = (await (await app.handler(post(list, { 'x-role': 'reader' }))).json()) as {
+      result: { tools: { name: string }[] }
+    }
+    const writer = (await (await app.handler(post(list, { 'x-role': 'writer' }))).json()) as {
+      result: { tools: { name: string }[] }
+    }
     expect(reader.result.tools.map((t) => t.name)).toEqual(['LeadsList'])
     expect(writer.result.tools.map((t) => t.name).sort()).toEqual(['LeadsDelete', 'LeadsList'])
   })
@@ -57,7 +63,9 @@ describe('edge filterActions', () => {
       }
     })
     await app.handler(post(list))
-    await app.handler(post({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'LeadsList', arguments: {} } }))
+    await app.handler(
+      post({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'LeadsList', arguments: {} } })
+    )
     expect(seen[0]).toEqual({ method: 'tools/list', toolName: undefined })
     expect(seen[1]).toEqual({ method: 'tools/call', toolName: 'LeadsList' })
   })
@@ -66,7 +74,7 @@ describe('edge filterActions', () => {
     const app = await startEdge({ filterActions })
     const res = await app.handler(post(list, { 'x-role': 'intruder' }))
     expect(res.status).toBe(401)
-    const body = await res.json() as { error: { message: string }; id: number }
+    const body = (await res.json()) as { error: { message: string }; id: number }
     expect(body.error.message).toBe('invalid api key')
     expect(body.id).toBe(1)
   })
@@ -74,7 +82,7 @@ describe('edge filterActions', () => {
   it('runs without a filter exactly as before', async () => {
     const app = await startEdge()
     const res = await app.handler(post(list))
-    const body = await res.json() as { result: { tools: { name: string }[] } }
+    const body = (await res.json()) as { result: { tools: { name: string }[] } }
     expect(body.result.tools).toHaveLength(2)
   })
 })
@@ -89,13 +97,19 @@ describe('edge onToolCall telemetry', () => {
 
   async function startWithHook() {
     const events: ToolCallEvent[] = []
-    const app = edge({ enableJsonResponse: true, onToolCall: (event) => { events.push(event) } })
+    const app = edge({
+      enableJsonResponse: true,
+      onToolCall: (event) => {
+        events.push(event)
+      }
+    })
     const generated = app.adapter({ name: 'test', description: 'test', version: '0.0.0' }, createContext())
     await generated.start([strict])
     return { app, events }
   }
 
-  const call = (args: unknown) => post({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'LeadsGet', arguments: args } })
+  const call = (args: unknown) =>
+    post({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'LeadsGet', arguments: args } })
 
   it('emits exactly one success event carrying the parsed args', async () => {
     const { app, events } = await startWithHook()
@@ -112,7 +126,7 @@ describe('edge onToolCall telemetry', () => {
     // Emit-only: the wire response is the SDK's own native rejection - an
     // isError tool result carrying the InvalidParams message (SDK >= 1.29).
     expect(res.status).toBe(200)
-    const body = await res.json() as { result: { isError: boolean; content: { text: string }[] } }
+    const body = (await res.json()) as { result: { isError: boolean; content: { text: string }[] } }
     expect(body.result.isError).toBe(true)
     expect(body.result.content[0].text).toContain('Input validation error')
     expect(events).toHaveLength(1)

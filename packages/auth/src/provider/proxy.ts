@@ -53,8 +53,12 @@ type ResourceParam = { ok: true; value?: string } | { ok: false }
  */
 function readBodyResource(body: Record<string, string>): ResourceParam {
   const raw: unknown = body.resource
-  if (raw === undefined || raw === '') { return { ok: true } }
-  if (typeof raw !== 'string') { return { ok: false } }
+  if (raw === undefined || raw === '') {
+    return { ok: true }
+  }
+  if (typeof raw !== 'string') {
+    return { ok: false }
+  }
   const normalized = normalizeResourceUri(raw)
   return normalized ? { ok: true, value: normalized } : { ok: false }
 }
@@ -69,7 +73,9 @@ async function readAuthorizeResource(
   multiResource: boolean,
   isAllowedResource: (resource: string) => Promise<boolean>
 ): Promise<{ ok: true; value?: string } | { ok: false; response: OAuthResponse }> {
-  if (!multiResource) { return { ok: true, value: params.get('resource') ?? undefined } }
+  if (!multiResource) {
+    return { ok: true, value: params.get('resource') ?? undefined }
+  }
 
   // RFC 8707 permits repeats; we deliberately support exactly one resource per
   // grant, so `aud` stays a single string and the token endpoint's equality rule
@@ -78,13 +84,15 @@ async function readAuthorizeResource(
   if (values.length > 1) {
     return { ok: false, response: errorResponse(400, 'invalid_target', 'Only one resource indicator is supported') }
   }
-  if (values.length === 0) { return { ok: true } }
+  if (values.length === 0) {
+    return { ok: true }
+  }
 
   const normalized = normalizeResourceUri(values[0])
   if (!normalized) {
     return { ok: false, response: errorResponse(400, 'invalid_target', 'Invalid resource indicator') }
   }
-  if (!await isAllowedResource(normalized)) {
+  if (!(await isAllowedResource(normalized))) {
     return { ok: false, response: errorResponse(400, 'invalid_target', 'Unknown or unsupported resource') }
   }
   return { ok: true, value: normalized }
@@ -98,9 +106,15 @@ function resourceChecker(config: OAuthProxyConfig): (resource: string) => Promis
     ? new Set(allowed.map((value) => normalizeResourceUri(value) ?? value))
     : undefined
   return async (resource) => {
-    if (resource === defaultResource) { return true }
-    if (!allowed) { return false }
-    if (exact) { return exact.has(resource) }
+    if (resource === defaultResource) {
+      return true
+    }
+    if (!allowed) {
+      return false
+    }
+    if (exact) {
+      return exact.has(resource)
+    }
     return (allowed as (r: string) => boolean | Promise<boolean>)(resource)
   }
 }
@@ -128,7 +142,11 @@ async function verifyPkce(verifier: string, challenge: string): Promise<boolean>
   return computed === challenge
 }
 
-function jsonResponse(status: number, body: Record<string, unknown>, headers: Record<string, string> = {}): OAuthResponse {
+function jsonResponse(
+  status: number,
+  body: Record<string, unknown>,
+  headers: Record<string, string> = {}
+): OAuthResponse {
   return {
     status,
     headers: { 'Content-Type': 'application/json', ...CORS_HEADERS, ...headers },
@@ -150,18 +168,28 @@ function errorResponse(status: number, error: string, description: string): OAut
 
 async function signAccessToken(
   key: Uint8Array,
-  opts: { scopes: string[]; email?: string; sub?: string; clientId: string; issuer: string; audience?: string; ttl: number }
+  opts: {
+    scopes: string[]
+    email?: string
+    sub?: string
+    clientId: string
+    issuer: string
+    audience?: string
+    ttl: number
+  }
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
-  return new SignJWT({ scope: opts.scopes.join(' '), email: opts.email })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(opts.sub ?? opts.email ?? opts.clientId)
-    .setIssuer(opts.issuer)
-    // The AS identity never fragments; only the audience follows the resource.
-    .setAudience(opts.audience ?? opts.issuer)
-    .setIssuedAt(now)
-    .setExpirationTime(now + opts.ttl)
-    .sign(key)
+  return (
+    new SignJWT({ scope: opts.scopes.join(' '), email: opts.email })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(opts.sub ?? opts.email ?? opts.clientId)
+      .setIssuer(opts.issuer)
+      // The AS identity never fragments; only the audience follows the resource.
+      .setAudience(opts.audience ?? opts.issuer)
+      .setIssuedAt(now)
+      .setExpirationTime(now + opts.ttl)
+      .sign(key)
+  )
 }
 
 async function handleRegister(
@@ -170,10 +198,14 @@ async function handleRegister(
   allowedRedirectUris: string[]
 ): Promise<OAuthResponse> {
   const body = req.body
-  if (!body) { return errorResponse(400, 'invalid_request', 'Missing request body') }
+  if (!body) {
+    return errorResponse(400, 'invalid_request', 'Missing request body')
+  }
 
   const redirectUris = body.redirect_uris
-  if (!redirectUris) { return errorResponse(400, 'invalid_request', 'redirect_uris is required') }
+  if (!redirectUris) {
+    return errorResponse(400, 'invalid_request', 'redirect_uris is required')
+  }
 
   let uris: string[]
   try {
@@ -217,9 +249,14 @@ async function resolveClient(
   clientId: string,
   store: OAuthStore,
   allowedRedirectUris: string[]
-): Promise<{ clientId: string; clientSecret: string; redirectUris: string[]; clientName?: string; createdAt: number } | OAuthResponse> {
+): Promise<
+  | { clientId: string; clientSecret: string; redirectUris: string[]; clientName?: string; createdAt: number }
+  | OAuthResponse
+> {
   const existing = await store.getClient(clientId)
-  if (existing) { return existing }
+  if (existing) {
+    return existing
+  }
 
   if (!clientId.startsWith('https://')) {
     return errorResponse(400, 'invalid_client', 'Unknown client_id')
@@ -240,7 +277,7 @@ async function resolveClient(
     if (!metaRes.ok) {
       return errorResponse(400, 'invalid_client', 'Failed to fetch client metadata document')
     }
-    const meta = await metaRes.json() as Record<string, unknown>
+    const meta = (await metaRes.json()) as Record<string, unknown>
     const metaRedirectUris = meta.redirect_uris as string[] | undefined
     if (!Array.isArray(metaRedirectUris) || metaRedirectUris.length === 0) {
       return errorResponse(400, 'invalid_client', 'Client metadata must include redirect_uris')
@@ -291,7 +328,7 @@ async function exchangeUpstreamCode(
     return errorResponse(502, 'upstream_error', 'Failed to exchange code with upstream provider')
   }
 
-  const tokens = await tokenResponse.json() as Record<string, unknown>
+  const tokens = (await tokenResponse.json()) as Record<string, unknown>
   return {
     accessToken: tokens.access_token as string,
     idToken: tokens.id_token as string | undefined
@@ -302,13 +339,15 @@ async function fetchUserinfo(
   userinfoUrl: string | undefined,
   accessToken: string
 ): Promise<{ email?: string; sub?: string }> {
-  if (!userinfoUrl || !accessToken) { return {} }
+  if (!userinfoUrl || !accessToken) {
+    return {}
+  }
   try {
     const res = await fetch(userinfoUrl, {
       headers: { Authorization: `Bearer ${accessToken}` }
     })
     if (res.ok) {
-      const userinfo = await res.json() as Record<string, unknown>
+      const userinfo = (await res.json()) as Record<string, unknown>
       return { email: userinfo.email as string | undefined, sub: userinfo.sub as string | undefined }
     }
   } catch {
@@ -330,7 +369,7 @@ async function handleRefreshToken(
   }
 
   // Legacy mode ignores a `resource` in the token body entirely, as before.
-  const requested = multiResource ? readBodyResource(body) : { ok: true } as ResourceParam
+  const requested = multiResource ? readBodyResource(body) : ({ ok: true } as ResourceParam)
   if (!requested.ok) {
     return errorResponse(400, 'invalid_target', 'Invalid resource indicator')
   }
@@ -411,13 +450,15 @@ async function handleAuthorizationCode(
     return errorResponse(400, 'invalid_request', 'Missing required parameters')
   }
 
-  const requested = multiResource ? readBodyResource(body) : { ok: true } as ResourceParam
+  const requested = multiResource ? readBodyResource(body) : ({ ok: true } as ResourceParam)
   if (!requested.ok) {
     return errorResponse(400, 'invalid_target', 'Invalid resource indicator')
   }
 
   const authCode = await store.getAuthCode(code)
-  if (!authCode) { return errorResponse(400, 'invalid_grant', 'Invalid or expired authorization code') }
+  if (!authCode) {
+    return errorResponse(400, 'invalid_grant', 'Invalid or expired authorization code')
+  }
 
   await store.deleteAuthCode(code)
 
@@ -442,7 +483,7 @@ async function handleAuthorizationCode(
   const effectiveResource = requested.value ?? authCode.resource
   // Re-check here, not only at /authorize: a client that omitted the indicator
   // on the authorize leg must not be able to smuggle one in at redemption.
-  if (effectiveResource !== undefined && !await isAllowedResource(effectiveResource)) {
+  if (effectiveResource !== undefined && !(await isAllowedResource(effectiveResource))) {
     return errorResponse(400, 'invalid_target', 'Unknown or unsupported resource')
   }
 
@@ -521,8 +562,12 @@ async function verifyAccessToken(
 
     const { payload } = await jwtVerify(token, key, { issuer })
     const aud = payload.aud
-    if (typeof aud !== 'string' || aud === '') { return undefined }
-    if (!await isAllowedResource(aud)) { return undefined }
+    if (typeof aud !== 'string' || aud === '') {
+      return undefined
+    }
+    if (!(await isAllowedResource(aud))) {
+      return undefined
+    }
 
     return {
       ...authInfoFromPayload(token, payload),
@@ -545,7 +590,9 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
   let signingKey: Uint8Array | null = null
 
   async function getSigningKey(): Promise<Uint8Array> {
-    if (signingKey) { return signingKey }
+    if (signingKey) {
+      return signingKey
+    }
     if (config.signingKey) {
       signingKey = new TextEncoder().encode(config.signingKey)
     } else {
@@ -556,17 +603,21 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
 
   return {
     metadata(): OAuthResponse {
-      return jsonResponse(200, {
-        issuer: config.resourceUrl,
-        authorization_endpoint: `${config.resourceUrl}/authorize`,
-        token_endpoint: `${config.resourceUrl}/token`,
-        registration_endpoint: `${config.resourceUrl}/register`,
-        response_types_supported: ['code'],
-        grant_types_supported: ['authorization_code', 'refresh_token'],
-        code_challenge_methods_supported: ['S256'],
-        token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
-        scopes_supported: scopes
-      }, { 'Cache-Control': 'max-age=3600' })
+      return jsonResponse(
+        200,
+        {
+          issuer: config.resourceUrl,
+          authorization_endpoint: `${config.resourceUrl}/authorize`,
+          token_endpoint: `${config.resourceUrl}/token`,
+          registration_endpoint: `${config.resourceUrl}/register`,
+          response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code', 'refresh_token'],
+          code_challenge_methods_supported: ['S256'],
+          token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
+          scopes_supported: scopes
+        },
+        { 'Cache-Control': 'max-age=3600' }
+      )
     },
 
     register(req) {
@@ -584,20 +635,28 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
       const codeChallengeMethod = params.get('code_challenge_method')
 
       const requestedResource = await readAuthorizeResource(params, multiResource, isAllowedResource)
-      if (!requestedResource.ok) { return requestedResource.response }
+      if (!requestedResource.ok) {
+        return requestedResource.response
+      }
       const resource = requestedResource.value
 
       if (responseType !== 'code') {
         return errorResponse(400, 'unsupported_response_type', 'Only response_type=code is supported')
       }
-      if (!clientId) { return errorResponse(400, 'invalid_request', 'client_id is required') }
-      if (!redirectUri) { return errorResponse(400, 'invalid_request', 'redirect_uri is required') }
+      if (!clientId) {
+        return errorResponse(400, 'invalid_request', 'client_id is required')
+      }
+      if (!redirectUri) {
+        return errorResponse(400, 'invalid_request', 'redirect_uri is required')
+      }
       if (!codeChallenge || codeChallengeMethod !== 'S256') {
         return errorResponse(400, 'invalid_request', 'PKCE with S256 is required')
       }
 
       const result = await resolveClient(clientId, store, config.redirectUris)
-      if ('status' in result) { return result }
+      if ('status' in result) {
+        return result
+      }
       const client = result
 
       if (!client.redirectUris.includes(redirectUri)) {
@@ -650,16 +709,22 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
       }
 
       const pending = await store.getPendingAuth(proxyState)
-      if (!pending) { return errorResponse(400, 'invalid_request', 'Unknown or expired state') }
+      if (!pending) {
+        return errorResponse(400, 'invalid_request', 'Unknown or expired state')
+      }
 
       const pkceVerifier = await store.getPkceVerifier(proxyState)
-      if (!pkceVerifier) { return errorResponse(400, 'invalid_request', 'Missing PKCE verifier') }
+      if (!pkceVerifier) {
+        return errorResponse(400, 'invalid_request', 'Missing PKCE verifier')
+      }
 
       await store.deletePendingAuth(proxyState)
       await store.deletePkceVerifier(proxyState)
 
       const upstream = await exchangeUpstreamCode(upstreamCode, config, callbackPath, pkceVerifier)
-      if ('status' in upstream) { return upstream }
+      if ('status' in upstream) {
+        return upstream
+      }
 
       const userinfo = await fetchUserinfo(config.userinfoUrl, upstream.accessToken)
 
@@ -689,7 +754,9 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
 
     async token(req): Promise<OAuthResponse> {
       const body = req.body
-      if (!body) { return errorResponse(400, 'invalid_request', 'Missing request body') }
+      if (!body) {
+        return errorResponse(400, 'invalid_request', 'Missing request body')
+      }
 
       const tokenConfig = { resourceUrl: config.resourceUrl, tokenTtl }
 

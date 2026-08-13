@@ -1,5 +1,20 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Action, ActionRun, ActionStreamRun, AdapterFactory, binarySchemaMeta, createConsoleLogger, isBinarySchema, isStreamingAction, resourceBytes, SilkweaveContext, SilkweaveError, SilkweaveOptions, toActionResource, unwrap, type ActionResource } from '@silkweave/core'
+import {
+  Action,
+  ActionRun,
+  ActionStreamRun,
+  AdapterFactory,
+  binarySchemaMeta,
+  createConsoleLogger,
+  isBinarySchema,
+  isStreamingAction,
+  resourceBytes,
+  SilkweaveContext,
+  SilkweaveError,
+  SilkweaveOptions,
+  toActionResource,
+  unwrap,
+  type ActionResource
+} from '@silkweave/core'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { once } from 'events'
@@ -33,9 +48,13 @@ function parseCLIInput(action: Action, args: any[]) {
   const rawInput: Record<string, unknown> = {}
   for (const key of Object.keys(action.input.shape)) {
     const value = opts[camelCase(key)]
-    if (value !== undefined) { rawInput[key] = value }
+    if (value !== undefined) {
+      rawInput[key] = value
+    }
   }
-  action.args?.forEach((k, index) => { rawInput[String(k)] = args[index] })
+  action.args?.forEach((k, index) => {
+    rawInput[String(k)] = args[index]
+  })
   const { error, data } = action.input.safeParse(rawInput)
   if (error || !data) {
     handleCLIError(error)
@@ -45,7 +64,10 @@ function parseCLIInput(action: Action, args: any[]) {
   return data
 }
 
-interface OptionSpec { placeholder: string; parseArg?: (value: string) => unknown }
+interface OptionSpec {
+  placeholder: string
+  parseArg?: (value: string) => unknown
+}
 
 /**
  * Tolerant JSON parse. A union arm is typically a scalar (`number | number[]`),
@@ -54,7 +76,11 @@ interface OptionSpec { placeholder: string; parseArg?: (value: string) => unknow
  * parses. Throwing here would trade a build-time crash for a run-time one.
  */
 function parseMaybeJson(value: string): unknown {
-  try { return JSON.parse(value) } catch { return value }
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
 }
 
 /**
@@ -64,7 +90,9 @@ function parseMaybeJson(value: string): unknown {
  */
 function literalSpec(values: readonly unknown[]): OptionSpec {
   const placeholder = `<${values.map((value) => String(value)).join('|')}>`
-  if (values.every((value) => typeof value === 'string')) { return { placeholder } }
+  if (values.every((value) => typeof value === 'string')) {
+    return { placeholder }
+  }
   return { placeholder, parseArg: parseMaybeJson }
 }
 
@@ -72,7 +100,9 @@ function literalSpec(values: readonly unknown[]): OptionSpec {
 function literalUnionValues(options: readonly z.ZodType[]): unknown[] | undefined {
   const values: unknown[] = []
   for (const option of options) {
-    if (!(option instanceof z.ZodLiteral)) { return undefined }
+    if (!(option instanceof z.ZodLiteral)) {
+      return undefined
+    }
     values.push(...option.def.values)
   }
   return values
@@ -92,7 +122,16 @@ function optionSpec(type: z.ZodType, key: string): OptionSpec {
     return { placeholder: '<number>', parseArg: (value) => Number(value) }
   }
   if (type instanceof z.ZodBigInt) {
-    return { placeholder: '<bigint>', parseArg: (value) => { try { return BigInt(value) } catch { return value } } }
+    return {
+      placeholder: '<bigint>',
+      parseArg: (value) => {
+        try {
+          return BigInt(value)
+        } catch {
+          return value
+        }
+      }
+    }
   }
   if (type instanceof z.ZodString || type instanceof z.ZodEnum) {
     return { placeholder: '<string>' }
@@ -144,9 +183,13 @@ function extensionFromMime(mimeType: string): string {
  */
 async function writeResourceResult(res: ActionResource, outputPath: string | undefined) {
   const bytes = resourceBytes(res)
-  if (res.description) { console.error(res.description) }
+  if (res.description) {
+    console.error(res.description)
+  }
   if (!outputPath && !process.stdout.isTTY) {
-    if (!process.stdout.write(bytes)) { await once(process.stdout, 'drain') }
+    if (!process.stdout.write(bytes)) {
+      await once(process.stdout, 'drain')
+    }
     return
   }
   const target = outputPath ?? res.name ?? `resource.${extensionFromMime(res.mimeType)}`
@@ -180,7 +223,9 @@ function registerCommand(program: Command, action: Action, options: SilkweaveOpt
   // order - not input-shape key order - so commander's positional slots line up
   // with how parseCLIInput reads them back (else the values are cross-assigned).
   for (const key of Object.keys(shape)) {
-    if (argSet.has(key)) { continue }
+    if (argSet.has(key)) {
+      continue
+    }
     const [type, { defaultValue }] = unwrap(shape[key])
     addCliOption(command, key, type, defaultValue, false)
   }
@@ -205,24 +250,23 @@ function registerCommand(program: Command, action: Action, options: SilkweaveOpt
       console.info(`${options.name} - ${action.name}`)
     }
     const runFn = action.run as ActionRun<object, object>
-    runFn(input, actionContext).then(async (result) => {
-      const res = await toActionResource(result, binarySchemaMeta(action.output))
-      if (res) {
-        await writeResourceResult(res, binaryOutput ? command.opts<{ output?: string }>().output : undefined)
-        return
-      }
-      logger.info(JSON.stringify(result, null, 2))
-    }).catch(handleCLIError)
+    runFn(input, actionContext)
+      .then(async (result) => {
+        const res = await toActionResource(result, binarySchemaMeta(action.output))
+        if (res) {
+          await writeResourceResult(res, binaryOutput ? command.opts<{ output?: string }>().output : undefined)
+          return
+        }
+        logger.info(JSON.stringify(result, null, 2))
+      })
+      .catch(handleCLIError)
   })
 }
 
 export const cli: AdapterFactory = () => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'cli' })
-    const program = new Command()
-      .name(options.name)
-      .description(options.description)
-      .version(options.version)
+    const program = new Command().name(options.name).description(options.description).version(options.version)
 
     return {
       context,
@@ -232,7 +276,7 @@ export const cli: AdapterFactory = () => {
         }
         program.parse()
       },
-      stop: async () => { }
+      stop: async () => {}
     }
   }
 }

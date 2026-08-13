@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 
@@ -13,12 +12,16 @@ let cached: any | null | undefined
  * app's decorators wrote to is the same one we read.
  */
 function loadClassValidator(): any | null {
-  if (cached !== undefined) { return cached }
+  if (cached !== undefined) {
+    return cached
+  }
   for (const base of [import.meta.url, join(process.cwd(), 'noop.js')]) {
     try {
       cached = createRequire(base)('class-validator')
       return cached
-    } catch { /* try the next resolution base */ }
+    } catch {
+      /* try the next resolution base */
+    }
   }
   cached = null
   return cached
@@ -40,7 +43,9 @@ export interface ValidationMeta {
  */
 export function classValidatorMetas(dtoType: any): Record<string, ValidationMeta[]> {
   const cv = loadClassValidator()
-  if (!cv?.getMetadataStorage) { return {} }
+  if (!cv?.getMetadataStorage) {
+    return {}
+  }
   let metas: Array<{ propertyName?: string; type?: string; name?: string; constraints?: unknown[] }>
   try {
     metas = cv.getMetadataStorage().getTargetValidationMetadatas(dtoType, null, false, false)
@@ -49,8 +54,10 @@ export function classValidatorMetas(dtoType: any): Record<string, ValidationMeta
   }
   const out: Record<string, ValidationMeta[]> = {}
   for (const m of metas) {
-    if (!m.propertyName) { continue }
-    (out[m.propertyName] ??= []).push({ type: m.type, name: m.name, constraints: m.constraints })
+    if (!m.propertyName) {
+      continue
+    }
+    ;(out[m.propertyName] ??= []).push({ type: m.type, name: m.name, constraints: m.constraints })
   }
   return out
 }

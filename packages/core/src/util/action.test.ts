@@ -34,7 +34,9 @@ describe('validateActionDisposition', () => {
       toolResult: (result) => ({ content: [{ type: 'text', text: JSON.stringify(result) }] }),
       run: async ({ id }) => ({ id })
     })
-    expect(() => validateActionDisposition(action as Action)).toThrow(/toolResult.*cannot be combined with disposition 'structured'/)
+    expect(() => validateActionDisposition(action as Action)).toThrow(
+      /toolResult.*cannot be combined with disposition 'structured'/
+    )
   })
 
   it('rejects structured streaming actions', () => {
@@ -43,7 +45,9 @@ describe('validateActionDisposition', () => {
       disposition: 'structured',
       output: z.object({ id: z.string() }),
       chunk: z.object({ id: z.string() }),
-      run: async function* ({ id }: { id: string }) { yield { id } }
+      run: async function* ({ id }: { id: string }) {
+        yield { id }
+      }
     } as Action
     expect(() => validateActionDisposition(action)).toThrow(/not supported on a streaming action/)
   })

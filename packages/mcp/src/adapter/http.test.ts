@@ -27,7 +27,10 @@ beforeAll(async () => {
       host: 'localhost',
       port: 0,
       // Bearer auth on everything else - the marketplace route must bypass it.
-      auth: { verifyToken: async (token) => token === 'secret' ? { token, clientId: 'test', scopes: [] } : undefined, required: true },
+      auth: {
+        verifyToken: async (token) => (token === 'secret' ? { token, clientId: 'test', scopes: [] } : undefined),
+        required: true
+      },
       skills: [defineSkill({ files: { 'SKILL.md': SKILL_MD } })],
       skillsMarketplace: { owner: { name: 'Atomic', email: 'dev@atomic.bi' }, description: 'Team skills' }
     }
@@ -44,16 +47,18 @@ describe('http skillsMarketplace', () => {
     const response = await fetch(`http://127.0.0.1:${port}/.claude-plugin/marketplace.json`)
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toContain('application/json')
-    const doc = await response.json() as { name: string; owner: object; description: string; plugins: object[] }
+    const doc = (await response.json()) as { name: string; owner: object; description: string; plugins: object[] }
     expect(doc.name).toBe('team-skills')
     expect(doc.owner).toEqual({ name: 'Atomic', email: 'dev@atomic.bi' })
     expect(doc.description).toBe('Team skills')
-    expect(doc.plugins).toEqual([{
-      name: 'deploy-checklist',
-      source: { source: 'npm', package: 'deploy-checklist-skill', version: '1.0.0' },
-      description: 'Walk the release checklist before deploying',
-      version: '1.0.0'
-    }])
+    expect(doc.plugins).toEqual([
+      {
+        name: 'deploy-checklist',
+        source: { source: 'npm', package: 'deploy-checklist-skill', version: '1.0.0' },
+        description: 'Walk the release checklist before deploying',
+        version: '1.0.0'
+      }
+    ])
   })
 
   it('still guards the MCP endpoint', async () => {

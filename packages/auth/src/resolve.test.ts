@@ -42,18 +42,21 @@ describe('normalizeResourceUri', () => {
 
 describe('protectedResourceMetadataUrl', () => {
   it('uses RFC 9728 path-insertion form for a path resource', () => {
-    expect(protectedResourceMetadataUrl('https://mcp.example.com/yoexoexl'))
-      .toBe('https://mcp.example.com/.well-known/oauth-protected-resource/yoexoexl')
+    expect(protectedResourceMetadataUrl('https://mcp.example.com/yoexoexl')).toBe(
+      'https://mcp.example.com/.well-known/oauth-protected-resource/yoexoexl'
+    )
   })
 
   it('collapses to the bare well-known path for an origin resource', () => {
-    expect(protectedResourceMetadataUrl('https://mcp.example.com'))
-      .toBe('https://mcp.example.com/.well-known/oauth-protected-resource')
+    expect(protectedResourceMetadataUrl('https://mcp.example.com')).toBe(
+      'https://mcp.example.com/.well-known/oauth-protected-resource'
+    )
   })
 
   it('preserves nested paths', () => {
-    expect(protectedResourceMetadataUrl('https://mcp.example.com/a/b'))
-      .toBe('https://mcp.example.com/.well-known/oauth-protected-resource/a/b')
+    expect(protectedResourceMetadataUrl('https://mcp.example.com/a/b')).toBe(
+      'https://mcp.example.com/.well-known/oauth-protected-resource/a/b'
+    )
   })
 })
 
@@ -133,8 +136,9 @@ describe('pathResolver', () => {
 
   it('builds the identifier from the configured origin, never the request origin', () => {
     // A spoofed Host must not steer the advertised metadata URL or the audience.
-    expect(resolver(requestFor('https://evil.example.com/yoexoexl'), createContext({})))
-      .toBe('https://mcp.example.com/yoexoexl')
+    expect(resolver(requestFor('https://evil.example.com/yoexoexl'), createContext({}))).toBe(
+      'https://mcp.example.com/yoexoexl'
+    )
   })
 
   it('returns undefined for a non-matching path', () => {
@@ -143,8 +147,9 @@ describe('pathResolver', () => {
 
   it('normalizes a trailing-slash origin', () => {
     const trailing = pathResolver({ origin: 'https://mcp.example.com/', match: /^\/([a-z]{8})$/ })
-    expect(trailing(requestFor('https://mcp.example.com/yoexoexl'), createContext({})))
-      .toBe('https://mcp.example.com/yoexoexl')
+    expect(trailing(requestFor('https://mcp.example.com/yoexoexl'), createContext({}))).toBe(
+      'https://mcp.example.com/yoexoexl'
+    )
   })
 
   it('maps to the origin resource when a function match returns an empty string', () => {

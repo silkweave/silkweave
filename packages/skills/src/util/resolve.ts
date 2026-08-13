@@ -1,4 +1,11 @@
-import { isResolvedSkill, isTextMimeType, SilkweaveError, type Skill, type SkillDefinition, type SkillFile } from '@silkweave/core'
+import {
+  isResolvedSkill,
+  isTextMimeType,
+  SilkweaveError,
+  type Skill,
+  type SkillDefinition,
+  type SkillFile
+} from '@silkweave/core'
 import { sha256 } from './digest.js'
 import { aggregateDigest } from './extension.js'
 import { parseSkillMarkdown } from './frontmatter.js'
@@ -28,7 +35,9 @@ async function loadSkillDir(dir: string): Promise<RawSkillFiles> {
   const files: Record<string, Uint8Array | string> = {}
   const walk = async (current: string): Promise<void> => {
     for (const entry of await readdir(current, { withFileTypes: true })) {
-      if (entry.name.startsWith('.')) { continue }
+      if (entry.name.startsWith('.')) {
+        continue
+      }
       const absolute = path.join(current, entry.name)
       if (entry.isDirectory()) {
         await walk(absolute)
@@ -46,7 +55,9 @@ async function loadSkillDir(dir: string): Promise<RawSkillFiles> {
 /** Conventional string entries under the frontmatter `metadata` mapping (`version`, `npmPackage`). */
 function frontmatterMetadata(frontmatter: Record<string, unknown>, key: string): string | undefined {
   const metadata = frontmatter['metadata']
-  if (typeof metadata !== 'object' || metadata === null) { return undefined }
+  if (typeof metadata !== 'object' || metadata === null) {
+    return undefined
+  }
   const value = (metadata as Record<string, unknown>)[key]
   return typeof value === 'string' ? value : undefined
 }
@@ -54,8 +65,12 @@ function frontmatterMetadata(frontmatter: Record<string, unknown>, key: string):
 /** SKILL.md first, then supporting files alphabetically - a stable order for digests and listings. */
 function sortFiles(files: SkillFile[]): SkillFile[] {
   return [...files].sort((a, b) => {
-    if (a.path === SKILL_MD) { return -1 }
-    if (b.path === SKILL_MD) { return 1 }
+    if (a.path === SKILL_MD) {
+      return -1
+    }
+    if (b.path === SKILL_MD) {
+      return 1
+    }
     return a.path.localeCompare(b.path)
   })
 }
@@ -75,7 +90,10 @@ export async function resolveSkill(definition: SkillDefinition): Promise<Skill> 
     : { files: definition.files!, dirName: undefined }
   const skillMd = rawFiles[SKILL_MD]
   if (typeof skillMd !== 'string') {
-    throw new SilkweaveError(`Skill${definition.dir ? ` at '${definition.dir}'` : ''} has no ${SKILL_MD}`, 'invalid_skill')
+    throw new SilkweaveError(
+      `Skill${definition.dir ? ` at '${definition.dir}'` : ''} has no ${SKILL_MD}`,
+      'invalid_skill'
+    )
   }
   const { frontmatter } = parseSkillMarkdown(skillMd)
   const frontmatterName = typeof frontmatter['name'] === 'string' ? frontmatter['name'] : undefined
@@ -99,12 +117,16 @@ export async function resolveSkill(definition: SkillDefinition): Promise<Skill> 
   if (typeof description !== 'string' || description.length < 1 || description.length > 1024) {
     throw new SilkweaveError(`Skill '${name}': frontmatter 'description' is required (1-1024 chars)`, 'invalid_skill')
   }
-  const files = sortFiles(await Promise.all(Object.entries(rawFiles).map(async ([path, data]) => ({
-    path: assertSafeSkillPath(path),
-    mimeType: mimeForPath(path),
-    data,
-    digest: await sha256(data)
-  }))))
+  const files = sortFiles(
+    await Promise.all(
+      Object.entries(rawFiles).map(async ([path, data]) => ({
+        path: assertSafeSkillPath(path),
+        mimeType: mimeForPath(path),
+        data,
+        digest: await sha256(data)
+      }))
+    )
+  )
   const digest = await aggregateDigest(files)
   const version = definition.version ?? frontmatterMetadata(frontmatter, 'version')
   const npmPackage = definition.npmPackage ?? frontmatterMetadata(frontmatter, 'npmPackage')
@@ -125,7 +147,9 @@ export async function resolveSkill(definition: SkillDefinition): Promise<Skill> 
  * duplicate names. This is what the MCP adapters call once at start.
  */
 export async function resolveSkills(entries: (Skill | SkillDefinition)[]): Promise<Skill[]> {
-  const skills = await Promise.all(entries.map((entry) => isResolvedSkill(entry) ? Promise.resolve(entry) : resolveSkill(entry)))
+  const skills = await Promise.all(
+    entries.map((entry) => (isResolvedSkill(entry) ? Promise.resolve(entry) : resolveSkill(entry)))
+  )
   const seen = new Set<string>()
   for (const skill of skills) {
     if (seen.has(skill.name)) {

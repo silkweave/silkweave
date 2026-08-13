@@ -70,13 +70,21 @@ describe('validateToken', () => {
   describe('issuer binding (RFC 9207 / SEP-2468)', () => {
     it('rejects a token from an unexpected issuer', async () => {
       const auth: AuthInfo = { token: 'tok', iss: 'https://evil.example.com', aud: 'https://mcp.example.com' }
-      const result = await validateToken(bearer(), configReturning(auth, { issuer: 'https://idp.example.com' }), context)
+      const result = await validateToken(
+        bearer(),
+        configReturning(auth, { issuer: 'https://idp.example.com' }),
+        context
+      )
       expect(result.error?.body.error_description).toBe('Token issuer mismatch')
     })
 
     it('accepts a token from the expected issuer', async () => {
       const auth: AuthInfo = { token: 'tok', iss: 'https://idp.example.com', aud: 'https://mcp.example.com' }
-      const result = await validateToken(bearer(), configReturning(auth, { issuer: 'https://idp.example.com' }), context)
+      const result = await validateToken(
+        bearer(),
+        configReturning(auth, { issuer: 'https://idp.example.com' }),
+        context
+      )
       expect(result.auth).toBe(auth)
     })
   })
@@ -88,10 +96,11 @@ describe('validateToken', () => {
     }
 
     /** A context carrying a Fetch request, as every adapter forks it. */
-    const at = (path: string) => createContext({
-      adapter: 'test',
-      request: new Request(`https://mcp.example.com${path}`)
-    })
+    const at = (path: string) =>
+      createContext({
+        adapter: 'test',
+        request: new Request(`https://mcp.example.com${path}`)
+      })
 
     it('challenges with the RFC 9728 insertion-form metadata URL', async () => {
       const config = configReturning(undefined, { resourceUrl: tenantResolver })
@@ -150,7 +159,11 @@ describe('validateToken', () => {
   describe('step-up scope challenge (SEP-2350)', () => {
     it('returns 403 with the required scopes in WWW-Authenticate', async () => {
       const auth: AuthInfo = { token: 'tok', aud: 'https://mcp.example.com', scopes: ['read'] }
-      const result = await validateToken(bearer(), configReturning(auth, { requiredScopes: ['read', 'write'] }), context)
+      const result = await validateToken(
+        bearer(),
+        configReturning(auth, { requiredScopes: ['read', 'write'] }),
+        context
+      )
       expect(result.error?.statusCode).toBe(403)
       expect(result.error?.body.error).toBe('insufficient_scope')
       expect(result.error?.headers['WWW-Authenticate']).toContain('scope="read write"')
@@ -158,7 +171,11 @@ describe('validateToken', () => {
 
     it('passes when all required scopes are present', async () => {
       const auth: AuthInfo = { token: 'tok', aud: 'https://mcp.example.com', scopes: ['read', 'write'] }
-      const result = await validateToken(bearer(), configReturning(auth, { requiredScopes: ['read', 'write'] }), context)
+      const result = await validateToken(
+        bearer(),
+        configReturning(auth, { requiredScopes: ['read', 'write'] }),
+        context
+      )
       expect(result.auth).toBe(auth)
     })
   })

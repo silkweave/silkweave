@@ -1,5 +1,11 @@
 import { Action, ActionResource, SerializedResource, Silkweave } from '@silkweave/core'
-import type { AnyTRPCRootTypes, TRPCBuiltRouter, TRPCMutationProcedure, TRPCQueryProcedure, TRPCSubscriptionProcedure } from '@trpc/server'
+import type {
+  AnyTRPCRootTypes,
+  TRPCBuiltRouter,
+  TRPCMutationProcedure,
+  TRPCQueryProcedure,
+  TRPCSubscriptionProcedure
+} from '@trpc/server'
 import type { z } from 'zod/v4'
 
 // Mirror the runtime key `camelCase(action.name)` from change-case: split on
@@ -11,11 +17,13 @@ type CamelJoin<S extends string> = S extends `${infer A}${'.' | '-' | '_' | ' '}
   : S
 type CamelCase<S extends string> = Uncapitalize<CamelJoin<S>>
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ChunkOf<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<infer C, unknown, unknown> ? C : never
+type ChunkOf<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<infer C, unknown, unknown>
+  ? C
+  : never
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type IsStreaming<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<unknown, unknown, unknown> ? true : false
+type IsStreaming<A extends Action> = A['run'] extends (...args: any[]) => AsyncGenerator<unknown, unknown, unknown>
+  ? true
+  : false
 
 // A resource result crosses tRPC's JSON wire as its SerializedResource
 // envelope (buildRouter serializes at runtime), so the inferred output type
@@ -24,23 +32,24 @@ type IsStreaming<A extends Action> = A['run'] extends (...args: any[]) => AsyncG
 // unions, matching the per-call runtime detection.
 type SerializeOutput<R> = R extends ActionResource | Blob | Uint8Array | ArrayBuffer ? SerializedResource : R
 
-type ActionToProcedure<A extends Action> = IsStreaming<A> extends true
-  ? TRPCSubscriptionProcedure<{
-    meta: object
-    input: z.infer<A['input']>
-    output: ChunkOf<A>
-  }>
-  : ('query' extends NonNullable<A['kind']>
-    ? TRPCQueryProcedure<{
-      meta: object
-      input: z.infer<A['input']>
-      output: SerializeOutput<Awaited<ReturnType<A['run']>>>
-    }>
-    : TRPCMutationProcedure<{
-      meta: object
-      input: z.infer<A['input']>
-      output: SerializeOutput<Awaited<ReturnType<A['run']>>>
-    }>)
+type ActionToProcedure<A extends Action> =
+  IsStreaming<A> extends true
+    ? TRPCSubscriptionProcedure<{
+        meta: object
+        input: z.infer<A['input']>
+        output: ChunkOf<A>
+      }>
+    : 'query' extends NonNullable<A['kind']>
+      ? TRPCQueryProcedure<{
+          meta: object
+          input: z.infer<A['input']>
+          output: SerializeOutput<Awaited<ReturnType<A['run']>>>
+        }>
+      : TRPCMutationProcedure<{
+          meta: object
+          input: z.infer<A['input']>
+          output: SerializeOutput<Awaited<ReturnType<A['run']>>>
+        }>
 
 type ActionsToRouterRecord<Actions extends Record<string, Action>> = {
   [K in keyof Actions & string as CamelCase<Actions[K]['name']>]: ActionToProcedure<Actions[K]>
@@ -62,6 +71,5 @@ type TrpcRootTypes = {
  * export type AppRouter = InferTrpcRouter<typeof server>
  * ```
  */
-export type InferTrpcRouter<S> = S extends Silkweave<infer Actions>
-  ? TRPCBuiltRouter<TrpcRootTypes, ActionsToRouterRecord<Actions>>
-  : never
+export type InferTrpcRouter<S> =
+  S extends Silkweave<infer Actions> ? TRPCBuiltRouter<TrpcRootTypes, ActionsToRouterRecord<Actions>> : never

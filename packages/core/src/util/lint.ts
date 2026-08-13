@@ -19,7 +19,9 @@ const MIN_DESCRIPTION_LENGTH = 12
 
 /** A field's `.describe()` text, looking through optional/default/nullable/readonly wrappers. */
 function describedText(field: z.ZodTypeAny): string | undefined {
-  if (field.description) { return field.description }
+  if (field.description) {
+    return field.description
+  }
   const [base] = unwrap(field)
   return base.description
 }
@@ -76,7 +78,9 @@ export function lintActions(actions: Action[]): ActionLintWarning[] {
  */
 export function reportActionLint(
   actions: Action[],
-  warn: (message: string) => void = (message) => { console.warn(message) }
+  warn: (message: string) => void = (message) => {
+    console.warn(message)
+  }
 ): ActionLintWarning[] {
   const warnings = lintActions(actions)
   for (const warning of warnings) {

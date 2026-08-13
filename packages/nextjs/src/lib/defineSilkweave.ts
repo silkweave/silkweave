@@ -72,10 +72,14 @@ export function defineSilkweave<const Arr extends readonly Action[]>(
   const { actions, ...identity } = options
 
   return {
-    mcp: (mcpOptions) => lazyHandlers(['GET', 'POST', 'DELETE', 'OPTIONS'], async () =>
-      (await import('./mcpRoute.js')).buildMcpRoute(identity, actions, mcpOptions)),
-    trpc: (trpcOptions) => lazyHandlers(['GET', 'POST', 'OPTIONS'], async () =>
-      (await import('./trpcRoute.js')).buildTrpcRoute(identity, actions, trpcOptions)),
+    mcp: (mcpOptions) =>
+      lazyHandlers(['GET', 'POST', 'DELETE', 'OPTIONS'], async () =>
+        (await import('./mcpRoute.js')).buildMcpRoute(identity, actions, mcpOptions)
+      ),
+    trpc: (trpcOptions) =>
+      lazyHandlers(['GET', 'POST', 'OPTIONS'], async () =>
+        (await import('./trpcRoute.js')).buildTrpcRoute(identity, actions, trpcOptions)
+      ),
     Router: undefined as unknown as InferTrpcRouter<AppServer<Arr>>
   }
 }
