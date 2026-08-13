@@ -39,6 +39,44 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '5.2.0',
+    date: '2026-08-13',
+    summary:
+      'Silkweave now installs alongside either Zod major instead of pinning you to one, every dependency moves to its latest stable, and the open advisory count across the repo drops from 24 to 1.',
+    changes: [
+      {
+        type: 'improvement',
+        text: 'Zod 3 and Zod 4 are both supported. Every package now declares zod@^3.25.0 || ^4.0.0 instead of ^3.25.0, matching what the MCP SDK, the Vercel AI SDK and zod-to-json-schema already declare. This also fixes a real install failure: an app already on Zod 4 previously could not satisfy the peer range at all. Nothing to change in your code - the zod/v4 import path ships in both majors.',
+        commit: '5c924c7'
+      },
+      {
+        type: 'improvement',
+        text: 'Wider peer ranges elsewhere too: commander ^13 || ^14 || ^15 on @silkweave/mcp, and ai ^5 || ^6 || ^7 on @silkweave/ai (AI SDK v7 made convertToModelMessages async; the adapter handles all three). Bring your own major - Silkweave no longer forces the choice.',
+        commit: '5c924c7'
+      },
+      {
+        type: 'improvement',
+        text: 'Every dependency upgraded to latest stable, including MCP SDK 1.30, fastify 5.11, @trpc/server 11.18 and TypeScript 7. Open advisories across the repo drop from 24 to 1 (the remaining one is pinned by a transitive of the private website and is not in any published package). A fresh install of the published dependency surface audits clean.',
+        commit: '5c924c7'
+      },
+      {
+        type: 'fix',
+        text: 'The documentation page rendered blank in production from 5.1.0 onward. Fixed.',
+        commit: 'f55216f'
+      },
+      {
+        type: 'fix',
+        text: 'Corrected the guidance on empty-string optionals: z.string().min(1).optional() still accepts a single space, so z.string().trim().min(1).optional() is the form that rejects both.',
+        commit: 'b2b4176'
+      },
+      {
+        type: 'improvement',
+        text: '@silkweave/cli and the silkweave CLI now declare engines.node >= 22.12, the floor commander 15 requires. Node 20 reached end of life in April 2026; the other packages are unchanged at Node 18+.',
+        commit: '5c924c7'
+      }
+    ]
+  },
+  {
     version: '5.1.0',
     date: '2026-08-13',
     summary:
