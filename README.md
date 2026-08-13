@@ -92,7 +92,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
 | `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + plain `console` output |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
-| `@silkweave/trpc` | [![npm](https://img.shields.io/npm/v/@silkweave/trpc)](https://www.npmjs.com/package/@silkweave/trpc) | tRPC adapter - end-to-end type-safe procedures (standalone server + fetch handler) |
+| `@silkweave/trpc` | [![npm](https://img.shields.io/npm/v/@silkweave/trpc)](https://www.npmjs.com/package/@silkweave/trpc) | tRPC adapter - end-to-end type-safe procedures (standalone server, fetch handler, or a handler you mount yourself) |
 | `@silkweave/edge` | [![npm](https://img.shields.io/npm/v/@silkweave/edge)](https://www.npmjs.com/package/@silkweave/edge) | Web-Standard edge/serverless adapter - stateless MCP over Streamable HTTP (Cloudflare Workers, Vercel, Bun, Deno) |
 | `@silkweave/nestjs` | [![npm](https://img.shields.io/npm/v/@silkweave/nestjs)](https://www.npmjs.com/package/@silkweave/nestjs) | NestJS adapter - expose existing controllers as MCP tools via `@Mcp()` (input reflected from route + param decorators + swagger/class-validator) |
 | `@silkweave/nextjs` | [![npm](https://img.shields.io/npm/v/@silkweave/nextjs)](https://www.npmjs.com/package/@silkweave/nextjs) | Next.js App Router adapter - `defineSilkweave({ actions })` projects one action set onto MCP + tRPC route handlers |
@@ -328,7 +328,7 @@ MCP logging notifications are wired automatically - `logger.info("message")` in 
 
 ### MCP Streamable HTTP
 
-A **stateless** MCP transport over HTTP (per the 2026 spec direction): each `POST /mcp` mints a fresh transport and server, handles exactly that request - streaming progress over SSE when the call carries a progress token - and tears down when the response closes. No session IDs, no session map; any request can hit any instance, so the same adapter works behind load balancers and in multi-replica deployments.
+A **stateless** MCP transport over HTTP (per the 2026 spec direction): each `POST /mcp` mints a fresh transport and server, handles exactly that request - streaming progress over SSE when the call carries a progress token - and tears down when the response closes. No session IDs, no session map; any request can hit any instance, so the same adapter works behind load balancers and in multi-replica deployments. `GET` and `DELETE` on the transport path answer `405` with `Allow: POST` - the Streamable HTTP spec's response for a server offering no standing SSE stream, and what MCP clients read as the "no stream here" signal.
 
 ```typescript
 import { silkweave } from '@silkweave/core'
@@ -349,6 +349,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/mcp` | Handle a single MCP request (per-request SSE response) |
+| `GET`/`DELETE` | `/mcp` | `405 Allow: POST` - the stateless transport offers no standing SSE stream |
 | `GET` | `/resource/:id` | Sideloaded embedded resources (`disposition: 'smart'`) |
 | various | OAuth + `/.well-known/*` | When `auth` is configured |
 | `GET` | `/.claude-plugin/marketplace.json` | When `skillsMarketplace` is configured |
@@ -366,6 +367,7 @@ CORS is configured out of the box.
 | `onToolCall` | `OnToolCall` | Fire-and-forget per-call telemetry |
 | `skills` | `(Skill \| SkillDefinition)[]` | Serve [Agent Skills](#agent-skills-over-mcp) |
 | `skillsMarketplace` | `SkillsMarketplaceOptions` | Claude Code plugin marketplace for npm-published skills |
+| `transportPaths` | `string[]` | Extra paths that also serve the transport - the per-tenant connector URLs of a [multi-resource server](#one-as-n-protected-resources) |
 
 ### tRPC
 
@@ -394,6 +396,38 @@ const { results } = await client.search.query({ query: 'hello', limit: 5 })
 ```
 
 For serverless runtimes (Astro, Vercel, Cloudflare Workers), use **`trpcFetch()`** instead - it returns a Web Standard `(Request) => Promise<Response>` handler (plus `GET`/`POST`) rather than binding a port. Streaming actions are registered as tRPC **subscriptions** automatically.
+
+For a Node server you already own, use **`trpcNode()`** - it returns a `(req, res)` handler to mount as one route among many:
+
+```typescript
+const api = trpcNode({ endpoint: '/trpc', auth })
+
+const server = silkweave({ name: 'wiki', version: '1.0.0' }).adapter(api.adapter).actions(actions)
+export type AppRouter = InferTrpcRouter<typeof server>
+await server.start()
+
+httpServer.on('request', (req, res) => {
+  if (req.url?.startsWith('/trpc')) { return api.handler(req, res) }
+  // ...the MCP transport, your gateway, the SPA
+})
+```
+
+This matters beyond convenience: an app whose browser talks tRPC and whose agent talks MCP usually needs both on **one origin**, because a browser cannot put an `Authorization` header on a WebSocket upgrade - the only credential a tab can present is a per-origin cookie. The handler does not verify its prefix (it slices `endpoint` unconditionally), and it configures no CORS, since a mounted handler does not own its host's response headers.
+
+**Cookie-shaped auth.** `auth` reads exactly one credential, a bearer token. `authenticate` - available on all three tRPC adapters - resolves the caller from the request itself instead:
+
+```typescript
+trpcNode({
+  endpoint: '/trpc',
+  auth,                              // the agent still presents a bearer token
+  authenticate: (req) => {           // the user's tab presents a cookie
+    const user = sessions.resolve(req)
+    return user ? { token: user.sessionId, clientId: user.id } : null
+  }
+})
+```
+
+Returning `null` falls through to the bearer path, so one endpoint serves both callers, and the resolved identity lands on the **same `auth` context key** the MCP adapters use - one action's `run()` serves the browser and the agent unchanged. Note it bypasses every check `validateToken` performs (expiry, issuer, audience, scopes), because what it validates is not a token, and it inherits a browser CSRF threat model bearer endpoints are structurally immune to - see the [package README](packages/trpc/README.md#cookie--custom-authentication) before reaching for it.
 
 ### Fastify REST API
 
@@ -676,6 +710,28 @@ const { adapter, handler } = edge({ auth })
 ```
 
 Importing only `@silkweave/auth` keeps the issuer/store machinery out of your bundle; reach for `@silkweave/auth/oauth` only when you run the OAuth 2.1 flow yourself.
+
+### One AS, N protected resources
+
+A server fronting several tenants needs a distinct URL per tenant - Claude Desktop and claude.ai dedupe MCP connectors **by URL**, so one URL means one attachable space - and each URL must be its own OAuth **protected resource** with its own token audience, so a token minted for tenant A is rejected when replayed at tenant B. There is still exactly one authorization server.
+
+```typescript
+import { pathResolver } from '@silkweave/auth'
+
+const AS = 'https://mcp.example.com'
+const TENANT = /^\/([a-z]{8})$/
+
+const auth = google({
+  clientId, clientSecret, store,
+  resourceUrl: AS,                                              // AS identity + default audience
+  resolveResource: pathResolver({ origin: AS, match: TENANT }), // one resource per tenant
+  allowedResources: async (resource) => isLiveTenant(resource)  // which audiences the AS will mint
+})
+```
+
+`pathResolver` builds identifiers from *your configured origin*, never the inbound request's, so a spoofed `Host` cannot steer the advertised metadata URL or the expected audience. Adapters serve the RFC 9728 path-insertion metadata route automatically, and existing string `resourceUrl` configs are unchanged in every respect.
+
+**`aud` is not membership.** The authorization server mints `aud: .../tenantA` for any authenticated user who asks, including one with no rights in tenant A - the indicator says where a token may be *presented*, never what its subject may *do* there. Per-tenant authorization stays your job on every call; `validateToken` returns the resolved `resource` so that check needs no URL re-parsing. See the [auth README](packages/auth/README.md#multi-resource-one-authorization-server-n-protected-resources).
 
 ---
 
@@ -1008,6 +1064,10 @@ interface FastifyAdapterOptions {
 // CLI via commander - from @silkweave/cli
 import { cli } from '@silkweave/cli'
 function cli(): AdapterFactory
+
+// tRPC on a node:http server you own - from @silkweave/trpc
+import { trpcNode } from '@silkweave/trpc'
+function trpcNode(options?: TrpcNodeAdapterOptions): { adapter: AdapterGenerator; handler: (req, res) => void }
 
 // tRPC - from @silkweave/trpc
 import { trpc, trpcFetch, type InferTrpcRouter } from '@silkweave/trpc'
