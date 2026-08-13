@@ -191,6 +191,7 @@ export default { fetch: handler }
 |--------|------|---------|-------------|
 | `endpoint` | `string` | `'/trpc'` | URL prefix stripped before tRPC routing |
 | `auth` | `AuthConfig` | `undefined` | Same semantics as `trpc()`. On auth failure the handler returns a `401 Response` with `WWW-Authenticate` headers |
+| `authenticate` | `Authenticate<Request>` | `undefined` | Resolve the caller from the request itself - see [Cookie / custom authentication](#cookie--custom-authentication) |
 
 ### Return shape
 
@@ -208,6 +209,96 @@ export default { fetch: handler }
 - **CORS**: not handled by `trpcFetch`. Configure it in your host framework (Astro middleware, `vercel.json` headers, Cloudflare Worker response headers, etc).
 - **Cold-start safety**: an internal `_ready` promise gates the handler until `server.start()` has completed the router build, so the first invocation from a cold serverless function won't race the module-top `await server.start()`.
 - **`server.start()` is still required**. It's what builds the tRPC router from your registered actions. It just doesn't `listen()` in fetch mode.
+
+## Mounting on a server you already own (`trpcNode`)
+
+`trpc()` binds its own port; `trpcFetch()` returns a Web-Standard handler. The third shape is the
+one a real Node application has: an HTTP server that already exists, owned by something else, onto
+which tRPC mounts as one route among many. `trpcNode()` returns that handler.
+
+This is not only a convenience. An app whose browser talks tRPC and whose agent talks MCP usually
+needs both on **one origin**, for a reason with no workaround: a browser cannot put an
+`Authorization` header on a WebSocket upgrade, so the only credential a tab can present on an attach
+is a cookie - and a cookie is per-origin. Move the API to another port and the app's login stops
+authenticating the agent socket.
+
+```typescript
+import { silkweave } from '@silkweave/core'
+import { trpcNode, type InferTrpcRouter } from '@silkweave/trpc'
+
+const api = trpcNode({ endpoint: '/trpc', auth })
+
+const server = silkweave({ name: 'wiki', description: '...', version: '1.0.0' })
+  .adapter(api.adapter)
+  .actions(wikiActions)
+
+export type AppRouter = InferTrpcRouter<typeof server>
+await server.start()
+
+// Mount on whatever owns the port.
+httpServer.on('request', (req, res) => {
+  if (req.url?.startsWith('/trpc')) { return api.handler(req, res) }
+  // ...the agent gateway, the MCP transport, the SPA
+})
+```
+
+### `trpcNode` options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `endpoint` | `string` | `'/trpc/'` | URL prefix stripped before tRPC routing (normalized to a trailing slash) |
+| `auth` | `AuthConfig` | `undefined` | Same semantics as `trpc()` |
+| `authenticate` | `Authenticate<IncomingMessage>` | `undefined` | Resolve the caller from the request itself - see below |
+
+Returns `{ adapter, handler }`, where `handler` is a `(req: IncomingMessage, res: ServerResponse) => void`.
+
+- **The handler does not verify the prefix.** The underlying tRPC handler slices `endpoint` off the
+  path unconditionally, so route only matching URLs into it (as above).
+- **CORS is not configured**, like `trpcFetch` and unlike `trpc()`: a mounted handler does not own
+  the response headers of the server it is mounted on.
+- **Readiness**: the handler waits for `server.start()` and answers `503` if the router failed to
+  build, so a request arriving before start resolves neither hangs nor 500s.
+- `server.start()` is still required - it builds the router. It just doesn't `listen()`.
+
+## Cookie / custom authentication
+
+`auth` reads exactly one credential: a bearer token in the `Authorization` header. That is right for
+MCP and for service-to-service calls, and it is not how a same-origin SPA authenticates - the
+browser sends a cookie, because that is also what authenticates the WebSocket upgrade.
+
+`authenticate` resolves the caller from the request itself. It is available on all three adapters:
+
+```typescript
+trpcNode({
+  endpoint: '/trpc',
+  auth,                                  // the agent still presents a bearer token
+  authenticate: (req) => {               // the user's tab presents a cookie
+    const user = sessions.resolve(req)
+    return user ? { token: user.sessionId, clientId: user.id } : null
+  }
+})
+```
+
+The chain is: `authenticate` first; returning `null` falls through to the `auth` bearer path (so one
+endpoint serves both callers), and with no `auth` configured a decline is a `401` **without** a
+`WWW-Authenticate` challenge - advertising OAuth discovery on a cookie endpoint would mislead. Throw
+a `SilkweaveError` to reject with a specific status; it is mapped to a `TRPCError` rather than
+surfacing as an opaque 500.
+
+The `AuthInfo` you return lands on the **same `auth` context key** the MCP adapters use, so one
+action's `run()` serves the browser and the agent unchanged - that identity is the whole point.
+
+> **`authenticate` bypasses every check `validateToken` performs** - expiry, issuer (RFC 9207),
+> audience (RFC 8707), and required scopes (SEP-2350). That is correct, since what you are
+> validating is not a token, but it means validation is entirely yours. Do not use it as a "custom
+> token validator".
+>
+> **CSRF**: once a cookie authenticates this endpoint, it inherits a browser threat model that
+> bearer endpoints are structurally immune to. `kind: 'query'` actions execute on `GET`, and
+> `SameSite=Lax` cookies ride top-level `GET` navigations, so a side-effectful query is one link
+> away from being triggered cross-site. Pair this with `SameSite` cookies, check `Origin` or
+> `Sec-Fetch-Site` (you receive the whole request precisely so you can), and keep side effects out
+> of queries.
 
 ## Errors
 
