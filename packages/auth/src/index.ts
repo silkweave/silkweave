@@ -7,6 +7,7 @@
 export * from './errors.js'
 export * from './extract.js'
 export * from './metadata.js'
+export * from './resolve.js'
 export * from './types.js'
 export * from './validate.js'
 export type { OAuthProvider, OAuthRequest, OAuthResponse } from './provider/types.js'

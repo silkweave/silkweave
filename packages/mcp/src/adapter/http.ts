@@ -32,6 +32,18 @@ export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
    * never an empty tool list).
    */
   filterActions?: FilterActions
+  /**
+   * Extra paths that also serve the MCP transport, beyond the default `/mcp`.
+   * For a multi-resource server these are the per-tenant connector URLs
+   * (e.g. `['/:spaceId']`), each of which the `AuthConfig.resourceUrl` resolver
+   * maps to its own protected resource and token audience.
+   *
+   * Express 5 dropped inline param regexes, so `'/:spaceId'` matches EVERY
+   * single path segment. That is safe - a request whose audience does not match
+   * is rejected by `validateToken` - but registration order matters, so these
+   * are mounted after the OAuth and well-known routes.
+   */
+  transportPaths?: string[]
   /** Telemetry hook invoked once per tool call (fire-and-forget). */
   onToolCall?: OnToolCall
   /**
@@ -65,14 +77,20 @@ export function buildMcpExpressApp(
   actions: Action[],
   options: StartMcpHttpOptions
 ): Express {
-  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, skillsExtension, skillsMarketplace, ...mcpAppOptions } = options
+  const { host, auth, cors: corsConfig, sideloadResources = true, resourceDir, filterActions, onToolCall, skills, skillsExtension, skillsMarketplace, transportPaths, ...mcpAppOptions } = options
   const app = createMcpExpressApp({ ...mcpAppOptions, host })
 
   const corsHandler = mcpCors(corsConfig ?? true)
   if (corsHandler) { app.use(corsHandler) }
 
   if (auth?.authorizationServers?.length && auth.resourceUrl) {
-    app.get('/.well-known/oauth-protected-resource', protectedResourceMetadata(auth))
+    // A resolver serves N resources, whose RFC 9728 documents live at the
+    // insertion-form path `/.well-known/oauth-protected-resource/<resource path>`.
+    // Express 5 optional-splat covers both that and the bare root document.
+    const wellKnownPath = typeof auth.resourceUrl === 'string'
+      ? '/.well-known/oauth-protected-resource'
+      : '/.well-known/oauth-protected-resource{/*resource}'
+    app.get(wellKnownPath, protectedResourceMetadata(auth, context))
   }
 
   let oauthPaths = new Set<string>()
@@ -113,6 +131,9 @@ export function buildMcpExpressApp(
   }
 
   app.post('/mcp', express.json(), transport.post)
+  for (const path of transportPaths ?? []) {
+    app.post(path, express.json(), transport.post)
+  }
   // Surface a skill boot failure (bad SKILL.md, missing @silkweave/skills) at
   // start rather than as per-request 500s.
   app.locals.mcpReady = transport.ready

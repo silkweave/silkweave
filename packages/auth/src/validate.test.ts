@@ -81,6 +81,72 @@ describe('validateToken', () => {
     })
   })
 
+  describe('per-request resource resolution', () => {
+    const tenantResolver = ({ url }: { url: URL }) => {
+      const match = /^\/([a-z]{8})$/.exec(url.pathname)
+      return match ? `https://mcp.example.com/${match[1]}` : undefined
+    }
+
+    /** A context carrying a Fetch request, as every adapter forks it. */
+    const at = (path: string) => createContext({
+      adapter: 'test',
+      request: new Request(`https://mcp.example.com${path}`)
+    })
+
+    it('challenges with the RFC 9728 insertion-form metadata URL', async () => {
+      const config = configReturning(undefined, { resourceUrl: tenantResolver })
+      const result = await validateToken(null, config, at('/yoexoexl'))
+      expect(result.error?.headers['WWW-Authenticate']).toContain(
+        'resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/yoexoexl"'
+      )
+    })
+
+    it('rejects a token minted for another tenant (cross-resource replay)', async () => {
+      const auth: AuthInfo = { token: 'tok', aud: 'https://mcp.example.com/yoexoexl' }
+      const config = configReturning(auth, { resourceUrl: tenantResolver })
+      const result = await validateToken(bearer(), config, at('/kqwrmach'))
+      expect(result.error?.statusCode).toBe(401)
+      expect(result.error?.body.error_description).toBe('Token audience mismatch')
+    })
+
+    it('accepts a token whose aud matches the resolved tenant', async () => {
+      const auth: AuthInfo = { token: 'tok', aud: 'https://mcp.example.com/yoexoexl' }
+      const config = configReturning(auth, { resourceUrl: tenantResolver })
+      const result = await validateToken(bearer(), config, at('/yoexoexl'))
+      expect(result.auth).toBe(auth)
+      expect(result.resource).toBe('https://mcp.example.com/yoexoexl')
+    })
+
+    it('challenges without resource_metadata when the resolver does not match', async () => {
+      const config = configReturning(undefined, { resourceUrl: tenantResolver })
+      const result = await validateToken(null, config, at('/resource/abc'))
+      expect(result.error?.headers['WWW-Authenticate']).not.toContain('resource_metadata=')
+    })
+
+    it('skips the default audience check on a resolver miss (fail-open, as today)', async () => {
+      // Sideload and other guarded non-resource routes must keep working.
+      const auth: AuthInfo = { token: 'tok', aud: 'https://mcp.example.com/yoexoexl' }
+      const config = configReturning(auth, { resourceUrl: tenantResolver })
+      const result = await validateToken(bearer(), config, at('/resource/abc'))
+      expect(result.auth).toBe(auth)
+      expect(result.resource).toBeUndefined()
+    })
+
+    it('still enforces an explicit audience on a resolver miss', async () => {
+      const auth: AuthInfo = { token: 'tok', aud: 'https://mcp.example.com/yoexoexl' }
+      const config = configReturning(auth, { resourceUrl: tenantResolver, audience: 'https://mcp.example.com' })
+      const result = await validateToken(bearer(), config, at('/resource/abc'))
+      expect(result.error?.body.error_description).toBe('Token audience mismatch')
+    })
+
+    it('keeps the append-form challenge URL for a string config', async () => {
+      const result = await validateToken(null, configReturning(undefined), context)
+      expect(result.error?.headers['WWW-Authenticate']).toContain(
+        'resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource"'
+      )
+    })
+  })
+
   describe('step-up scope challenge (SEP-2350)', () => {
     it('returns 403 with the required scopes in WWW-Authenticate', async () => {
       const auth: AuthInfo = { token: 'tok', aud: 'https://mcp.example.com', scopes: ['read'] }

@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
-import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
+import { AuthConfig, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, PROTECTED_RESOURCE_WELL_KNOWN, resolveProtectedResourceMetadata, toResourceRequest, validateToken } from '@silkweave/auth'
 import { Action, AdapterGenerator, OnToolCall, SilkweaveContext, SilkweaveOptions, Skill, SkillDefinition, validateActionDisposition } from '@silkweave/core'
 import { emitInvalidArguments, filterErrorResponse, MARKETPLACE_PATH, prepareSkills, registerTools, rpcInfo, type FilterActions, type SkillServing, type SkillsMarketplaceOptions } from '@silkweave/mcp/tools'
 
@@ -29,6 +29,14 @@ export interface EdgeAdapterOptions {
    * `SilkweaveError.statusCode` or 500 - never an empty tool list).
    */
   filterActions?: FilterActions
+  /**
+   * Extra paths that also serve the MCP transport, beyond `path` (default
+   * `/mcp`). For a multi-resource server these are the per-tenant connector
+   * URLs, each mapped by the `auth.resourceUrl` resolver to its own protected
+   * resource and token audience. Edge has no router, so this is either an exact
+   * path list or a predicate that composes with the consumer's own routing.
+   */
+  transportPaths?: string[] | ((pathname: string) => boolean)
   /** Telemetry hook invoked once per tool call (fire-and-forget). */
   onToolCall?: OnToolCall
   /**
@@ -165,9 +173,29 @@ function marketplaceResponse(request: Request, serving: SkillServing | undefined
   })
 }
 
-/** `GET /.well-known/oauth-protected-resource` - protected resource metadata (RFC 9728). */
-function protectedResourceResponse(auth: AuthConfig, corsHeaders: Record<string, string>): Response {
-  const metadata = generateProtectedResourceMetadata(auth.resourceUrl!, auth.authorizationServers!, auth.requiredScopes)
+/**
+ * `GET /.well-known/oauth-protected-resource[/<resource path>]` - RFC 9728
+ * metadata. A string `resourceUrl` serves one precomputable document at the bare
+ * path; a `ResourceResolver` serves the insertion-form path per request, 404ing
+ * on an unrecognized sub-resource.
+ */
+function protectedResourceResponse(
+  auth: AuthConfig,
+  request: Request,
+  context: SilkweaveContext,
+  corsHeaders: Record<string, string>
+): Response {
+  const metadata = typeof auth.resourceUrl === 'string'
+    ? generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers!, auth.requiredScopes)
+    : resolveProtectedResourceMetadata(auth, toResourceRequest(context.fork({ request }))!, context)
+
+  if (!metadata) {
+    return new Response(JSON.stringify({ error: 'not_found', error_description: 'Unknown protected resource' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
   return new Response(JSON.stringify(metadata), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600' }
   })
@@ -267,12 +295,17 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   _ready.catch(() => { /* surfaced via start() / per-request await */ })
 
   // Pre-compute valid paths for fast rejection of bogus requests
-  const validPaths = new Set<string>([mcpPath])
+  const extraTransportPaths = Array.isArray(options.transportPaths) ? options.transportPaths : []
+  const matchTransportPath = typeof options.transportPaths === 'function' ? options.transportPaths : undefined
+  const validPaths = new Set<string>([mcpPath, ...extraTransportPaths])
   if (options.skillsMarketplace) {
     validPaths.add(MARKETPLACE_PATH)
   }
+  // A string resourceUrl has exactly one document; a resolver serves a family of
+  // insertion-form paths, matched by prefix below rather than by exact set.
+  const resolverMetadata = options.auth?.authorizationServers?.length && typeof options.auth.resourceUrl === 'function'
   if (options.auth?.authorizationServers?.length && options.auth.resourceUrl) {
-    validPaths.add('/.well-known/oauth-protected-resource')
+    validPaths.add(PROTECTED_RESOURCE_WELL_KNOWN)
   }
   if (options.auth?.provider) {
     validPaths.add('/.well-known/oauth-authorization-server')
@@ -296,8 +329,14 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
   const handleRequestInner = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
 
-    // Fast rejection - no async work, no allocations for unknown paths
-    if (!validPaths.has(url.pathname)) {
+    // Fast rejection - no async work, no allocations for unknown paths. A
+    // resolver additionally serves the insertion-form sub-paths under the
+    // well-known prefix, so those are matched by prefix rather than by set.
+    const isResolverMetadata = resolverMetadata && url.pathname.startsWith(`${PROTECTED_RESOURCE_WELL_KNOWN}/`)
+    const isTransportPath = url.pathname === mcpPath
+      || extraTransportPaths.includes(url.pathname)
+      || matchTransportPath?.(url.pathname) === true
+    if (!validPaths.has(url.pathname) && !isResolverMetadata && !isTransportPath) {
       return new Response('Not Found', { status: 404 })
     }
 
@@ -313,8 +352,11 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     }
 
     // Protected resource metadata (RFC 9728)
-    if (url.pathname === '/.well-known/oauth-protected-resource') {
-      return protectedResourceResponse(options.auth!, CORS_HEADERS)
+    if (url.pathname === PROTECTED_RESOURCE_WELL_KNOWN || isResolverMetadata) {
+      // A resolver needs the per-request context, which only exists once the
+      // adapter has been registered; the string form needs nothing.
+      if (resolverMetadata) { await _ready }
+      return protectedResourceResponse(options.auth!, request, _context!, CORS_HEADERS)
     }
 
     // OAuth provider routes

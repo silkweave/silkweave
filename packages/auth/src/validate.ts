@@ -1,15 +1,42 @@
 import { SilkweaveContext } from '@silkweave/core'
 import { AuthError, insufficientScope, invalidToken } from './errors.js'
 import { buildWWWAuthenticate, extractBearerToken } from './extract.js'
+import { protectedResourceMetadataUrl, resolveResourceUrl } from './resolve.js'
 import { AuthConfig, AuthInfo } from './types.js'
 
 export interface ValidateResult {
   auth?: AuthInfo
+  /**
+   * The protected resource identifier this request resolved to (see
+   * `AuthConfig.resourceUrl`). Adapters fork this onto the action context under
+   * `resource`, so a multi-tenant server can authorize per tenant without
+   * re-parsing the request URL.
+   *
+   * Note this is *where the token may be presented*, never *what the subject may
+   * do there* - see the `allowedResources` docs. Treating a matching resource as
+   * an access grant is a privilege escalation.
+   */
+  resource?: string
   error?: {
     statusCode: number
     headers: Record<string, string>
     body: { error: string; error_description: string }
   }
+}
+
+/**
+ * The RFC 9728 metadata URL advertised in a `WWW-Authenticate` challenge.
+ *
+ * String configs keep the historical **append** form. For a path-less resource
+ * the two forms coincide, and for a path'd one (e.g. the nestjs adapter's
+ * basePath mount) switching to insertion would advertise a URL nobody serves.
+ * Resolver-resolved resources always carry a path, so they get RFC 9728's
+ * **insertion** form - which is also what the MCP SDK probes when no challenge
+ * header is in hand.
+ */
+function challengeUrl(config: AuthConfig, resource: string | undefined): string | undefined {
+  if (typeof config.resourceUrl === 'string') { return `${config.resourceUrl}/.well-known/oauth-protected-resource` }
+  return resource ? protectedResourceMetadataUrl(resource) : undefined
 }
 
 export async function validateToken(
@@ -18,9 +45,8 @@ export async function validateToken(
   context: SilkweaveContext
 ): Promise<ValidateResult> {
   const required = config.required ?? true
-  const resourceMetadataUrl = config.resourceUrl
-    ? `${config.resourceUrl}/.well-known/oauth-protected-resource`
-    : undefined
+  const resource = resolveResourceUrl(config, context)
+  const resourceMetadataUrl = challengeUrl(config, resource)
 
   const token = extractBearerToken(authorizationHeader)
 
@@ -55,7 +81,14 @@ export async function validateToken(
 
   // Audience binding (RFC 8707 / SEP-2352): reject a token whose `aud` does not
   // include this resource - the resource-server confused-deputy defence.
-  const expectedAudience = config.audience === false ? undefined : (config.audience ?? config.resourceUrl)
+  //
+  // When a resolver returns `undefined` (the request URL is not a recognized
+  // resource) this behaves exactly as an unset `resourceUrl` does today: no
+  // *default* audience check, though an explicit `config.audience` still
+  // applies. Fail-open is deliberate - adapters guard non-resource routes too
+  // (sideload `/resource/:id`), and failing closed there would 401 every
+  // sideload fetch.
+  const expectedAudience = config.audience === false ? undefined : (config.audience ?? resource)
   if (expectedAudience !== undefined && !audienceMatches(authInfo.aud, expectedAudience)) {
     return buildErrorResult(invalidToken('Token audience mismatch'), resourceMetadataUrl)
   }
@@ -69,7 +102,7 @@ export async function validateToken(
     }
   }
 
-  return { auth: authInfo }
+  return { auth: authInfo, ...(resource !== undefined ? { resource } : {}) }
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { FastifyCorsOptions } from '@fastify/cors'
-import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@silkweave/auth'
+import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, PROTECTED_RESOURCE_WELL_KNOWN, resolveProtectedResourceMetadata, toResourceRequest, validateToken } from '@silkweave/auth'
 import { Action, actionMethod, ActionStreamRun, AdapterFactory, binarySchemaMeta, buildLogLevels, HttpMethod, isBinarySchema, isStreamingAction, Logger, LogLevel, methodHasBody, pathParamNames, resolveActionInput, resourceBytes, runStreamingAction, SilkweaveContext, SilkweaveError, toActionResource, validateActionRouting, type ActionResource } from '@silkweave/core'
 import { once } from 'events'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -357,10 +357,22 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, aut
         })
         await registerScalarDocs(instance)
 
-        if (auth?.authorizationServers?.length && auth.resourceUrl) {
-          instance.get('/.well-known/oauth-protected-resource', () => {
-            return generateProtectedResourceMetadata(auth.resourceUrl!, auth.authorizationServers!, auth.requiredScopes)
-          })
+        if (auth?.authorizationServers?.length && typeof auth.resourceUrl === 'string') {
+          const metadata = generateProtectedResourceMetadata(auth.resourceUrl, auth.authorizationServers, auth.requiredScopes)
+          instance.get(PROTECTED_RESOURCE_WELL_KNOWN, () => metadata)
+        } else if (auth?.authorizationServers?.length && typeof auth.resourceUrl === 'function') {
+          // A resolver serves a family of insertion-form documents, one per
+          // resource, so the route is a wildcard and an unknown one is a 404.
+          const resolve = (request: FastifyRequest, reply: FastifyReply) => {
+            const resourceRequest = toResourceRequest(context.fork({ request }))
+            const metadata = resourceRequest && resolveProtectedResourceMetadata(auth, resourceRequest, context)
+            if (!metadata) {
+              return reply.status(404).send({ error: 'not_found', error_description: 'Unknown protected resource' })
+            }
+            return metadata
+          }
+          instance.get(PROTECTED_RESOURCE_WELL_KNOWN, resolve)
+          instance.get(`${PROTECTED_RESOURCE_WELL_KNOWN}/*`, resolve)
         }
 
         const oauthPaths = auth?.provider ? mountOAuthRoutes(instance, auth) : new Set<string>()

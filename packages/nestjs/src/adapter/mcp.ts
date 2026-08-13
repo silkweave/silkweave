@@ -19,6 +19,14 @@ export interface McpAdapterOptions {
   auth?: AuthConfig
   /** CORS configuration. `false` to disable, `true`/omitted for permissive defaults, or a `CorsOptions` object. */
   cors?: CorsOptions | boolean
+  /**
+   * Extra paths that also serve the MCP transport, beyond `basePath`. For a
+   * multi-resource server these are the per-tenant connector URLs (e.g.
+   * `['/:spaceId']`), each mapped by the `auth.resourceUrl` resolver to its own
+   * protected resource and token audience. Mounted after the OAuth/well-known
+   * routes; note Express 5 matches `'/:spaceId'` against every single segment.
+   */
+  transportPaths?: string[]
   /** Mount the sideload resource route at `${basePath}/resource/:id`. Default `true`. */
   sideloadResources?: boolean
   /** Directory the sideload route reads from. Default `'resources'`. */
@@ -82,14 +90,32 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
       // Public auth-discovery / OAuth routes - registered first so they're
       // never inadvertently guarded by the auth middleware.
       if (auth?.authorizationServers?.length && auth.resourceUrl) {
-        adapter.get(
-          `${basePath}/.well-known/oauth-protected-resource`,
-          ...prefix(corsHandler, protectedResourceMetadata(auth))
-        )
+        if (typeof auth.resourceUrl === 'string') {
+          adapter.get(
+            `${basePath}/.well-known/oauth-protected-resource`,
+            ...prefix(corsHandler, protectedResourceMetadata(auth))
+          )
+        } else {
+          // Insertion-form metadata lives at the server ROOT by definition
+          // (`/.well-known/oauth-protected-resource/<resource path>`), not under
+          // basePath - that is the only place a spec-conformant client probes.
+          adapter.get(
+            '/.well-known/oauth-protected-resource{/*resource}',
+            ...prefix(corsHandler, protectedResourceMetadata(auth, baseContext))
+          )
+        }
       }
       if (auth?.provider) {
         const oauth = oauthRoutes(auth)
         adapter.get(`${basePath}/.well-known/oauth-authorization-server`, ...prefix(corsHandler, oauth.wellKnownAuthServer))
+        // The MCP SDK probes RFC 8414 insertion form for a path'd issuer
+        // (`/.well-known/oauth-authorization-server/mcp`) and never the append
+        // form above, so serve the same document there too. Without this, AS
+        // discovery fails and the client falls back to root-absolute
+        // `/authorize` + `/register`, which nothing here mounts.
+        if (basePath) {
+          adapter.get(`/.well-known/oauth-authorization-server${basePath}`, ...prefix(corsHandler, oauth.wellKnownAuthServer))
+        }
         adapter.get(`${basePath}/authorize`, ...prefix(corsHandler, oauth.authorize))
         adapter.get(`${basePath}${oauth.callbackPath}`, ...prefix(corsHandler, oauth.callback))
         adapter.post(`${basePath}/token`, ...prefix(corsHandler, ...oauth.token))
@@ -105,6 +131,9 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
 
       const transport = mcpTransport(silkweaveOptions, baseContext, actions, { filterActions: options.filterActions, onToolCall })
       adapter.post(basePath, ...prefix(corsHandler, express.json(), protect(transport.post)))
+      for (const path of options.transportPaths ?? []) {
+        adapter.post(path, ...prefix(corsHandler, express.json(), protect(transport.post)))
+      }
     }
   }
 }
