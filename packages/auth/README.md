@@ -194,6 +194,87 @@ const metadata = generateProtectedResourceMetadata(
 // }
 ```
 
+## Multi-resource: one authorization server, N protected resources
+
+A server fronting several tenants needs a distinct URL per tenant (Claude Desktop and
+claude.ai dedupe MCP connectors by URL), and each URL must be its own OAuth **protected
+resource** with its own token audience - so a token minted for tenant A is rejected when
+replayed against tenant B. There is still exactly one authorization server.
+
+Set `resourceUrl` to a **resolver** instead of a string, and give the authorization server
+an allow-list of the resource indicators it will mint an `aud` for:
+
+```typescript
+import { createOAuthProxy } from '@silkweave/auth/oauth'
+import { pathResolver, type AuthConfig } from '@silkweave/auth'
+
+const AS = 'https://mcp.example.com'
+const TENANT = /^\/([a-z]{8})$/
+
+const provider = createOAuthProxy({
+  authorizeUrl, tokenUrl, clientId, clientSecret,
+  resourceUrl: AS,              // AS identity: iss + endpoint base + default audience
+  redirectUris, signingKey, store,
+  // The allow-list is the AS's, never the client's.
+  allowedResources: async (resource) => {
+    const { origin, pathname } = new URL(resource)
+    const match = TENANT.exec(pathname)
+    return origin === AS && !!match && await spaceExists(match[1])
+  }
+})
+
+const auth: AuthConfig = {
+  verifyToken: (token) => provider.verifyToken(token),
+  provider,
+  authorizationServers: [AS],
+  // Canonical by construction: identifiers are built from `origin`, never from
+  // the inbound request's origin, so a spoofed Host cannot steer the advertised
+  // metadata URL or the expected audience.
+  resourceUrl: pathResolver({ origin: AS, match: TENANT })
+}
+```
+
+On the wire: an unauthorized `POST https://mcp.example.com/yoexoexl` is challenged with
+`resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/yoexoexl"`
+(RFC 9728 path-insertion form, which is what the MCP SDK probes); that document advertises
+`resource: https://mcp.example.com/yoexoexl` and the shared `authorization_servers`; the
+client sends `resource=…/yoexoexl` on both the authorize and token legs; the minted token
+carries that `aud`; presenting it at `/kqwrmach` is a 401.
+
+| `allowedResources` | client `resource` | minted `aud` |
+|---|---|---|
+| unset | absent | `resourceUrl` |
+| unset | anything | `resourceUrl` - the indicator is ignored (pre-5.1 behavior) |
+| set | absent | `resourceUrl` (the default resource) |
+| set | allowed value | that value, normalized |
+| set | anything else | `invalid_target`, no token |
+
+Notes that matter:
+
+- **`aud` is not membership.** The AS mints `aud: …/tenantA` for any authenticated upstream
+  user who asks, including one with no rights in tenant A. The indicator says where a token
+  may be *presented*, never what its subject may *do* there. Per-tenant authorization stays
+  your job on every call - treating "aud matches my tenant" as an access grant is a privilege
+  escalation. `validateToken` returns the resolved `resource` so you have the tenant identity
+  without re-parsing the URL.
+- **Shape vs. existence.** The resolver is synchronous *shape* mapping, so it serves a metadata
+  document for any tenant-shaped path - including one that does not exist. Existence is the
+  authorization server's job, asynchronously, in `allowedResources`: an unknown-but-shaped tenant
+  gets a document but can never get a token. That leaks nothing beyond the id shape; for
+  existence-accurate metadata, have the resolver consult a synchronous cache of live tenants.
+- **A resolver returning `undefined`** behaves exactly as an unset `resourceUrl`: a challenge
+  without `resource_metadata` and no default audience check (an explicit `audience` still
+  applies). This keeps guarded non-resource routes such as sideload `/resource/:id` working.
+- **Refresh is not a pivot.** The audience rides the refresh-token record and is re-minted
+  verbatim on rotation; a `resource` on the refresh request that differs is `invalid_target`.
+- **One resource per grant.** Repeated `resource` parameters are rejected rather than silently
+  using the first.
+- A predicate `allowedResources` runs on every `verifyToken`, so a store-backed check is a hit
+  per bearer validation - cache it, and note the store's availability becomes the token path's.
+
+Adapters mount the wildcard well-known route automatically when `resourceUrl` is a resolver.
+Existing string configs are unchanged in every respect, including the append-form challenge URL.
+
 ## Store Adapters
 
 The OAuth proxy needs persistent storage for auth codes, client registrations, PKCE verifiers, and refresh tokens. Three built-in adapters are available:

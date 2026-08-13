@@ -39,6 +39,34 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '5.1.0',
+    date: '2026-08-13',
+    summary: 'Multi-resource OAuth: one authorization server can now front N protected resources - per-tenant MCP endpoints, each with its own token audience, so a token minted for one tenant is rejected at another.',
+    unreleased: true,
+    changes: [
+      {
+        type: 'feature',
+        text: 'AuthConfig.resourceUrl accepts a resolver, not just a string: map each request to the protected resource it addresses and one server can front N tenants behind a single authorization server. Use pathResolver({ origin, match }) to get the canonical-origin guarantee structurally - identifiers are built from your configured origin, never the request\'s, so a spoofed Host cannot steer the advertised metadata URL or the expected audience. Adapters mount the RFC 9728 path-insertion well-known route (/.well-known/oauth-protected-resource/<tenant>) automatically.'
+      },
+      {
+        type: 'feature',
+        text: 'The OAuth proxy honors the RFC 8707 resource indicator: allowedResources (a list or an async predicate) bounds which audiences it will mint, the indicator is threaded from /authorize through the auth code into the token, and the audience rides the refresh-token record so rotation preserves it. Exactly one resource per grant; a mismatched resource on refresh is invalid_target, so a refresh token cannot become a lateral move to another audience.'
+      },
+      {
+        type: 'improvement',
+        text: 'Tightened token verification for multi-resource deployments: verifyToken now returns aud and iss, which makes validateToken\'s per-request audience binding the real confused-deputy defence rather than a no-op, and requires a single non-empty string aud (rejecting missing and array forms). Single-resource configs keep the historical issuer+audience pin byte-identical.'
+      },
+      {
+        type: 'fix',
+        text: 'NestJS: the MCP adapter now also serves the RFC 8414 authorization-server metadata at the root insertion-form path (/.well-known/oauth-authorization-server<basePath>). MCP clients probe that path and never the basePath-appended one, so OAuth discovery previously failed and clients fell back to root-absolute /authorize and /register, which nothing mounted.'
+      },
+      {
+        type: 'improvement',
+        text: 'The OAuth proxy has tests for the first time: the full authorize -> callback -> token -> refresh -> verify flow against a stubbed upstream, covering the minting rules, the authorize/token equality rule, refresh audience preservation, and cross-resource replay rejection.'
+      }
+    ]
+  },
+  {
     version: '5.0.1',
     date: '2026-07-29',
     summary: 'A CLI adapter fix: an action with a union-typed input field no longer takes the whole binary down.',

@@ -81,6 +81,29 @@ const auth = google({
   store: createJsonStore('store.json')
 })`
 
+const multiResourceRaw = `import { pathResolver } from '@silkweave/auth'
+import { google } from '@silkweave/auth/oauth'
+
+const AS = 'https://mcp.example.com'
+const TENANT = /^\\/([a-z]{8})$/
+
+const auth = google({
+  clientId: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  resourceUrl: AS,                                       // AS identity: iss + default audience
+  resolveResource: pathResolver({ origin: AS, match: TENANT }),  // one resource per tenant
+  allowedResources: async (resource) => {                // which audiences the AS will mint
+    const { origin, pathname } = new URL(resource)
+    const match = TENANT.exec(pathname)
+    return origin === AS && !!match && await spaceExists(match[1])
+  },
+  redirectUris: ['https://claude.ai/*'],
+  store
+})
+
+// Mount the transport at each tenant URL as well as /mcp.
+http({ host: 'localhost', port: 8080, auth, transportPaths: ['/:spaceId'] })`
+
 const guardRaw = `export const AdminAction = createAction({
   name: 'admin',
   description: 'Admin-only action',
@@ -1359,6 +1382,22 @@ if (auth) {
       <li><strong>Protected Resource Metadata</strong> - RFC 9728 discovery</li>
     </ul>
     <p>Storage backends (also from <code>@silkweave/auth/oauth</code>): <code>createMemoryStore()</code> (development), <code>createJsonStore(path)</code> (file-based), <code>createRedisStore(redis)</code> (production).</p>
+  </section>
+
+  <section id="multi-resource">
+    <h3>Multi-Resource: One AS, N Protected Resources</h3>
+    <p>A server fronting several tenants needs a distinct URL per tenant - Claude Desktop and claude.ai dedupe MCP connectors <strong>by URL</strong>, so one URL means one attachable space. Distinct URLs alone are not enough: each must be its own OAuth <strong>protected resource</strong> with its own token audience, so a token minted for tenant A is rejected when replayed against tenant B. There is still exactly one authorization server.</p>
+    <p>Set <code>resourceUrl</code> to a resolver instead of a string, and give the authorization server an allow-list of the resource indicators it will mint an <code>aud</code> for:</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={multiResourceRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(multiResourceRaw)} /></pre>
+    </div>
+    <p>On the wire: an unauthorized request to <code>https://mcp.example.com/yoexoexl</code> is challenged with <code>resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/yoexoexl"</code> (RFC 9728 path-insertion form, which is what MCP clients probe); that document advertises the tenant as its <code>resource</code> plus the shared <code>authorization_servers</code>; the client sends <code>resource=&hellip;/yoexoexl</code> on both the authorize and token legs; the minted token carries that <code>aud</code>; presenting it at another tenant is a 401.</p>
+    <p><code>pathResolver({ origin, match })</code> builds identifiers from <em>your configured origin</em>, never the inbound request's - so a spoofed <code>Host</code> header cannot steer the advertised metadata URL or the expected audience. Adapters mount the wildcard well-known route automatically when <code>resourceUrl</code> is a resolver, and existing string configs are unchanged in every respect.</p>
+    <p><strong><code>aud</code> is not membership.</strong> The authorization server will mint <code>aud: &hellip;/tenantA</code> for any authenticated user who asks, including one with no rights in tenant A. The indicator says where a token may be <em>presented</em>, never what its subject may <em>do</em> there - per-tenant authorization stays your job on every call. <code>validateToken</code> returns the resolved <code>resource</code> so that check needs no URL re-parsing.</p>
   </section>
 
   <section id="per-action-guards">
