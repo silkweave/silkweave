@@ -1,10 +1,15 @@
 {
   "compilerOptions": {
-    "customConditions": ["@silkweave/source"],
+    "customConditions": [
+      "@silkweave/source"
+    ],
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "outDir": "build",
     "rootDir": "src",
     "strict": true,
@@ -16,8 +21,16 @@
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "build"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "build"
+  ]
 }

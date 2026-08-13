@@ -1,5 +1,12 @@
 import { createAction } from '@silkweave/core'
-import { convertToModelMessages, streamText, type LanguageModel, type ToolSet, type UIMessage, type UIMessageChunk } from 'ai'
+import {
+  convertToModelMessages,
+  streamText,
+  type LanguageModel,
+  type ToolSet,
+  type UIMessage,
+  type UIMessageChunk
+} from 'ai'
 import z from 'zod/v4'
 
 export interface CreateChatActionOptions {
@@ -65,7 +72,9 @@ export function createChatAction(options: CreateChatActionOptions) {
       const result = streamText({
         model: options.model,
         system: options.system,
-        messages: convertToModelMessages(uiMessages),
+        // `convertToModelMessages` became async in AI SDK v7. Awaiting is a no-op on
+        // v5/v6, where it returns the array directly, so this works across all three.
+        messages: await convertToModelMessages(uiMessages),
         tools: options.tools,
         maxOutputTokens: options.maxOutputTokens,
         temperature: options.temperature

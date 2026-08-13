@@ -1,0 +1,26 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "none",
+  "printWidth": 120,
+  "ignorePatterns": [
+    // Code only. Markdown is published content (blog posts, READMEs) where reflowing
+    // can change rendered output, and JSON/CSS churn buys nothing.
+    "**/*.md",
+    "**/*.json",
+    "**/*.jsonc",
+    "**/*.css",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/build/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/.vercel/**",
+    "**/out/**",
+    "**/scratch/**",
+    "**/src/generated/**",
+    "**/next-env.d.ts",
+    "examples/ai/resources/actions.d.ts"
+  ]
+}

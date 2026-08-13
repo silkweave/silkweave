@@ -12,6 +12,10 @@ const SILKWEAVE_PACKAGES = [
   '@silkweave/trpc'
 ]
 
+// Next 16 defaults to Turbopack, but Turbopack exposes no equivalent of webpack's
+// `resolve.conditionNames`, so it cannot honor `@silkweave/source`. The `dev`/`build`
+// scripts therefore pass `--webpack` explicitly. This only affects the example's own
+// bundling - nothing here ships, and consumers on Turbopack resolve `build/` normally.
 const nextConfig: NextConfig = {
   transpilePackages: SILKWEAVE_PACKAGES,
   webpack: (config) => {

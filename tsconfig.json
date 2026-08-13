@@ -1,14 +1,83 @@
 {
   "files": [],
   "references": [
-    { "path": "example" },
-    { "path": "packages/auth" },
-    { "path": "packages/cli" },
-    { "path": "packages/core" },
-    { "path": "packages/fastify" },
-    { "path": "packages/logger" },
-    { "path": "packages/mcp" },
-    { "path": "packages/typegen" },
-    { "path": "website" }
+    {
+      "path": "packages/ai"
+    },
+    {
+      "path": "packages/auth"
+    },
+    {
+      "path": "packages/cli"
+    },
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/edge"
+    },
+    {
+      "path": "packages/fastify"
+    },
+    {
+      "path": "packages/mcp"
+    },
+    {
+      "path": "packages/nestjs"
+    },
+    {
+      "path": "packages/nextjs"
+    },
+    {
+      "path": "packages/silkweave"
+    },
+    {
+      "path": "packages/skills"
+    },
+    {
+      "path": "packages/trpc"
+    },
+    {
+      "path": "packages/typegen"
+    },
+    {
+      "path": "examples/ai"
+    },
+    {
+      "path": "examples/cli"
+    },
+    {
+      "path": "examples/cloudflare"
+    },
+    {
+      "path": "examples/core"
+    },
+    {
+      "path": "examples/edge"
+    },
+    {
+      "path": "examples/fastify"
+    },
+    {
+      "path": "examples/mcp"
+    },
+    {
+      "path": "examples/nestjs"
+    },
+    {
+      "path": "examples/nextjs"
+    },
+    {
+      "path": "examples/skills"
+    },
+    {
+      "path": "examples/trpc"
+    },
+    {
+      "path": "examples/typegen"
+    },
+    {
+      "path": "website"
+    }
   ]
 }

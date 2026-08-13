@@ -11,7 +11,7 @@
       "DOM",
       "DOM.Iterable"
     ],
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -41,7 +41,8 @@
   "include": [
     "next-env.d.ts",
     "src",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

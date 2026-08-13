@@ -1,6 +1,5 @@
 .vscode
 src/
 CLAUDE.md
-eslint.config.mjs
 tsconfig.json
 tsdown.config.ts

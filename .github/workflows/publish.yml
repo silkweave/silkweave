@@ -45,6 +45,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Format check
+        run: pnpm format:check
+
       - name: Lint + typecheck
         run: pnpm exec turbo lint check
 

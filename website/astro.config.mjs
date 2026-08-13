@@ -1,5 +1,6 @@
+import { unified } from '@astrojs/markdown-remark'
 import sitemap from '@astrojs/sitemap'
-import vercel from "@astrojs/vercel"
+import vercel from '@astrojs/vercel'
 import { defineConfig } from 'astro/config'
 import rehypeExternalLinks from 'rehype-external-links'
 
@@ -23,15 +24,24 @@ export default defineConfig({
     inlineStylesheets: 'always'
   },
   markdown: {
-    // External links in markdown content (blog posts) open in a new tab. Same-site
-    // absolute links stay in-tab; the base Layout script covers non-markdown pages.
-    rehypePlugins: [
-      [rehypeExternalLinks, {
-        target: '_blank',
-        rel: ['noopener', 'noreferrer'],
-        test: (node) => !String(node.properties?.href ?? '').startsWith('https://www.silkweave.dev')
-      }]
-    ]
+    // Astro 7 renders markdown with Sätteri by default. We stay on the unified()
+    // pipeline so the rehype plugin below keeps working unchanged - porting it to a
+    // Sätteri HAST plugin would change how every post renders, which is not something
+    // a dependency upgrade should do.
+    processor: unified({
+      // External links in markdown content (blog posts) open in a new tab. Same-site
+      // absolute links stay in-tab; the base Layout script covers non-markdown pages.
+      rehypePlugins: [
+        [
+          rehypeExternalLinks,
+          {
+            target: '_blank',
+            rel: ['noopener', 'noreferrer'],
+            test: (node) => !String(node.properties?.href ?? '').startsWith('https://www.silkweave.dev')
+          }
+        ]
+      ]
+    })
   },
   integrations: [
     // /test is a live tRPC demo with no inbound links - keep it out of the sitemap

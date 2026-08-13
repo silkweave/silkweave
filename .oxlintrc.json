@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "unicorn", "promise", "node"],
+  // `correctness` + `suspicious` only. `pedantic`/`style`/`perf` impose opinions the
+  // previous eslint config deliberately did not (id-length, no-magic-numbers,
+  // func-style, explicit-function-return-type), and turning them on would be a
+  // codebase-wide rewrite rather than a linter swap.
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    // Mirrors the `_`-prefix convention documented in CLAUDE.md.
+    "no-unused-vars": ["error", {
+      "args": "all",
+      "argsIgnorePattern": "^_",
+      "caughtErrors": "all",
+      "caughtErrorsIgnorePattern": "^_",
+      "destructuredArrayIgnorePattern": "^_",
+      "varsIgnorePattern": "^_",
+      "ignoreRestSiblings": true
+    }],
+    "no-shadow": "error",
+    "typescript/adjacent-overload-signatures": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/prefer-for-of": "error",
+    "typescript/unified-signatures": "error",
+
+    // `_meta` is an MCP protocol field, not a private-member convention.
+    "no-underscore-dangle": "off",
+    // `Worker.postMessage(message, transfer)` has no `targetOrigin` parameter - that is
+    // `Window.postMessage`. The rule's suggested fix would be read as a transfer list.
+    "unicorn/require-post-message-target-origin": "off",
+    // A worker has exactly one `onmessage`; `addEventListener` buys nothing here.
+    "unicorn/prefer-add-event-listener": "off",
+    // Sequential `await` in a loop is deliberate throughout (streaming backpressure,
+    // ordered skill resolution, per-file digesting) - see runStreamingAction.
+    "no-await-in-loop": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/consistent-function-scoping": "off",
+    // Empty classes are test fixtures (NestJS controllers/guards need a class identity).
+    "typescript/no-extraneous-class": "off",
+    "promise/always-return": "off"
+  },
+  "ignorePatterns": [
+    "**/build/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/.vercel/**",
+    "**/out/**",
+    "**/scratch/**",
+    "**/src/generated/**",
+    "**/next-env.d.ts",
+    "examples/ai/resources/actions.d.ts"
+  ]
+}
