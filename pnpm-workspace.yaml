@@ -1,5 +1,10 @@
 allowBuilds:
-  '@modelcontextprotocol/inspector': set this to true or false
+  # Inspector 2.x added a `postinstall` (scripts/install-clients.mjs) that cascades
+  # `npm install` into clients/{web,cli,tui,launcher} for a from-source checkout. It
+  # exits early when the package lives under node_modules, which is always our case,
+  # and the published tarball already ships each client's build/ output - so running
+  # it would be a no-op. pnpm 11 exits non-zero until this is answered explicitly.
+  '@modelcontextprotocol/inspector': false
   '@nestjs/core': false
   '@scarf/scarf': true
   '@swc/core': true
