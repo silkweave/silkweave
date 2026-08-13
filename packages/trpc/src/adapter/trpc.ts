@@ -4,7 +4,7 @@ import { createHTTPHandler } from '@trpc/server/adapters/standalone'
 import cors, { CorsOptions } from 'cors'
 import http, { IncomingMessage, ServerResponse } from 'http'
 import { buildRouter, TrpcHandlerContext } from '../lib/buildRouter.js'
-import { authResponseMeta, createActionLogger, resolveAuth, throwAuthError } from '../lib/createContext.js'
+import { authResponseMeta, createActionLogger, resolveIdentity, throwAuthError, type Authenticate } from '../lib/createContext.js'
 
 export interface TrpcAdapterOptions {
   host?: string
@@ -14,6 +14,13 @@ export interface TrpcAdapterOptions {
   /** CORS configuration. `false` to disable, `true`/`undefined` for permissive defaults, or a CorsOptions object. */
   cors?: CorsOptions | boolean
   auth?: AuthConfig
+  /**
+   * Resolve the caller from the request itself (a session cookie, typically)
+   * instead of a bearer token. Returning `null` falls through to `auth`. See
+   * `Authenticate` for the security stance - notably that this bypasses every
+   * check `validateToken` performs, and the CSRF note.
+   */
+  authenticate?: Authenticate<IncomingMessage>
 }
 
 type CorsMiddleware = (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => void
@@ -42,8 +49,10 @@ export const trpc: AdapterFactory<TrpcAdapterOptions> = (options) => {
         const createContext = async (
           opts: { req: IncomingMessage; res: ServerResponse }
         ): Promise<TrpcHandlerContext> => {
-          const resolved = await resolveAuth(
+          const resolved = await resolveIdentity(
+            options.authenticate,
             options.auth,
+            opts.req,
             opts.req.headers.authorization,
             context.fork({ request: opts.req })
           )

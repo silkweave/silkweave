@@ -2,12 +2,19 @@ import { AuthConfig } from '@silkweave/auth'
 import { Adapter, AdapterGenerator, SilkweaveOptions } from '@silkweave/core'
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
 import { buildRouter, TrpcHandlerContext } from '../lib/buildRouter.js'
-import { authResponseMeta, createActionLogger, resolveAuth, throwAuthError } from '../lib/createContext.js'
+import { authResponseMeta, createActionLogger, resolveIdentity, throwAuthError, type Authenticate } from '../lib/createContext.js'
 
 export interface TrpcFetchAdapterOptions {
   /** URL prefix stripped from incoming requests before tRPC routing. Default `/trpc`. */
   endpoint?: string
   auth?: AuthConfig
+  /**
+   * Resolve the caller from the request itself (a session cookie, typically)
+   * instead of a bearer token. Returning `null` falls through to `auth`. See
+   * `Authenticate` for the security stance - notably that this bypasses every
+   * check `validateToken` performs, and the CSRF note.
+   */
+  authenticate?: Authenticate<Request>
 }
 
 export type FetchHandler = (request: Request) => Promise<Response>
@@ -40,6 +47,11 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
 
   let handler: FetchHandler | undefined
 
+  // A boot failure rejects `ready` before any request has attached a handler,
+  // which Node reports as an unhandled rejection. The real surfacing happens in
+  // start() (which rethrows) and per-request below.
+  ready.catch(() => { /* surfaced via start() / per-request dispatch */ })
+
   const adapter: AdapterGenerator = (_silkweaveOptions: SilkweaveOptions, baseContext): Adapter => {
     const context = baseContext.fork({ adapter: 'trpc' })
     return {
@@ -59,8 +71,10 @@ export function trpcFetch(options: TrpcFetchAdapterOptions = {}): TrpcFetchAdapt
         const createContext = async (
           opts: { req: Request }
         ): Promise<TrpcHandlerContext> => {
-          const resolved = await resolveAuth(
+          const resolved = await resolveIdentity(
+            options.authenticate,
             options.auth,
+            opts.req,
             opts.req.headers.get('authorization'),
             context.fork({ request: opts.req })
           )
