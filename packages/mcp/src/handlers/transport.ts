@@ -35,6 +35,15 @@ export interface McpTransportHandlers {
   /** `POST /mcp` - handle a single stateless MCP request/response (SSE per call). */
   post: RequestHandler
   /**
+   * `GET`/`DELETE` on the transport path. The stateless transport is POST-only:
+   * there is no standing SSE stream to open and no session to tear down.
+   * Streamable HTTP requires a server offering no stream to answer `GET` with
+   * 405, and MCP clients treat 405 as the "no stream here" signal - mounted
+   * under a framework's default 404 they instead see an error naming neither
+   * the method nor the route. Wire this for GET and DELETE alongside `post`.
+   */
+  methodNotAllowed: RequestHandler
+  /**
    * Resolves when the async parts of the handler (the `skills` option) are
    * ready; rejects on a skill boot failure. Server-owning callers (`http()`)
    * await this so a bad skill fails `start()` instead of every request.
@@ -151,5 +160,13 @@ export function mcpTransport(
     }
   }
 
-  return { post, ready: skillsReady.then(() => undefined), skills: skillsReady }
+  const methodNotAllowed: RequestHandler = (_req, res) => {
+    res.set('Allow', 'POST').status(405).json({
+      jsonrpc: '2.0',
+      error: { code: -32_000, message: 'Method Not Allowed: this MCP endpoint is POST-only' },
+      id: null
+    })
+  }
+
+  return { post, methodNotAllowed, ready: skillsReady.then(() => undefined), skills: skillsReady }
 }

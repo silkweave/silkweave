@@ -130,9 +130,12 @@ export function buildMcpExpressApp(
     })
   }
 
-  app.post('/mcp', express.json(), transport.post)
-  for (const path of transportPaths ?? []) {
+  for (const path of ['/mcp', ...(transportPaths ?? [])]) {
     app.post(path, express.json(), transport.post)
+    // POST-only transport: answer GET/DELETE with 405 rather than the default
+    // 404, which is what MCP clients expect from a server with no SSE stream.
+    app.get(path, transport.methodNotAllowed)
+    app.delete(path, transport.methodNotAllowed)
   }
   // Surface a skill boot failure (bad SKILL.md, missing @silkweave/skills) at
   // start rather than as per-request 500s.

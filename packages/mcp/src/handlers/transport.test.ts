@@ -163,3 +163,30 @@ describe('mcpTransport onToolCall telemetry', () => {
     })
   })
 })
+
+describe('mcpTransport methodNotAllowed', () => {
+  let mnaServer: Server
+  let mnaPort: number
+
+  beforeAll(async () => {
+    const app = express()
+    const transport = mcpTransport({ name: 'test', description: 'test', version: '0.0.0' }, createContext({ adapter: 'http' }), [testAction('a', [])], {})
+    app.post('/mcp', express.json(), transport.post)
+    app.get('/mcp', transport.methodNotAllowed)
+    app.delete('/mcp', transport.methodNotAllowed)
+    mnaServer = app.listen(0)
+    mnaPort = (mnaServer.address() as AddressInfo).port
+  })
+
+  afterAll(() => new Promise<void>((resolve) => mnaServer.close(() => resolve())))
+
+  // The stateless transport offers no SSE stream, and Streamable HTTP requires
+  // 405 there. Clients read 405 as "no stream"; a default 404 surfaces as an
+  // error naming neither the method nor the route.
+  it.each(['GET', 'DELETE'])('answers %s with 405 and Allow: POST', async (method) => {
+    const res = await fetch(`http://127.0.0.1:${mnaPort}/mcp`, { method })
+    expect(res.status).toBe(405)
+    expect(res.headers.get('allow')).toBe('POST')
+    expect((await res.json() as { error: { message: string } }).error.message).toContain('POST-only')
+  })
+})

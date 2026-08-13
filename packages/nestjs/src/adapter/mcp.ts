@@ -59,7 +59,8 @@ function compose(...handlers: RequestHandler[]): RequestHandler {
  * transport, sideload, well-known and OAuth routes individually on Nest's
  * HTTP adapter at the configured `basePath` (default `/mcp`):
  *
- * - `POST/GET/DELETE ${basePath}` - Streamable HTTP transport
+ * - `POST ${basePath}` - Streamable HTTP transport (GET/DELETE answer 405: the
+ *   stateless transport is POST-only)
  * - `GET ${basePath}/resource/:id` - sideload (`sideloadResources` opt-out)
  * - `GET ${basePath}/.well-known/oauth-protected-resource` - RFC 9728 metadata (when `auth.resourceUrl`/`auth.authorizationServers` set)
  * - `GET ${basePath}/authorize`, `POST ${basePath}/token`, `POST ${basePath}/register`, `GET ${basePath}${callbackPath}` (when `auth.provider` set)
@@ -130,9 +131,12 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
       }
 
       const transport = mcpTransport(silkweaveOptions, baseContext, actions, { filterActions: options.filterActions, onToolCall })
-      adapter.post(basePath, ...prefix(corsHandler, express.json(), protect(transport.post)))
-      for (const path of options.transportPaths ?? []) {
+      for (const path of [basePath, ...(options.transportPaths ?? [])]) {
         adapter.post(path, ...prefix(corsHandler, express.json(), protect(transport.post)))
+        // POST-only transport: 405 rather than Nest's default 404, which is what
+        // MCP clients expect from a server offering no SSE stream.
+        adapter.get(path, ...prefix(corsHandler, transport.methodNotAllowed))
+        adapter.delete(path, ...prefix(corsHandler, transport.methodNotAllowed))
       }
     }
   }
