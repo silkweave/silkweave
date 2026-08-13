@@ -1,11 +1,24 @@
-import { AuthConfig } from '../types.js'
-import { createOAuthProxy } from './proxy.js'
+import { AuthConfig, ResourceResolver } from '../types.js'
+import { AllowedResources, createOAuthProxy } from './proxy.js'
 import { OAuthStore } from './store.js'
 
 export interface GoogleOAuthOptions {
   clientId: string
   clientSecret: string
+  /**
+   * Authorization-server identity: `iss`, the endpoint base, and the default
+   * audience. Stays a single string even for a multi-resource deployment - the
+   * AS identity does not fragment. Use `resolveResource` to front N resources.
+   */
   resourceUrl: string
+  /**
+   * Per-request protected-resource resolution for the emitted `AuthConfig`
+   * (see `AuthConfig.resourceUrl`). Overrides only the resource-server side;
+   * `resourceUrl` remains the AS identity and the `authorization_servers` entry.
+   */
+  resolveResource?: ResourceResolver
+  /** RFC 8707 resource indicators this AS will mint an `aud` for. See `AllowedResources`. */
+  allowedResources?: AllowedResources
   redirectUris: string[]
   requiredScopes?: string[]
   callbackPath?: string
@@ -27,13 +40,14 @@ export function google(options: GoogleOAuthOptions): AuthConfig {
     callbackPath: options.callbackPath,
     signingKey: options.signingKey,
     tokenTtl: options.tokenTtl,
-    store: options.store
+    store: options.store,
+    allowedResources: options.allowedResources
   })
 
   return {
     verifyToken: (token) => provider.verifyToken(token),
     required: true,
-    resourceUrl: options.resourceUrl,
+    resourceUrl: options.resolveResource ?? options.resourceUrl,
     authorizationServers: [options.resourceUrl],
     provider,
     callbackPath: options.callbackPath ?? '/auth/callback'

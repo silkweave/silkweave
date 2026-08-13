@@ -8,6 +8,8 @@ export interface AuthCodeData {
   upstreamIdToken?: string
   email?: string
   sub?: string
+  /** RFC 8707 resource indicator captured at /authorize, carried into the mint. */
+  resource?: string
   expiresAt: number
 }
 
@@ -35,6 +37,13 @@ export interface RefreshTokenData {
   scopes: string[]
   email?: string
   sub?: string
+  /**
+   * The audience this token chain was minted for. Re-minted verbatim on refresh
+   * so rotation cannot become a lateral move to a different resource. Absent on
+   * records predating multi-resource support - those refresh into
+   * default-audience tokens, exactly what they already were.
+   */
+  resource?: string
   expiresAt: number
 }
 
