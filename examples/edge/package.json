@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-edge",
-  "version": "5.2.0",
+  "version": "5.2.1",
   "description": "Silkweave Web-Standard edge adapter route handler example (Vercel/Next.js/serverless)",
   "private": true,
   "type": "module",

@@ -39,6 +39,19 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '5.2.1',
+    date: '2026-09-06',
+    summary:
+      'A curated MCP tool title now actually reaches the client instead of being shadowed by one derived from the tool name.',
+    changes: [
+      {
+        type: 'fix',
+        text: 'MCP tool titles: a title declared via `@Mcp({ annotations: { title } })` is now used as the tool\'s display name. The adapter had always set a top-level `title` derived from the tool name, and since MCP resolves `title` before `annotations.title`, the declared one could never be reached - every curated title silently rendered as a de-camel-cased identifier ("App Context" rather than "Checking what you have open").',
+        commit: '0c85d93'
+      }
+    ]
+  },
+  {
     version: '5.2.0',
     date: '2026-08-13',
     summary:
