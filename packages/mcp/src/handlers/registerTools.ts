@@ -225,7 +225,10 @@ export function registerTools(
     server.registerTool(
       pascalCase(action.name),
       {
-        title: capitalCase(action.name),
+        // Display-name precedence is `title` > `annotations.title` > `name`, so a
+        // curated annotations title has to be lifted here or the derived one
+        // shadows it for every spec-following client.
+        title: action.annotations?.title ?? capitalCase(action.name),
         description: action.description,
         inputSchema: action.input,
         // Derived base (query ⇒ read-only), explicit annotations merged over.

@@ -50,6 +50,20 @@ describe('registerTools annotations', () => {
     const { tools } = await client.listTools()
     expect(tools[0].annotations).toMatchObject({ readOnlyHint: false })
   })
+
+  it('lifts a curated annotations.title to the top-level title, keeping it in annotations', async () => {
+    const client = await connect([action({ annotations: { title: 'Checking what you have open' } })])
+    const { tools } = await client.listTools()
+    expect(tools[0].title).toBe('Checking what you have open')
+    expect(tools[0].annotations).toMatchObject({ title: 'Checking what you have open' })
+  })
+
+  it('falls back to the derived title when the action declares none', async () => {
+    const client = await connect([action({})])
+    const { tools } = await client.listTools()
+    expect(tools[0].title).toBe('Hello World')
+    expect(tools[0].annotations?.title).toBeUndefined()
+  })
 })
 
 describe('registerTools positional args _meta', () => {
