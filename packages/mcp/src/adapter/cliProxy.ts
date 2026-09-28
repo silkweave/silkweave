@@ -35,7 +35,15 @@ export interface CliProxyOptions {
   fetch?: FetchLike
   /** OAuth provider for full auth flows, passed through to the transport. */
   authProvider?: OAuthClientProvider
+  /**
+   * Longest a tool call may run, in ms (default 30 minutes). Progress notifications from the
+   * server reset the clock, so this bounds only a silent call.
+   */
+  toolTimeoutMs?: number
 }
+
+/** Default `toolTimeoutMs`: long enough for imports and backfills that report no progress. */
+export const DEFAULT_TOOL_TIMEOUT_MS = 30 * 60_000
 
 interface JsonSchemaProperty {
   type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | string
@@ -234,7 +242,8 @@ export function registerToolCommand(
   client: Client,
   tool: Tool,
   formatter: CLIFormatterFn,
-  cliName: string
+  cliName: string,
+  toolTimeoutMs: number = DEFAULT_TOOL_TIMEOUT_MS
 ) {
   const command = program.command(kebabCase(tool.name))
   if (tool.description) {
@@ -274,11 +283,19 @@ export function registerToolCommand(
       console.info(`${cliName} - ${tool.name}`)
       attachNotificationLogging(client)
     }
-    const response = (await client.callTool({
-      name: tool.name,
-      arguments: buildToolInput(properties, argKeys, positionals, opts),
-      _meta: { progressToken: randomUUID(), disposition: 'json' }
-    })) as ToolResultContent
+    // The SDK's 60 s request default would abandon a long tool (an import, a backfill) that the
+    // server keeps running. Progress notifications keep the call alive; toolTimeoutMs caps it.
+    const response = (await client.callTool(
+      {
+        name: tool.name,
+        arguments: buildToolInput(properties, argKeys, positionals, opts),
+        _meta: { progressToken: randomUUID(), disposition: 'json' }
+      },
+      undefined,
+      { timeout: toolTimeoutMs, resetTimeoutOnProgress: true }
+    )) as ToolResultContent & { isError?: boolean }
+    // A tool that failed (validation, a refused write) must fail the shell command too.
+    if (response.isError) process.exitCode = 1
     const decoded = response.content.map((block) => ({ block, binary: binaryPayload(block) }))
     const binaries = decoded.flatMap(({ binary }) => (binary ? [binary] : []))
     const textContent = decoded.filter(({ binary }) => !binary).map(({ block }) => block)
@@ -335,7 +352,8 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({
   headers,
   requestInit,
   fetch: fetchImpl,
-  authProvider
+  authProvider,
+  toolTimeoutMs = DEFAULT_TOOL_TIMEOUT_MS
 }) => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'cliProxy' })
@@ -379,7 +397,7 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({
           console.error(`(remote tools unavailable: ${connectErrorMessage(error, url)})`)
         }
         for (const tool of tools) {
-          registerToolCommand(program, client, tool, formatter, options.name)
+          registerToolCommand(program, client, tool, formatter, options.name, toolTimeoutMs)
         }
         if (!connected && argv.length === 0) {
           // Offline with no args: no subcommands are registered, so commander

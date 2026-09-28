@@ -124,7 +124,9 @@ describe('cliProxy positional arguments', () => {
       expect.objectContaining({
         name: 'CreateIdentity',
         arguments: { id: 'abc', count: 2 }
-      })
+      }),
+      undefined,
+      expect.anything()
     )
   })
 
@@ -134,7 +136,9 @@ describe('cliProxy positional arguments', () => {
       expect.objectContaining({
         name: 'AllocateTab',
         arguments: { identity: 'default', agentId: 'cli', url: 'https://example.com' }
-      })
+      }),
+      undefined,
+      expect.anything()
     )
   })
 
@@ -152,8 +156,32 @@ describe('cliProxy positional arguments', () => {
       expect.objectContaining({
         name: 'ListSessions',
         arguments: {}
-      })
+      }),
+      undefined,
+      expect.anything()
     )
+  })
+})
+
+describe('cliProxy tool results', () => {
+  it('sets exitCode 1 when the tool reports an error', async () => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    mocks.callTool.mockResolvedValue({ isError: true, content: [{ type: 'text', text: '{"success":false}' }] })
+    await run(['create-identity', 'abc'])
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('leaves exitCode alone on success', async () => {
+    await run(['create-identity', 'abc'])
+    expect(process.exitCode).toBe(0)
+  })
+
+  it('outlives the SDK request default and resets on progress', async () => {
+    await run(['create-identity', 'abc'], { toolTimeoutMs: 1234 })
+    expect(mocks.callTool).toHaveBeenCalledWith(expect.anything(), undefined, {
+      timeout: 1234,
+      resetTimeoutOnProgress: true
+    })
   })
 })
 
