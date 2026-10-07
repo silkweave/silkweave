@@ -132,6 +132,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 | `requestInit` | `RequestInit` | Passed through to `StreamableHTTPClientTransport` |
 | `fetch` | `FetchLike` | Custom fetch implementation, passed through to the transport |
 | `authProvider` | `OAuthClientProvider` | OAuth provider for full auth flows, passed through to the transport |
+| `toolTimeoutMs` | `number` | Per-call timeout (default 30 min, `DEFAULT_TOOL_TIMEOUT_MS`), reset on every progress notification - so long imports outlive the SDK's 60 s request default |
 
 Authenticating against a bearer-gated server (e.g. `http({ auth })`) is one option:
 
@@ -143,6 +144,12 @@ cliProxy({
 ```
 
 A failed connect prints a short, legible message (`authentication failed for <origin> - check your token` on a 401/403) instead of an SDK stack trace, and root `--help`/`--version` still work when the server is unreachable (the subcommand list needs a live connection; the base help does not).
+
+A tool result with `isError: true` is printed as usual and the process exits with code `1`, so scripts and CI can tell a refused call from a successful one.
+
+#### Input schema mapping
+
+Each input property becomes a flag typed from its JSON Schema `type`: booleans as `--flag`/`--no-flag`, numbers as `--flag <number>`, strings and enums as `--flag <string>`, objects and arrays as `--flag <json>`. **Nullable** properties - `anyOf`/`oneOf` with exactly one non-null branch (zod `.nullable()`, NestJS `@ApiProperty({ nullable: true })`) or `type: [X, 'null']` - map to their non-null type, and the literal value `null` sends `null`. Anything else (real unions, untyped `{}`) becomes a lenient `--flag <value>` that sends the value as JSON when it parses and as a raw string otherwise; the server validates it. One unusual property never takes down the rest of the CLI.
 
 #### Positional arguments
 
