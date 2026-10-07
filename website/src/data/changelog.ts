@@ -39,6 +39,29 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '5.2.2',
+    date: '2026-10-07',
+    summary:
+      'The MCP CLI proxy survives nullable inputs, reports refused tool calls with a failing exit code, and waits out long-running tools.',
+    changes: [
+      {
+        type: 'fix',
+        text: 'cliProxy: a nullable input (`anyOf` with a `null` branch, e.g. NestJS `nullable: true` or zod `.nullable()`) no longer crashes the whole CLI with "Unsupported JSON Schema type" - it maps to its non-null type, and `null` passes through. Any other unmappable property gets a lenient flag instead of breaking every command.',
+        commit: '28f5cab'
+      },
+      {
+        type: 'fix',
+        text: 'cliProxy: a tool result with `isError` now exits with code 1, so scripts and CI can tell a refused call from a success.',
+        commit: 'eff247e'
+      },
+      {
+        type: 'fix',
+        text: "cliProxy: tool calls no longer give up at the MCP SDK's 60 s default - the new `toolTimeoutMs` option (default 30 min) bounds each call and resets on every progress notification.",
+        commit: 'eff247e'
+      }
+    ]
+  },
+  {
     version: '5.2.1',
     date: '2026-09-06',
     summary:

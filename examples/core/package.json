@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-core",
-  "version": "5.2.1",
+  "version": "5.2.2",
   "description": "Silkweave core: run an Action directly without an adapter",
   "private": true,
   "type": "module",
