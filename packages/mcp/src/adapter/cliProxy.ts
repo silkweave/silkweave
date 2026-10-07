@@ -46,10 +46,53 @@ export interface CliProxyOptions {
 export const DEFAULT_TOOL_TIMEOUT_MS = 30 * 60_000
 
 interface JsonSchemaProperty {
-  type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | string
+  type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | string | string[]
   description?: string
   default?: unknown
   enum?: unknown[]
+  anyOf?: JsonSchemaProperty[]
+  oneOf?: JsonSchemaProperty[]
+  /** Set by `normalizeProperty()` when the schema also admits `null`. */
+  nullable?: boolean
+}
+
+function isNullBranch(branch: JsonSchemaProperty): boolean {
+  return branch.type === 'null' || (Array.isArray(branch.enum) && branch.enum.length === 1 && branch.enum[0] === null)
+}
+
+/**
+ * Collapse the nullable shapes JSON Schema generators emit onto a single
+ * concrete `type`: `anyOf`/`oneOf` with exactly one non-null branch (zod
+ * `.nullable()`, NestJS `nullable: true`) and `type: [X, 'null']` arrays. The
+ * outer description/default win over the branch's. Shapes that still carry no
+ * single type (real unions) are left alone and get a lenient option.
+ */
+function normalizeProperty(prop: JsonSchemaProperty): JsonSchemaProperty {
+  if (Array.isArray(prop.type)) {
+    const types = prop.type.filter((type) => type !== 'null')
+    const nullable = types.length < prop.type.length
+    return { ...prop, type: types.length === 1 ? types[0] : undefined, ...(nullable ? { nullable } : {}) }
+  }
+  const branches = prop.type === undefined ? (prop.anyOf ?? prop.oneOf) : undefined
+  if (!branches) {
+    return prop
+  }
+  const concrete = branches.filter((branch) => !isNullBranch(branch))
+  if (concrete.length !== 1) {
+    return prop
+  }
+  const { anyOf: _anyOf, oneOf: _oneOf, ...outer } = prop
+  const merged = normalizeProperty({ ...concrete[0], ...outer, type: concrete[0].type })
+  return concrete.length < branches.length ? { ...merged, nullable: true } : merged
+}
+
+/** Parse an option value as JSON when it is valid JSON, else keep the raw string. */
+function parseLenient(value: string): unknown {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
 }
 
 interface JsonSchemaObject {
@@ -58,10 +101,14 @@ interface JsonSchemaObject {
   required?: string[]
 }
 
-function coerce(value: unknown, type: JsonSchemaProperty['type']): unknown {
+function coerce(value: unknown, prop: JsonSchemaProperty | undefined): unknown {
   if (value === undefined) {
     return undefined
   }
+  if (prop?.nullable && value === 'null') {
+    return null
+  }
+  const type = prop?.type
   if (type === 'number' || type === 'integer') {
     const n = Number(value)
     return Number.isNaN(n) ? value : n
@@ -105,7 +152,10 @@ function addCliOption(command: Command, key: string, prop: JsonSchemaProperty) {
     command.option(`--${flag} <json>`, description ?? '', JSON.parse, defaultValue as never)
     return
   }
-  throw new Error(`Unsupported JSON Schema type for CLI option "${key}": ${type ?? 'undefined'}`)
+  // Unions, untyped (`{}`) and otherwise unrecognized schemas: never take the
+  // whole CLI down over one property - accept JSON, falling back to the raw
+  // string, and let the server validate.
+  command.option(`--${flag} <value>`, description ?? '', parseLenient, defaultValue as never)
 }
 
 function addCliArgument(command: Command, key: string, prop: JsonSchemaProperty, required: boolean) {
@@ -147,13 +197,13 @@ function buildToolInput(
     // (action_id) map too, not just single-word ones.
     const value = opts[camelCase(key)]
     if (value !== undefined) {
-      input[key] = coerce(value, properties[key]?.type)
+      input[key] = coerce(value, properties[key])
     }
   }
   argKeys.forEach((key, index) => {
     const value = positionals[index]
     if (value !== undefined) {
-      input[key] = coerce(value, properties[key]?.type)
+      input[key] = coerce(value, properties[key])
     }
   })
   return input
@@ -250,7 +300,9 @@ export function registerToolCommand(
     command.description(tool.description)
   }
   const schema = tool.inputSchema as JsonSchemaObject
-  const properties = schema.properties ?? {}
+  const properties = Object.fromEntries(
+    Object.entries(schema.properties ?? {}).map(([key, prop]) => [key, normalizeProperty(prop)])
+  )
   const requiredKeys = new Set(schema.required ?? [])
   const argKeys = positionalKeys(tool, properties)
   const argSet = new Set(argKeys)

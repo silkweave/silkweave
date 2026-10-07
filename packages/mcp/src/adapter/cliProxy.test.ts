@@ -163,6 +163,60 @@ describe('cliProxy positional arguments', () => {
   })
 })
 
+describe('cliProxy nullable and unsupported schemas', () => {
+  const tools = [
+    {
+      name: 'SetCooldown',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cooldown_min: { anyOf: [{ type: 'integer' }, { type: 'null' }], description: 'Minutes' },
+          label: { type: ['string', 'null'] },
+          mode: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+          extra: {}
+        }
+      }
+    },
+    { name: 'Ping', inputSchema: { type: 'object', properties: {} } }
+  ]
+
+  beforeEach(() => {
+    mocks.listTools.mockResolvedValue({ tools })
+  })
+
+  it('treats an anyOf with one non-null branch as that type', async () => {
+    await run(['set-cooldown', '--cooldown-min', '5', '--label', 'x'])
+    expect(mocks.callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ arguments: { cooldown_min: 5, label: 'x' } }),
+      undefined,
+      expect.anything()
+    )
+  })
+
+  it('passes a literal null to a nullable property', async () => {
+    await run(['set-cooldown', '--cooldown-min', 'null'])
+    expect(mocks.callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ arguments: { cooldown_min: null } }),
+      undefined,
+      expect.anything()
+    )
+  })
+
+  it('accepts JSON or raw strings for real unions and untyped properties', async () => {
+    await run(['set-cooldown', '--mode', '3', '--extra', 'plain'])
+    expect(mocks.callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ arguments: { mode: 3, extra: 'plain' } }),
+      undefined,
+      expect.anything()
+    )
+  })
+
+  it('keeps sibling tools working', async () => {
+    await run(['ping'])
+    expect(mocks.callTool).toHaveBeenCalledWith(expect.objectContaining({ name: 'Ping' }), undefined, expect.anything())
+  })
+})
+
 describe('cliProxy tool results', () => {
   it('sets exitCode 1 when the tool reports an error', async () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
