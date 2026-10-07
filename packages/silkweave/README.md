@@ -59,7 +59,7 @@ npx silkweave proxy --token $TOKEN https://api.example.com/mcp screenshot --url 
 
 Proxy flags (`--token`, `--header`, `--silent`) go **before** the URL - everything after the first positional is passed through to the remote tool untouched, so tool flags never collide with proxy flags.
 
-This is the packaged [`cliProxy`](https://github.com/silkweave/silkweave/tree/master/packages/mcp) machinery with the URL from argv: positional arguments declared by the server (`_meta['silkweave/args']`) render as CLI positionals, binary results pipe to stdout or `--output`, and log/progress notifications stream to stderr. Ship a dedicated binary with the `cliProxy` adapter when you want a branded CLI; use `silkweave proxy` when you just want to call a server.
+This is the packaged [`cliProxy`](https://github.com/silkweave/silkweave/tree/master/packages/mcp) machinery with the URL from argv: positional arguments declared by the server (`_meta['silkweave/args']`) render as CLI positionals, binary results pipe to stdout or `--output`, log/progress notifications stream to stderr, nullable inputs map to their non-null type (any other unmappable input gets a lenient JSON-or-string flag), and a tool result with `isError` exits with code 1. Ship a dedicated binary with the `cliProxy` adapter when you want a branded CLI; use `silkweave proxy` when you just want to call a server.
 
 ## Options
 
