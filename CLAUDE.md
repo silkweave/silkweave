@@ -341,7 +341,7 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 - No semicolons, single quotes, 2-space indent, no trailing commas - **enforced by `oxfmt`**, not by hand (`pnpm format`); the rules live in `.oxfmtrc.json`
 - Unused vars must be prefixed with `_`
 - Imports use `.js` extensions (NodeNext module resolution)
-- Zod: source imports the v4 API as `from 'zod/v4'`; published packages declare **`zod@^3.25.0 || ^4.0.0`**, matching what the MCP SDK / AI SDK / zod-to-json-schema all declare. The `zod/v4` subpath exists in both 3.25+ and 4.x, so one import style serves both and consumers are never forced to migrate.
+- Zod: source imports the v4 API as `from 'zod/v4'`; published packages declare **`zod@^3.25.0 || ^4.0.0`**, matching what the MCP SDK / AI SDK / zod-to-json-schema all declare. The `zod/v4` subpath exists in both 3.25+ and 4.x, so one import style serves both and consumers are never forced to migrate. **Action schemas must use the v4 API** (`zod/v4` on 3.25+, the root on 4.x): classic v3 schemas were never supported (core's `Action` type rejects them; CLI/Fastify/typegen need v4 internals), and since 6.0 `assertZodV4Schemas()` (`packages/core/src/util/zod.ts`, run by `silkweave().start()` and the MCP boot paths) rejects them at startup with a legible `unsupported_schema` error instead of an opaque adapter crash. Consumer compatibility across the range is checked by `pnpm zod-compat` (packs the build into throwaway consumers on zod 3.25.76 / 4.0 / 4.1 / latest).
 - Always avoid Em-Dash (`—`), use regular dash instead, or ideally avoid altogether (comments, markdown, docs, website)
 
 ### Linting and formatting (oxc stack)

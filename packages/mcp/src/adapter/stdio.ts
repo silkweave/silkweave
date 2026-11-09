@@ -1,6 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/server'
 import { serveStdio, type StdioServerHandle } from '@modelcontextprotocol/server/stdio'
-import { AdapterFactory, OnToolCall, Skill, SkillDefinition, validateActionDisposition } from '@silkweave/core'
+import {
+  AdapterFactory,
+  OnToolCall,
+  Skill,
+  SkillDefinition,
+  validateActionDisposition,
+  assertZodV4Schemas
+} from '@silkweave/core'
 import { registerTools } from '../handlers/registerTools.js'
 import { prepareSkills } from '../handlers/skills.js'
 
@@ -28,6 +35,7 @@ export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions
         // here rather than in the generator - instructions are ctor-only.
         const serving = await prepareSkills(adapterOptions?.skills, { extension: adapterOptions?.skillsExtension })
         const all = serving ? [...actions, ...serving.actions] : actions
+        all.forEach(assertZodV4Schemas)
         all.forEach(validateActionDisposition)
         // serveStdio may call the factory more than once (a discarded
         // `server/discover` probe, then the connection), so build per call.

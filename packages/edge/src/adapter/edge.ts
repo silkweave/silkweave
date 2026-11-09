@@ -22,6 +22,7 @@ import {
   SilkweaveOptions,
   Skill,
   SkillDefinition,
+  assertZodV4Schemas,
   validateActionDisposition
 } from '@silkweave/core'
 import {
@@ -571,6 +572,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       context: _context,
       start: async (actions) => {
         try {
+          actions.forEach(assertZodV4Schemas)
           actions.forEach(validateActionDisposition)
           _actions = actions
           _serving = await prepareSkills(options.skills, {

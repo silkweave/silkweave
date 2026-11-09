@@ -2,6 +2,7 @@ import { Action } from '../util/action.js'
 import { Adapter, AdapterGenerator, SilkweaveOptions } from '../util/adapter.js'
 import { createContext } from '../util/context.js'
 import { reportActionLint } from '../util/lint.js'
+import { assertZodV4Schemas } from '../util/zod.js'
 
 export type { SilkweaveOptions } from '../util/adapter.js'
 
@@ -35,6 +36,8 @@ export function silkweave(options: SilkweaveOptions): Silkweave {
       return builder
     },
     start: async () => {
+      // Before lint and adapters: both read v4 schema internals.
+      actions.forEach(assertZodV4Schemas)
       if (options.lint !== false) {
         reportActionLint(actions)
       }

@@ -7,6 +7,7 @@ import {
   SilkweaveOptions,
   Skill,
   SkillDefinition,
+  assertZodV4Schemas,
   validateActionDisposition
 } from '@silkweave/core'
 import { type RequestHandler } from 'express'
@@ -82,6 +83,7 @@ export function mcpTransport(
   options: McpTransportOptions = {}
 ): McpTransportHandlers {
   // Fail at boot, not per request - the factory runs once when the app is built.
+  actions.forEach(assertZodV4Schemas)
   actions.forEach(validateActionDisposition)
   // Resolved once; a rejection is surfaced through `ready` (and re-thrown per
   // request), never left as an unhandled rejection.

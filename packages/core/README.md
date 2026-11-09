@@ -19,6 +19,8 @@ This package provides the foundational building blocks that all Silkweave adapte
 - **Streaming utilities** - `isStreamingAction()` and `runStreamingAction()` for adapters that need to consume async-generator actions
 - **Zod utilities** - `unwrap()` to recursively unwrap Zod wrapper types
 
+> **Zod:** works with the `zod` package `^3.25 || ^4`. Write action schemas with the **v4 API** - `import z from 'zod/v4'` (zod 3.25+ ships it alongside the classic API) or `import { z } from 'zod'` on zod 4. Classic v3 schemas are rejected at `start()` with an `unsupported_schema` error naming the action, so a zod 3.x codebase can keep its classic schemas everywhere else and migrate incrementally.
+
 ## Usage
 
 ```typescript
