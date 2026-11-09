@@ -25,7 +25,8 @@
     "prepack": "turbo prepack",
     "publish:all": "pnpm publish -r --access public",
     "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "zod-compat": "bash scripts/zod-compat/run.sh"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

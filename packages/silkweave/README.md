@@ -57,6 +57,8 @@ npx silkweave proxy http://localhost:8080/mcp hello Tobias     # call a tool
 npx silkweave proxy --token $TOKEN https://api.example.com/mcp screenshot --url https://x.dev -o shot.png
 ```
 
+> **Protocol:** the client connects with the 2025-era handshake (the MCP SDK v2 client's default `versionNegotiation: 'legacy'`), which every current server accepts, Silkweave 6 included. A server that serves *only* protocol 2026-07-28 (`legacy: 'reject'`) is not reachable yet.
+
 Proxy flags (`--token`, `--header`, `--silent`) go **before** the URL - everything after the first positional is passed through to the remote tool untouched, so tool flags never collide with proxy flags.
 
 This is the packaged [`cliProxy`](https://github.com/silkweave/silkweave/tree/master/packages/mcp) machinery with the URL from argv: positional arguments declared by the server (`_meta['silkweave/args']`) render as CLI positionals, binary results pipe to stdout or `--output`, log/progress notifications stream to stderr, nullable inputs map to their non-null type (any other unmappable input gets a lenient JSON-or-string flag), and a tool result with `isError` exits with code 1. Ship a dedicated binary with the `cliProxy` adapter when you want a branded CLI; use `silkweave proxy` when you just want to call a server.

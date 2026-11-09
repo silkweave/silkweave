@@ -113,6 +113,8 @@ http({
 
 MCP CLI proxy client - connects to a running HTTP MCP server and invokes tools from the command line. Imported from the dedicated `@silkweave/mcp/cli-proxy` subpath (kept out of the package root so importing the `stdio`/`http` servers does not pull the CLI client's `commander` into the server path). `commander` is an **optional peer dependency** - install it alongside `@silkweave/mcp` when you use the CLI proxy.
 
+> **Protocol:** the client connects with the 2025-era handshake (the MCP SDK v2 client's default `versionNegotiation: 'legacy'`), which every current server accepts, Silkweave 6 included. A server that serves *only* protocol 2026-07-28 (`legacy: 'reject'`) is not reachable yet.
+
 ```typescript
 import { silkweave } from '@silkweave/core'
 import { cliProxy } from '@silkweave/mcp/cli-proxy'

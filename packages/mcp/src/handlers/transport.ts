@@ -1,5 +1,5 @@
 import { toNodeHandler } from '@modelcontextprotocol/node'
-import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
+import { createMcpHandler } from '@modelcontextprotocol/server'
 import {
   Action,
   OnToolCall,
@@ -12,37 +12,9 @@ import {
 import { type RequestHandler } from 'express'
 import { authFromRequest } from './auth.js'
 import { filterErrorResponse, rpcInfo, type FilterActions } from './filter.js'
+import { createMcpServer } from './mcpServer.js'
 import { emitInvalidArguments } from './prevalidate.js'
-import { registerTools } from './registerTools.js'
 import { prepareSkills, type SkillServing, type SkillsMarketplaceOptions } from './skills.js'
-
-export function createMcpServer(
-  options: SilkweaveOptions,
-  actions: Action[],
-  context: SilkweaveContext,
-  onToolCall?: OnToolCall,
-  serving?: SkillServing
-): McpServer {
-  // Gate the whole skill surface (resources + instructions) on the skill
-  // actions having survived the per-request filter - see SkillServing.visible.
-  const skillsVisible = serving?.visible(actions) ?? false
-  const server = new McpServer(
-    {
-      name: options.name,
-      description: options.description,
-      version: options.version
-    },
-    {
-      capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
-      ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
-    }
-  )
-  registerTools(server, actions, context, { onToolCall })
-  if (skillsVisible) {
-    serving?.register(server)
-  }
-  return server
-}
 
 export interface McpTransportHandlers {
   /** `POST /mcp` - handle a single stateless MCP request/response (SSE per call). */

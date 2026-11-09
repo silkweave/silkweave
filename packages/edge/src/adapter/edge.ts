@@ -1,7 +1,6 @@
 import {
   createMcpHandler,
   isLegacyRequest,
-  McpServer,
   WebStandardStreamableHTTPServerTransport,
   type McpHttpHandler
 } from '@modelcontextprotocol/server'
@@ -26,11 +25,11 @@ import {
   validateActionDisposition
 } from '@silkweave/core'
 import {
+  createMcpServer,
   emitInvalidArguments,
   filterErrorResponse,
   MARKETPLACE_PATH,
   prepareSkills,
-  registerTools,
   rpcInfo,
   type FilterActions,
   type SkillServing,
@@ -320,37 +319,6 @@ async function applyActionFilter(
   }
 }
 
-/**
- * Mint the per-request server, gating the skill surface (resources +
- * instructions) on the skill actions having survived the per-request filter -
- * see SkillServing.visible.
- */
-function createEdgeMcpServer(
-  options: SilkweaveOptions,
-  actions: Action[],
-  context: SilkweaveContext,
-  onToolCall: OnToolCall | undefined,
-  serving: SkillServing | undefined
-): McpServer {
-  const skillsVisible = serving?.visible(actions) ?? false
-  const server = new McpServer(
-    {
-      name: options.name,
-      description: options.description,
-      version: options.version
-    },
-    {
-      capabilities: { tools: {}, logging: {}, ...(skillsVisible ? { resources: {} } : {}) },
-      ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
-    }
-  )
-  registerTools(server, actions, context, { onToolCall })
-  if (skillsVisible) {
-    serving?.register(server)
-  }
-  return server
-}
-
 /** How a request path relates to the routes this adapter serves. */
 interface EdgePathMatch {
   /** The path is one this adapter serves at all (else: 404 before any async work). */
@@ -459,7 +427,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
         if (!state) {
           throw new Error('silkweave edge: no request state for MCP factory call')
         }
-        return createEdgeMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
+        return createMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
       },
       {
         // Legacy traffic is routed above (isLegacyRequest); anything that still
@@ -574,7 +542,7 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
         sessionIdGenerator: undefined,
         enableJsonResponse: options.enableJsonResponse
       })
-      const server = createEdgeMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
+      const server = createMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
       await server.connect(transport)
       return transport.handleRequest(request, { parsedBody: rawBody })
     }
@@ -626,6 +594,9 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       },
       stop: async () => {
         _actions = []
+        // Abort in-flight modern exchanges; legacy serving holds nothing.
+        await _modernHandler?.close()
+        _modernHandler = undefined
       }
     }
   }
