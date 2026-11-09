@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-trpc",
-  "version": "5.2.3",
+  "version": "6.0.0",
   "description": "Silkweave tRPC adapter example",
   "private": true,
   "type": "module",

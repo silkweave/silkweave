@@ -39,23 +39,54 @@ export interface Release {
 
 export const releases: Release[] = [
   {
-    version: '5.2.3',
+    version: '6.0.0',
     date: '2026-11-09',
-    summary: 'NestJS 12 support and a full dependency refresh, ahead of the MCP SDK v2 move in 6.0.',
+    summary:
+      'Silkweave moves to the MCP SDK v2 and protocol 2026-07-28 (incl. server/discover) while every 2025-era client keeps working - plus NestJS 12 support and a full dependency refresh.',
     changes: [
       {
+        type: 'breaking',
+        text: 'MCP adapters run on the split MCP SDK v2 (`@modelcontextprotocol/server` / `client`). The `extra` action-context key is now the SDK v2 `ServerContext`; import SDK types from the v2 packages. `@modelcontextprotocol/sdk` is no longer a dependency - drop it from your project unless you use it directly.',
+        commit: 'c1ebbdf'
+      },
+      {
+        type: 'breaking',
+        text: 'Classic zod v3 schemas in actions now fail at `start()` with a clear `unsupported_schema` error (they were never supported, and only worked over MCP by accident). Write action schemas with the v4 API: `zod/v4` on zod 3.25+, or `zod` on zod 4.',
+        commit: 'c668b41'
+      },
+      {
+        type: 'feature',
+        text: 'Protocol 2026-07-28 served natively by `http()`, `mcpTransport()`, `edge()` and `stdio()`, including `server/discover`. 2025-era clients (Claude Code, v1 SDK clients, older AI SDK versions) are served through a stateless legacy path - no client has to upgrade.',
+        commit: 'c1ebbdf'
+      },
+      {
         type: 'improvement',
-        text: '@silkweave/nestjs now supports NestJS 12 and @nestjs/swagger 12 (peer ranges widened; 10 and 11 still work).',
+        text: 'Your zod stays your choice: the package range is still `^3.25 || ^4`, verified against zod 3.25, 4.0, 4.1 and 4.6 consumers in both protocol eras.',
+        commit: 'cf1f0e6'
+      },
+      {
+        type: 'improvement',
+        text: '@silkweave/nestjs supports NestJS 12 and @nestjs/swagger 12 (10 and 11 still work).',
         commit: 'f75f388'
       },
       {
         type: 'improvement',
-        text: 'All dependencies refreshed to latest stable. Published version ranges are unchanged (zod stays `^3.25 || ^4`), so upgrading forces nothing on consumers.',
-        commit: 'f75f388'
+        text: 'Tool JSON Schemas now declare draft 2020-12 (the MCP default; was draft-07). v1 SDK clients keep validating structured output fine.',
+        commit: 'c1ebbdf'
       },
       {
         type: 'fix',
-        text: 'Documented TypeScript 7 + `@swc-node/register`: it needs a TS 6 compiler in the package that runs it (TS 7 no longer ships the JS API it reads); the NestJS example now does this.',
+        text: 'stdio: a tool-name collision (e.g. `foo-bar` and `foo_bar`) fails `start()` again instead of an opaque error on the first handshake.',
+        commit: '8fd13b6'
+      },
+      {
+        type: 'fix',
+        text: 'Telemetry: a no-argument tool call no longer emits a false INVALID_ARGUMENTS event before its success event.',
+        commit: '15afd32'
+      },
+      {
+        type: 'fix',
+        text: 'TypeScript 7 + `@swc-node/register` (NestJS dev loader) documented: keep a TS 6 compiler where it runs.',
         commit: 'f75f388'
       }
     ]

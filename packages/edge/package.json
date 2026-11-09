@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/edge",
-  "version": "5.2.3",
+  "version": "6.0.0",
   "description": "Silkweave Web-Standard edge/serverless adapter (Cloudflare Workers, Vercel, Bun, Deno, Hono)",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
