@@ -55,7 +55,15 @@ describe('emitInvalidArguments', () => {
     expect(events[0].errorMessage).toContain('name')
   })
 
-  it('emits when arguments are missing entirely (parses the verbatim undefined, like the SDK)', async () => {
+  it('does not emit for omitted arguments to a no-argument tool (validated as {}, like the SDK)', async () => {
+    const { events, onToolCall } = collect()
+    const body = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'HelloWorld' } }
+    await emitInvalidArguments(body, [action({ input: z.object({}) })], createContext(), onToolCall)
+    await flush()
+    expect(events).toEqual([])
+  })
+
+  it('emits when arguments are missing and the schema has required fields (validated as {})', async () => {
     const { events, onToolCall } = collect()
     await emitInvalidArguments(
       { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'HelloWorld' } },

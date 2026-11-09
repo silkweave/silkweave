@@ -11,11 +11,12 @@ import { pascalCase } from 'change-case'
  * this seam is the only way such calls become visible to `onToolCall`.
  *
  * Strictly emit-only: the request always proceeds to the SDK, which produces
- * its own native rejection (an `isError` tool result carrying the
- * `InvalidParams` message on SDK 1.29), so wire behavior is identical with or
- * without a hook and the seam survives an SDK major swap unchanged. Validation mirrors the SDK exactly - the same
- * schema, `safeParseAsync` on the verbatim `params.arguments` - so a call can
- * never emit both a failure event here and a success event from the handler.
+ * its own native rejection (an `InvalidParams` error), so wire behavior is
+ * identical with or without a hook and the seam survives an SDK major swap
+ * unchanged. Validation mirrors the SDK exactly - the same schema, parsed
+ * against `params.arguments ?? {}` (the SDK's own normalization of omitted
+ * arguments) - so a call can never emit both a failure event here and a
+ * success event from the handler.
  * An unknown tool name is skipped (the SDK's "tool not found" rejection is
  * not an arguments failure), and any unexpected internal throw is logged and
  * swallowed - telemetry can never fail the call path.
@@ -39,7 +40,10 @@ export async function emitInvalidArguments(
     if (!action) {
       return
     }
-    const parsed = await action.input.safeParseAsync(message.params.arguments)
+    // Omitted arguments are validated as `{}`, exactly as the SDK does - else a
+    // no-argument call to a `z.object({})` tool would emit a false failure here
+    // and then succeed in the handler (two events for one call).
+    const parsed = await action.input.safeParseAsync(message.params.arguments ?? {})
     if (parsed.success) {
       return
     }
