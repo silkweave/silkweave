@@ -15,24 +15,24 @@
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.19",
-    "@astrojs/vercel": "^11.0.5",
+    "@astrojs/vercel": "^11.0.20",
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
     "@silkweave/edge": "workspace:*",
     "@silkweave/trpc": "workspace:*",
-    "@trpc/client": "^11.18.0",
-    "@trpc/server": "^11.18.0",
-    "@upstash/redis": "^1.38.2",
+    "@trpc/client": "^11.25.0",
+    "@trpc/server": "^11.25.0",
+    "@upstash/redis": "^1.41.0",
     "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
+    "@vercel/speed-insights": "^2.1.0",
     "rehype-external-links": "^3.0.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@astrojs/markdown-remark": "^7.2.2",
-    "@astrojs/sitemap": "^3.7.3",
-    "@types/node": "26.2.0",
-    "astro": "^7.2.1",
+    "@astrojs/markdown-remark": "^7.3.6",
+    "@astrojs/sitemap": "^3.7.4",
+    "@types/node": "26.6.6",
+    "astro": "^7.4.7",
     "typescript": "7.0.2"
   },
   "version": "5.2.2"

@@ -27,6 +27,8 @@ import { typegen } from '@silkweave/nestjs/typegen'
 `@nestjs/swagger` and `class-validator` are **optional** peers too - install whichever your DTOs already use; the reflector reads both and falls back to TypeScript `design:type` when neither is present.
 
 > NestJS needs decorator-aware transforms with `emitDecoratorMetadata`. Use `@swc-node/register` (`node --import @swc-node/register/esm-register src/main.ts`) or the `nest start` CLI; plain `tsx` does not emit decorator metadata.
+>
+> **TypeScript 7:** `@swc-node/register` reads the TypeScript JS API, which the TS 7 native compiler no longer ships (its peer range is `typescript >=4.3 <7`), so on TS 7 it crashes at startup (`Cannot read properties of undefined (reading 'Js')`). Keep a TS 6 compiler in the package that runs it (`"typescript": "^6.0.3"`), as `examples/nestjs` does. Supported Nest versions: 10, 11 and 12.
 
 ## Usage
 

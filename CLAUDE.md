@@ -347,6 +347,7 @@ All `mcp__roam-code__*` tools are available inside sub-agents (both `general-pur
 The workspace is on **TypeScript 7.0.2** (the native Go port). One migration note that is easy to lose an afternoon to:
 
 - **TS 7 no longer auto-includes `@types/*` packages.** Every `tsconfig.json` therefore carries an explicit `"types": [...]` array; without it `console`, `process`, `NodeJS`, `Blob`, `File`, `TextEncoder` and friends all vanish. Reproduced in a clean non-pnpm project, so it is a TS 7 behavior change, not a workspace-layout artifact. When adding a package, list its type providers (`node`, plus e.g. `react`/`vite/client` where relevant).
+- **`@swc-node/register` needs a TS < 7 compiler** (it reads the TypeScript JS API, which TS 7 does not ship; crashes with `reading 'Js'`). It resolves `typescript` as a peer, so a pnpm override / `packageExtensions` does not help - `examples/nestjs` pins `"typescript": "^6.0.3"` instead (private example, typechecks fine on 6). NestJS consumers on TS 7 need the same.
 - `tsdown` warns that the TS 7 API is experimental. Verified this does **not** affect published output: `packages/core/build/index.d.mts` is byte-identical between TS 5.9.3 and TS 7 apart from quote style.
 
 ## Package resolution (dev source vs. published build)
