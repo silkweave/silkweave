@@ -1,14 +1,14 @@
-import { Client } from '@modelcontextprotocol/sdk/client'
-import { UnauthorizedError, type OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
-import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js'
 import {
-  ContentBlock,
-  LoggingMessageNotificationSchema,
-  ProgressNotificationSchema,
-  Tool,
-  ToolResultContent
-} from '@modelcontextprotocol/sdk/types.js'
+  Client,
+  SdkHttpError,
+  StreamableHTTPClientTransport,
+  UnauthorizedError,
+  type ContentBlock,
+  type FetchLike,
+  type OAuthClientProvider,
+  type Tool,
+  type ToolResultContent
+} from '@modelcontextprotocol/client'
 import { AdapterFactory, base64ToBytes, createConsoleLogger, isTextMimeType } from '@silkweave/core'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
@@ -278,10 +278,10 @@ async function writeBinaryPayloads(binaries: BinaryPayload[], outputPath: string
 /** Bridge the server's log + progress notifications onto the console. */
 export function attachNotificationLogging(client: Client) {
   const logger = createConsoleLogger()
-  client.setNotificationHandler(LoggingMessageNotificationSchema, ({ params: { level, data } }) => {
+  client.setNotificationHandler('notifications/message', ({ params: { level, data } }) => {
     logger[level](data)
   })
-  client.setNotificationHandler(ProgressNotificationSchema, ({ params: { progress, total, message } }) => {
+  client.setNotificationHandler('notifications/progress', ({ params: { progress, total, message } }) => {
     logger.info({ progress, total, message })
   })
 }
@@ -343,7 +343,6 @@ export function registerToolCommand(
         arguments: buildToolInput(properties, argKeys, positionals, opts),
         _meta: { progressToken: randomUUID(), disposition: 'json' }
       },
-      undefined,
       { timeout: toolTimeoutMs, resetTimeoutOnProgress: true }
     )) as ToolResultContent & { isError?: boolean }
     // A tool that failed (validation, a refused write) must fail the shell command too.
@@ -381,7 +380,7 @@ export function mergeRequestInit(requestInit?: RequestInit, headers?: Record<str
 export function connectErrorMessage(error: unknown, url: URL): string {
   if (
     error instanceof UnauthorizedError ||
-    (error instanceof StreamableHTTPError && (error.code === 401 || error.code === 403))
+    (error instanceof SdkHttpError && (error.data.status === 401 || error.data.status === 403))
   ) {
     return `authentication failed for ${url.origin} - check your token`
   }

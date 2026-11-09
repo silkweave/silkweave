@@ -1,4 +1,4 @@
-import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
+import { UnauthorizedError } from '@modelcontextprotocol/client'
 import { createContext } from '@silkweave/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cliProxy, type CliProxyOptions } from './cliProxy.js'
@@ -10,19 +10,16 @@ const mocks = vi.hoisted(() => ({
   transportOptions: [] as unknown[]
 }))
 
-vi.mock('@modelcontextprotocol/sdk/client', () => ({
-  Client: class {
-    connect = mocks.connect
-    listTools = mocks.listTools
-    callTool = mocks.callTool
-    setNotificationHandler = () => {}
-  }
-}))
-
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@modelcontextprotocol/sdk/client/streamableHttp.js')>()
+vi.mock('@modelcontextprotocol/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@modelcontextprotocol/client')>()
   return {
     ...actual,
+    Client: class {
+      connect = mocks.connect
+      listTools = mocks.listTools
+      callTool = mocks.callTool
+      setNotificationHandler = () => {}
+    },
     StreamableHTTPClientTransport: class {
       constructor(_url: URL, options?: unknown) {
         mocks.transportOptions.push(options)
@@ -125,7 +122,6 @@ describe('cliProxy positional arguments', () => {
         name: 'CreateIdentity',
         arguments: { id: 'abc', count: 2 }
       }),
-      undefined,
       expect.anything()
     )
   })
@@ -137,7 +133,6 @@ describe('cliProxy positional arguments', () => {
         name: 'AllocateTab',
         arguments: { identity: 'default', agentId: 'cli', url: 'https://example.com' }
       }),
-      undefined,
       expect.anything()
     )
   })
@@ -157,7 +152,6 @@ describe('cliProxy positional arguments', () => {
         name: 'ListSessions',
         arguments: {}
       }),
-      undefined,
       expect.anything()
     )
   })
@@ -188,7 +182,6 @@ describe('cliProxy nullable and unsupported schemas', () => {
     await run(['set-cooldown', '--cooldown-min', '5', '--label', 'x'])
     expect(mocks.callTool).toHaveBeenCalledWith(
       expect.objectContaining({ arguments: { cooldown_min: 5, label: 'x' } }),
-      undefined,
       expect.anything()
     )
   })
@@ -197,7 +190,6 @@ describe('cliProxy nullable and unsupported schemas', () => {
     await run(['set-cooldown', '--cooldown-min', 'null'])
     expect(mocks.callTool).toHaveBeenCalledWith(
       expect.objectContaining({ arguments: { cooldown_min: null } }),
-      undefined,
       expect.anything()
     )
   })
@@ -206,14 +198,13 @@ describe('cliProxy nullable and unsupported schemas', () => {
     await run(['set-cooldown', '--mode', '3', '--extra', 'plain'])
     expect(mocks.callTool).toHaveBeenCalledWith(
       expect.objectContaining({ arguments: { mode: 3, extra: 'plain' } }),
-      undefined,
       expect.anything()
     )
   })
 
   it('keeps sibling tools working', async () => {
     await run(['ping'])
-    expect(mocks.callTool).toHaveBeenCalledWith(expect.objectContaining({ name: 'Ping' }), undefined, expect.anything())
+    expect(mocks.callTool).toHaveBeenCalledWith(expect.objectContaining({ name: 'Ping' }), expect.anything())
   })
 })
 
@@ -232,7 +223,7 @@ describe('cliProxy tool results', () => {
 
   it('outlives the SDK request default and resets on progress', async () => {
     await run(['create-identity', 'abc'], { toolTimeoutMs: 1234 })
-    expect(mocks.callTool).toHaveBeenCalledWith(expect.anything(), undefined, {
+    expect(mocks.callTool).toHaveBeenCalledWith(expect.anything(), {
       timeout: 1234,
       resetTimeoutOnProgress: true
     })

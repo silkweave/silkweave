@@ -1,5 +1,10 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
+import {
+  createMcpHandler,
+  isLegacyRequest,
+  McpServer,
+  WebStandardStreamableHTTPServerTransport,
+  type McpHttpHandler
+} from '@modelcontextprotocol/server'
 import {
   AuthConfig,
   generateProtectedResourceMetadata,
@@ -113,16 +118,36 @@ class OAuthRequestError extends Error {
   }
 }
 
-/** Transport DNS-rebinding config, enabled only when host/origin allow-lists are set. */
-function dnsRebindingOptions(options: EdgeAdapterOptions): Record<string, unknown> {
-  if (!options.allowedHosts && !options.allowedOrigins) {
-    return {}
+/**
+ * DNS-rebinding protection, enabled only when host/origin allow-lists are set.
+ * Exact-match semantics (a `Host` value incl. port, a full origin) - kept from
+ * the MCP SDK v1 transport this option was forwarded to, so existing configs
+ * mean the same thing (the v2 SDK helpers compare bare hostnames instead).
+ * A missing `Origin` passes: non-browser clients do not send one.
+ */
+function dnsRebindingResponse(
+  request: Request,
+  options: EdgeAdapterOptions,
+  corsHeaders: Record<string, string>
+): Response | undefined {
+  const reject = (message: string) =>
+    new Response(JSON.stringify({ jsonrpc: '2.0', error: { code: -32_000, message }, id: null }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  if (options.allowedHosts?.length) {
+    const host = request.headers.get('host')
+    if (!host || !options.allowedHosts.includes(host)) {
+      return reject(`Invalid Host header: ${host ?? '(missing)'}`)
+    }
   }
-  return {
-    enableDnsRebindingProtection: true,
-    ...(options.allowedHosts ? { allowedHosts: options.allowedHosts } : {}),
-    ...(options.allowedOrigins ? { allowedOrigins: options.allowedOrigins } : {})
+  if (options.allowedOrigins?.length) {
+    const origin = request.headers.get('origin')
+    if (origin && !options.allowedOrigins.includes(origin)) {
+      return reject(`Invalid Origin header: ${origin}`)
+    }
   }
+  return undefined
 }
 
 /** Map a thrown handler error to a JSON error Response (400 for a bad OAuth body, else 500). */
@@ -423,6 +448,30 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       }
     : null
 
+  // Per-request state for the shared modern handler's factory, keyed by the
+  // Request identity (weak: entries vanish with the request).
+  const pending = new WeakMap<Request, { actions: Action[]; context: SilkweaveContext }>()
+  let _modernHandler: McpHttpHandler | undefined
+  const modernHandler = () => {
+    _modernHandler ??= createMcpHandler(
+      ({ requestInfo }) => {
+        const state = requestInfo ? pending.get(requestInfo) : undefined
+        if (!state) {
+          throw new Error('silkweave edge: no request state for MCP factory call')
+        }
+        return createEdgeMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
+      },
+      {
+        // Legacy traffic is routed above (isLegacyRequest); anything that still
+        // reaches this handler as legacy is rejected rather than half-served.
+        legacy: 'reject',
+        ...(options.enableJsonResponse ? { responseMode: 'json' as const } : {}),
+        onerror: (error) => console.error('MCP handler error:', error)
+      }
+    )
+    return _modernHandler
+  }
+
   const handleRequestInner = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
 
@@ -474,6 +523,11 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     // wait for silkweave().start() to complete
     await _ready
 
+    const rebinding = dnsRebindingResponse(request, options, CORS_HEADERS)
+    if (rebinding) {
+      return rebinding
+    }
+
     // JSON-RPC batching was removed from the MCP spec (2025-06-18). A batch also
     // defeats per-request filterActions (rpcInfo reflects only the first message
     // while the transport would execute every entry), so reject batches before
@@ -511,14 +565,24 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     // request still proceeds to the SDK for its native rejection.
     await emitInvalidArguments(rawBody, activeActions, requestContext, options.onToolCall)
 
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: options.enableJsonResponse,
-      ...dnsRebindingOptions(options)
-    })
-    const server = createEdgeMcpServer(_options!, activeActions, requestContext, options.onToolCall, _serving)
-    await server.connect(transport)
-    return transport.handleRequest(request)
+    const state = { actions: activeActions, context: requestContext }
+    // 2025-era clients: the v1 stateless idiom, verbatim (a fresh transport +
+    // server per request) - so `enableJsonResponse` keeps applying to them; the
+    // SDK's built-in legacy leg would always answer over SSE.
+    if (await isLegacyRequest(request, rawBody)) {
+      const transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: options.enableJsonResponse
+      })
+      const server = createEdgeMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
+      await server.connect(transport)
+      return transport.handleRequest(request, { parsedBody: rawBody })
+    }
+    // 2026-07-28 clients (incl. `server/discover`): one handler, built once;
+    // its factory finds this request's filtered actions + context by identity
+    // (the SDK hands the factory the same Request passed to `fetch`).
+    pending.set(request, state)
+    return modernHandler().fetch(request, { parsedBody: rawBody })
   }
 
   // Top-level guard: any throw (malformed OAuth body, a boot-failure rejection

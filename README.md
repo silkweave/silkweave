@@ -548,7 +548,7 @@ export { GET, POST, DELETE }
 
 **How it works:**
 
-- Uses `WebStandardStreamableHTTPServerTransport` from the MCP SDK in stateless mode (`sessionIdGenerator: undefined`)
+- Built on the MCP SDK v2: protocol 2026-07-28 clients (incl. `server/discover`) natively, 2025-era clients through a stateless legacy path
 - Each request creates a fresh `McpServer` + transport, registers tools, handles the request, and returns a Web Standard `Response`
 - Only `POST` carries JSON-RPC; `GET` (standing SSE stream) and `DELETE` (session teardown) return `405`, since stateless mode has no session to attach a stream to or tear down (a `GET` stream would otherwise hang the request on serverless runtimes)
 - Logging goes to `process.stderr` (Vercel log drain) and MCP client notifications

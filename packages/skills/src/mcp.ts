@@ -1,5 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js'
+import { ProtocolError, ProtocolErrorCode, type McpServer } from '@modelcontextprotocol/server'
 import { bytesToBase64, isTextMimeType, type Skill, type SkillFile } from '@silkweave/core'
 import z from 'zod/v4'
 import { fileBytes } from './util/digest.js'
@@ -18,15 +17,9 @@ export function skillFileUri(skill: Skill, file: SkillFile): string {
  * dedicated `@silkweave/skills/mcp` entry so the package root stays free of
  * the MCP SDK (an optional peer needed only by servers).
  */
-const skillsListRequestSchema = z.object({
-  method: z.literal(SKILLS_LIST_METHOD),
-  params: z.looseObject({ cursor: z.string().optional() }).optional()
-})
+const skillsListParamsSchema = z.looseObject({ cursor: z.string().optional() }).optional()
 
-const skillsGetRequestSchema = z.object({
-  method: z.literal(SKILLS_GET_METHOD),
-  params: z.looseObject({ uri: z.string() })
-})
+const skillsGetParamsSchema = z.looseObject({ uri: z.string() })
 
 /**
  * EXPERIMENTAL - register the SEP-2640 draft extension surface: the
@@ -39,13 +32,13 @@ const skillsGetRequestSchema = z.object({
  */
 export function registerSkillExtension(server: McpServer, skills: Skill[]): void {
   server.server.registerCapabilities({ extensions: { [SKILLS_EXTENSION_ID]: { directoryRead: false } } })
-  server.server.setRequestHandler(skillsListRequestSchema, async () => ({
+  server.server.setRequestHandler(SKILLS_LIST_METHOD, { params: skillsListParamsSchema }, async () => ({
     skills: skills.map(skillEntry)
   }))
-  server.server.setRequestHandler(skillsGetRequestSchema, async (request) => {
-    const skill = skills.find((candidate) => skillUri(candidate) === request.params.uri)
+  server.server.setRequestHandler(SKILLS_GET_METHOD, { params: skillsGetParamsSchema }, async (params) => {
+    const skill = skills.find((candidate) => skillUri(candidate) === params.uri)
     if (!skill) {
-      throw new McpError(ErrorCode.InvalidParams, `Unknown skill uri '${request.params.uri}'`)
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown skill uri '${params.uri}'`)
     }
     return { skill: skillEntry(skill) }
   })

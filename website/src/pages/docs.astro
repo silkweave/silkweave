@@ -962,7 +962,7 @@ export { GET, POST, DELETE }`)} /></pre>
     </div>
     <ul>
       <li>Each request creates a fresh MCP server instance (fully stateless)</li>
-      <li>Uses <code>WebStandardStreamableHTTPServerTransport</code> from the MCP SDK</li>
+      <li>Built on the MCP SDK v2: protocol 2026-07-28 clients (incl. <code>server/discover</code>) natively, 2025-era clients through a stateless legacy path</li>
       <li>Only <code>POST</code> carries JSON-RPC; <code>GET</code> / <code>DELETE</code> return <code>405</code> (stateless mode has no SSE stream or session to tear down)</li>
       <li>Supports OAuth 2.1 and bearer token auth</li>
       <li><a href="#streaming">Streaming actions</a> deliver chunks as MCP <code>notifications/progress</code> just like the stateful HTTP adapter</li>

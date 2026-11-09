@@ -1,4 +1,4 @@
-import type { Client } from '@modelcontextprotocol/sdk/client'
+import type { Client } from '@modelcontextprotocol/client'
 import { diffSkills, lockEntry, type SkillDiff } from '@silkweave/skills'
 import type { Command } from 'commander'
 import { connectRemote, parseUrl, type RemoteOptions } from '../connect.js'

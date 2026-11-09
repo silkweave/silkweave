@@ -1,5 +1,5 @@
-import type { Client } from '@modelcontextprotocol/sdk/client'
-import type { ToolResultContent } from '@modelcontextprotocol/sdk/types.js'
+import type { Client } from '@modelcontextprotocol/client'
+import type { ToolResultContent } from '@modelcontextprotocol/client'
 import type { SkillManifestEntry, SkillPayload } from '@silkweave/skills'
 
 /** Parse a JSON tool result, surfacing `isError` results as legible failures. */

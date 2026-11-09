@@ -51,7 +51,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .start()
 ```
 
-Exposes a single stateless `POST /mcp` (each call mints a fresh transport with `sessionIdGenerator: undefined`; progress streams over SSE per call). No `Mcp-Session-Id`, no `GET`/`DELETE` reconnect. Built on Express with `StreamableHTTPServerTransport` from the MCP SDK.
+Exposes a single stateless `POST /mcp` (each call builds a fresh server; progress streams over SSE per call). No `Mcp-Session-Id`, no `GET`/`DELETE` reconnect. Built on Express and the MCP SDK v2 (`createMcpHandler` + `toNodeHandler`): clients speaking protocol 2026-07-28 (incl. `server/discover`) are served natively, 2025-era clients through the SDK's stateless legacy path, so both keep working.
 
 | Option | Type | Description |
 |--------|------|-------------|

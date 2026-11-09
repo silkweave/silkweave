@@ -1,7 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js'
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js'
+import type { CallToolResult, McpServer, ServerContext } from '@modelcontextprotocol/server'
 import {
   Action,
   ActionRun,
@@ -27,9 +24,10 @@ import {
   smartToolResult,
   structuredToolResult
 } from '../util/result.js'
+import { standardSchema } from '../util/schema.js'
 
 type LogStream = NonNullable<Parameters<typeof createLogger>[0]>['stream']
-type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>
+type ToolExtra = ServerContext
 
 export interface RegisterToolsOptions {
   /**
@@ -49,20 +47,32 @@ export interface RegisterToolsOptions {
 
 /**
  * Build the generic `request` context value (the same key REST/tRPC populate)
- * from the MCP SDK's `extra.requestInfo`, so transport-agnostic consumers - e.g.
+ * from the HTTP request the MCP SDK exposes on the tool context (`ctx.http.req`,
+ * a Web-Standard `Request`), so transport-agnostic consumers - e.g.
  * `@silkweave/nestjs` `@UseGuards` guards reading
  * `switchToHttp().getRequest().headers` - work over MCP. There are no path
  * `params`/`query`/`body` on the raw MCP call, so those start as empty
  * stand-ins; `@silkweave/nestjs` later fills them from the validated tool input
  * per the reflected param sources (path -> `params`, `@Query` -> `query`,
  * `@Body` -> `body`) so guards reading any of them decide as they would over
- * REST. Returns `undefined` when no HTTP request info is available.
+ * REST. Headers are flattened to a plain record with lowercase names (the shape
+ * Express/Node deliver and guards index into). Returns `undefined` when there is
+ * no HTTP request (stdio).
  */
-export function requestFromExtra(requestInfo: { headers?: unknown; url?: { toString(): string } } | undefined) {
-  if (!requestInfo) {
+export function requestFromExtra(request: Request | undefined) {
+  if (!request) {
     return undefined
   }
-  return { headers: requestInfo.headers ?? {}, url: requestInfo.url?.toString(), params: {}, query: {}, body: {} }
+  const headers: Record<string, string> = {}
+  request.headers.forEach((value, key) => {
+    headers[key] = value
+  })
+  return { headers, url: request.url, params: {}, query: {}, body: {} }
+}
+
+/** Send a notification related to the current tool call (progress, log). */
+function notify(extra: ToolExtra, method: string, params: Record<string, unknown>) {
+  return extra.mcpReq.notify({ method, params } as Parameters<ToolExtra['mcpReq']['notify']>[0])
 }
 
 /** Per-call logger that bridges silkweave logs/progress onto MCP notifications. */
@@ -70,16 +80,14 @@ function createToolLogger(extra: ToolExtra, stream: LogStream) {
   return createLogger({
     stream,
     onLog: (level, data) => {
-      extra.sendNotification({ method: 'notifications/message', params: { level, data } })
+      void notify(extra, 'notifications/message', { level, data })
     },
     onProgress: ({ progress, total, message }) => {
-      if (!extra._meta?.progressToken) {
+      const progressToken = extra.mcpReq._meta?.progressToken
+      if (progressToken === undefined) {
         return
       }
-      extra.sendNotification({
-        method: 'notifications/progress',
-        params: { progress, total, message, progressToken: extra._meta.progressToken }
-      })
+      void notify(extra, 'notifications/progress', { progress, total, message, progressToken })
     }
   })
 }
@@ -91,17 +99,18 @@ async function runAction(
   context: SilkweaveContext,
   extra: ToolExtra
 ): Promise<object | object[]> {
-  const progressToken = extra._meta?.progressToken
+  const progressToken = extra.mcpReq._meta?.progressToken
   if (isStreamingAction(action)) {
     return runStreamingAction(
       action,
       input,
       context,
-      progressToken
+      progressToken !== undefined
         ? async (chunk, index) => {
-            await extra.sendNotification({
-              method: 'notifications/progress',
-              params: { progressToken, progress: index + 1, message: JSON.stringify(chunk) }
+            await notify(extra, 'notifications/progress', {
+              progressToken,
+              progress: index + 1,
+              message: JSON.stringify(chunk)
             })
           }
         : undefined
@@ -230,13 +239,15 @@ export function registerTools(
         // shadows it for every spec-following client.
         title: action.annotations?.title ?? capitalCase(action.name),
         description: action.description,
-        inputSchema: action.input,
+        inputSchema: standardSchema(action.input),
         // Derived base (query ⇒ read-only), explicit annotations merged over.
         annotations: { readOnlyHint: action.kind === 'query', ...action.annotations },
         // Only structured actions declare an outputSchema contract - the SDK
         // enforces it server-side and SDK clients enforce it independently, so
         // forwarding is strictly opt-in via disposition.
-        ...(action.disposition === 'structured' && action.output ? { outputSchema: action.output } : {}),
+        ...(action.disposition === 'structured' && action.output
+          ? { outputSchema: standardSchema(action.output) }
+          : {}),
         // Positional-argument intent for silkweave-aware CLI clients (cliProxy
         // renders these input fields as positional arguments, in order).
         // Spec-legal tool _meta, ignored by every other client.
@@ -249,11 +260,11 @@ export function registerTools(
         const actionContext = context.fork({
           logger,
           extra,
-          request: requestFromExtra(extra.requestInfo)
+          request: requestFromExtra(extra.http?.req)
         })
         // Client-sent `_meta.disposition` wins; otherwise fall back to the
         // action's configured default (`json` when neither is set).
-        const disposition = extra._meta?.disposition ?? action.disposition
+        const disposition = extra.mcpReq._meta?.disposition ?? action.disposition
         // `input` is the SDK-parsed (post-zod) input - defaults applied, unknown
         // keys stripped - so telemetry `args` matches what the action ran with.
         const base = {
@@ -265,7 +276,7 @@ export function registerTools(
         }
         const started = Date.now()
         try {
-          const result = await runAction(action, input, actionContext, extra)
+          const result = await runAction(action, input as object, actionContext, extra)
           const res = await toActionResource(result, binarySchemaMeta(action.output))
           const formatted = formatToolResult(action, result, actionContext, disposition, res)
           emitToolCall(options.onToolCall, {

@@ -36,7 +36,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@silkweave/auth": "workspace:*",
     "@silkweave/core": "workspace:*",
     "@silkweave/mcp": "workspace:*",
@@ -51,6 +51,7 @@
     }
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
     "@silkweave/skills": "workspace:^",
     "@types/node": "^26.6.6",
     "rimraf": "^6.1.4",

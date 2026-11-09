@@ -1,4 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { McpServer } from '@modelcontextprotocol/server'
 import { SilkweaveError, type Action, type Skill, type SkillDefinition } from '@silkweave/core'
 
 /**

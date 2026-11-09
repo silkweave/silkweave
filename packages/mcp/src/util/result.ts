@@ -1,4 +1,4 @@
-import { EmbeddedResource, type CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import type { CallToolResult, EmbeddedResource } from '@modelcontextprotocol/server'
 import {
   bytesToBase64,
   isTextMimeType,

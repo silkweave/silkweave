@@ -34,7 +34,7 @@
     "dev": "tsx --conditions=@silkweave/source src/cli.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/client": "^2.4.0",
     "@silkweave/core": "workspace:*",
     "@silkweave/mcp": "workspace:*",
     "@silkweave/skills": "workspace:*",

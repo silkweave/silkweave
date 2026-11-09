@@ -1,4 +1,4 @@
-import type { Client } from '@modelcontextprotocol/sdk/client'
+import type { Client } from '@modelcontextprotocol/client'
 import { sha256 } from '@silkweave/skills'
 import { describe, expect, it } from 'vitest'
 import { fetchExtensionSkills, hasSkillsExtension } from './extension.js'

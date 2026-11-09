@@ -56,8 +56,8 @@ See the full [`examples/cloudflare`](https://github.com/silkweave/silkweave/tree
 
 ## How It Works
 
-- Uses `WebStandardStreamableHTTPServerTransport` from the MCP SDK in **stateless mode** (`sessionIdGenerator: undefined`)
-- Each request creates a fresh `McpServer` + transport, registers tools, handles the request, and returns a Web Standard `Response`
+- Built on the MCP SDK v2: protocol 2026-07-28 clients (incl. `server/discover`) are served by `createMcpHandler`; 2025-era clients are routed (`isLegacyRequest`) to a stateless `WebStandardStreamableHTTPServerTransport` (`sessionIdGenerator: undefined`), so `enableJsonResponse` keeps applying to them
+- Each request gets a fresh `McpServer` with its (filtered) tools and returns a Web Standard `Response`
 - Only `POST` carries JSON-RPC; `GET` (standing SSE stream) and `DELETE` (session teardown) return `405`, since stateless mode has no session to attach a stream to or tear down (a `GET` stream would otherwise hang the request on serverless runtimes like Cloudflare Workers)
 - Actions are registered as MCP tools using `PascalCase` names (same as the stdio and http adapters)
 - Tool results use `smartToolResult()` by default. Large payloads (> 4096 chars) are automatically split into a text summary + embedded resource to reduce LLM context bloat. Actions can override this with a custom `toolResult` hook.

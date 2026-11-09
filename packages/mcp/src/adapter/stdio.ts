@@ -1,5 +1,5 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { McpServer } from '@modelcontextprotocol/server'
+import { serveStdio, type StdioServerHandle } from '@modelcontextprotocol/server/stdio'
 import { AdapterFactory, OnToolCall, Skill, SkillDefinition, validateActionDisposition } from '@silkweave/core'
 import { registerTools } from '../handlers/registerTools.js'
 import { prepareSkills } from '../handlers/skills.js'
@@ -20,33 +20,39 @@ export interface StdioAdapterOptions {
 export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions) => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'stdio' })
-    let server: McpServer | undefined
+    let handle: StdioServerHandle | undefined
     return {
       context,
       start: async (actions) => {
-        // Skills resolve async (file reads + digests), so the server is built
-        // here rather than in the generator - its instructions are ctor-only.
+        // Skills resolve async (file reads + digests), so they are prepared
+        // here rather than in the generator - instructions are ctor-only.
         const serving = await prepareSkills(adapterOptions?.skills, { extension: adapterOptions?.skillsExtension })
-        server = new McpServer(
-          {
-            name: options.name,
-            description: options.description,
-            version: options.version
-          },
-          {
-            capabilities: { tools: {}, logging: {}, ...(serving ? { resources: {} } : {}) },
-            ...(serving ? { instructions: serving.instructions } : {})
-          }
-        )
         const all = serving ? [...actions, ...serving.actions] : actions
         all.forEach(validateActionDisposition)
-        registerTools(server, all, context, { logStream: false, onToolCall: adapterOptions?.onToolCall })
-        serving?.register(server)
-        const transport = new StdioServerTransport()
-        await server.connect(transport)
+        // serveStdio may call the factory more than once (a discarded
+        // `server/discover` probe, then the connection), so build per call.
+        const factory = () => {
+          const server = new McpServer(
+            {
+              name: options.name,
+              description: options.description,
+              version: options.version
+            },
+            {
+              capabilities: { tools: {}, logging: {}, ...(serving ? { resources: {} } : {}) },
+              ...(serving ? { instructions: serving.instructions } : {})
+            }
+          )
+          registerTools(server, all, context, { logStream: false, onToolCall: adapterOptions?.onToolCall })
+          serving?.register(server)
+          return server
+        }
+        // `legacy: 'serve'`: 2025-era clients (the initialize handshake) keep
+        // working next to 2026-07-28 clients.
+        handle = serveStdio(factory, { legacy: 'serve' })
       },
       stop: async () => {
-        await server?.close()
+        await handle?.close()
       }
     }
   }

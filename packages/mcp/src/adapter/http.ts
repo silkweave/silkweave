@@ -1,4 +1,4 @@
-import { createMcpExpressApp, type CreateMcpExpressAppOptions } from '@modelcontextprotocol/sdk/server/express.js'
+import { createMcpExpressApp, type CreateMcpExpressAppOptions } from '@modelcontextprotocol/express'
 import { AuthConfig } from '@silkweave/auth'
 import {
   Action,

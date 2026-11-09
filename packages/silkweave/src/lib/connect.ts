@@ -1,5 +1,5 @@
-import { Client } from '@modelcontextprotocol/sdk/client'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { Client } from '@modelcontextprotocol/client'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { connectErrorMessage, mergeRequestInit } from '@silkweave/mcp/cli-proxy'
 
 /** Common remote-connection options shared by `skills` and `proxy` commands. */

@@ -1,5 +1,5 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { toNodeHandler } from '@modelcontextprotocol/node'
+import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import {
   Action,
   OnToolCall,
@@ -16,7 +16,7 @@ import { emitInvalidArguments } from './prevalidate.js'
 import { registerTools } from './registerTools.js'
 import { prepareSkills, type SkillServing, type SkillsMarketplaceOptions } from './skills.js'
 
-function createMcpServer(
+export function createMcpServer(
   options: SilkweaveOptions,
   actions: Action[],
   context: SilkweaveContext,
@@ -96,10 +96,11 @@ export interface McpTransportOptions {
 /**
  * Build the MCP Streamable HTTP transport route handler.
  *
- * Stateless (per the 2026 spec direction): each `POST /mcp` mints a fresh
- * transport + server with `sessionIdGenerator: undefined`, handles exactly that
- * request (streaming progress over SSE when the call carries a `progressToken`),
- * and tears down on response close. No `Mcp-Session-Id`, no session map, no
+ * Stateless: each `POST /mcp` builds a fresh server (via the MCP SDK v2
+ * `createMcpHandler`) for exactly that request, streaming progress over SSE
+ * when the call carries a `progressToken`. Modern (2026-07-28) clients get the
+ * per-request protocol incl. `server/discover`; 2025-era clients are served by
+ * the SDK's stateless legacy leg. No `Mcp-Session-Id`, no session map, no
  * `GET`/`DELETE` reconnect - any request can hit any instance.
  */
 export function mcpTransport(
@@ -162,7 +163,6 @@ export function mcpTransport(
       }
     }
     try {
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
       // Fork the caller's resolved auth (attached by authMiddleware) into the
       // per-request context; registerTools' tool-call fork inherits it.
       const auth = authFromRequest(req)
@@ -171,13 +171,15 @@ export function mcpTransport(
       // handler (and its telemetry emit) ever runs, so surface it here. The
       // request still proceeds to the SDK for its native rejection.
       await emitInvalidArguments(req.body, active, reqContext, options.onToolCall)
-      const server = createMcpServer(silkweaveOptions, active, reqContext, options.onToolCall, serving)
-      res.on('close', () => {
-        void transport.close()
-        void server.close()
-      })
-      await server.connect(transport)
-      await transport.handleRequest(req, res, req.body)
+      // A per-request handler whose factory closes over this request's filtered
+      // actions + forked context. The SDK serves 2026-07-28 traffic (incl.
+      // `server/discover`) natively and 2025-era traffic through its stateless
+      // legacy leg (`legacy: 'stateless'`) - both from the same factory.
+      const handler = createMcpHandler(
+        () => createMcpServer(silkweaveOptions, active, reqContext, options.onToolCall, serving),
+        { legacy: 'stateless', onerror: (error) => console.error('MCP handler error:', error) }
+      )
+      await toNodeHandler(handler)(req, res, req.body)
     } catch (error) {
       console.error('Error handling MCP request:', error)
       if (!res.headersSent) {
