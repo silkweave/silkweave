@@ -12,10 +12,6 @@
     "lighthouse": {
       "command": "npx",
       "args": ["@danielsogl/lighthouse-mcp"]
-    },
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["chrome-devtools-mcp@latest"]
     }
   }
 }
