@@ -39,6 +39,28 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '5.2.3',
+    date: '2026-11-09',
+    summary: 'NestJS 12 support and a full dependency refresh, ahead of the MCP SDK v2 move in 6.0.',
+    changes: [
+      {
+        type: 'improvement',
+        text: '@silkweave/nestjs now supports NestJS 12 and @nestjs/swagger 12 (peer ranges widened; 10 and 11 still work).',
+        commit: 'f75f388'
+      },
+      {
+        type: 'improvement',
+        text: 'All dependencies refreshed to latest stable. Published version ranges are unchanged (zod stays `^3.25 || ^4`), so upgrading forces nothing on consumers.',
+        commit: 'f75f388'
+      },
+      {
+        type: 'fix',
+        text: 'Documented TypeScript 7 + `@swc-node/register`: it needs a TS 6 compiler in the package that runs it (TS 7 no longer ships the JS API it reads); the NestJS example now does this.',
+        commit: 'f75f388'
+      }
+    ]
+  },
+  {
     version: '5.2.2',
     date: '2026-10-07',
     summary:

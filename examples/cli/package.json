@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-cli",
-  "version": "5.2.2",
+  "version": "5.2.3",
   "description": "Silkweave CLI adapter example",
   "private": true,
   "type": "module",
