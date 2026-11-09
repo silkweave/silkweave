@@ -56,6 +56,8 @@ See the full [`examples/cloudflare`](https://github.com/silkweave/silkweave/tree
 
 ## How It Works
 
+> **Client compatibility (2026-07-28 only by default):** Claude Code (2.1.3xx) and `@ai-sdk/mcp` negotiate 2026-07-28 out of the box. **Codex CLI (<= 0.167) needs `[features] mcp_2026_07_28 = true` in `~/.codex/config.toml`** (off by default), otherwise its tools never appear. Older/2025-only clients (v1 SDK, older Claude Code) need `legacy: true` on the server.
+
 - Built on the MCP SDK v2 and speaks **protocol 2026-07-28 only** (incl. `server/discover`). A 2025-era client gets the SDK's unsupported-protocol-version error; set `legacy: true` to also serve 2025-era clients (older Claude Code versions, v1 SDK clients) through the SDK's stateless legacy path. `enableJsonResponse` applies to 2026-07-28 exchanges; the legacy path always answers over SSE.
 - Each request gets a fresh `McpServer` with its (filtered) tools and returns a Web Standard `Response`
 - Only `POST` carries JSON-RPC; `GET` (standing SSE stream) and `DELETE` (session teardown) return `405`, since stateless mode has no session to attach a stream to or tear down (a `GET` stream would otherwise hang the request on serverless runtimes like Cloudflare Workers)

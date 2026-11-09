@@ -53,6 +53,8 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
 
 Exposes a single stateless `POST /mcp` (each call builds a fresh server; progress streams over SSE per call). No `Mcp-Session-Id`, no `GET`/`DELETE` reconnect. Built on Express and the MCP SDK v2 (`createMcpHandler` + `toNodeHandler`). Built on the MCP SDK v2 and speaks **protocol 2026-07-28 only** (incl. `server/discover`). A 2025-era client gets the SDK's unsupported-protocol-version error; set `legacy: true` to also serve 2025-era clients (older Claude Code versions, v1 SDK clients) through the SDK's stateless legacy path.
 
+> **Client compatibility (2026-07-28 only by default):** Claude Code (2.1.3xx) and `@ai-sdk/mcp` negotiate 2026-07-28 out of the box. **Codex CLI (<= 0.167) needs `[features] mcp_2026_07_28 = true` in `~/.codex/config.toml`** (off by default), otherwise its tools never appear. Older/2025-only clients (v1 SDK, older Claude Code) need `legacy: true` on the server.
+
 | Option | Type | Description |
 |--------|------|-------------|
 | `host` | `string` | Bind address |

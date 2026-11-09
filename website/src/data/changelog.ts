@@ -46,7 +46,7 @@ export const releases: Release[] = [
     changes: [
       {
         type: 'breaking',
-        text: 'MCP servers (`http()`, `mcpTransport()`, `edge()`, `stdio()`, NestJS `mcp()`) reject 2025-era clients by default. Set `legacy: true` to also serve them (older Claude Code versions, v1 SDK clients) - current Claude Code and `@ai-sdk/mcp` connect over 2026-07-28 out of the box.',
+        text: 'MCP servers (`http()`, `mcpTransport()`, `edge()`, `stdio()`, NestJS `mcp()`) reject 2025-era clients by default. Set `legacy: true` to also serve them (older Claude Code versions, v1 SDK clients) - current Claude Code and `@ai-sdk/mcp` connect over 2026-07-28 out of the box. Codex CLI (<= 0.167) speaks 2026-07-28 only with `features.mcp_2026_07_28 = true` in its config.toml - enable it, or set `legacy: true` on servers Codex uses.',
         commit: '078e0b3'
       },
       {
