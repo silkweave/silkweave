@@ -1,5 +1,6 @@
 import { SilkweaveError } from '@silkweave/core'
 import { TRPCError } from '@trpc/server'
+import { JSONRPC2_TO_HTTP_CODE } from '@trpc/server/unstable-core-do-not-import'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { mapError } from './errors.js'
@@ -32,8 +33,22 @@ describe('mapError', () => {
     expect(result.cause).toBe(err)
   })
 
-  it('falls back to INTERNAL_SERVER_ERROR for an unmapped status code', () => {
-    expect(mapError(new SilkweaveError('teapot', 'teapot', 418)).code).toBe('INTERNAL_SERVER_ERROR')
+  it('maps every HTTP status tRPC has a code for (no 4xx degrades to a 500)', () => {
+    for (const [code, status] of Object.entries(JSONRPC2_TO_HTTP_CODE)) {
+      if (code === 'PARSE_ERROR') {
+        continue // shares 400 with BAD_REQUEST
+      }
+      expect(mapError(new SilkweaveError('x', 'x', status)).code, `status ${status}`).toBe(code)
+    }
+  })
+
+  it('maps a NestJS-style 422 to UNPROCESSABLE_CONTENT', () => {
+    expect(mapError(new SilkweaveError('invalid', 'http_error', 422)).code).toBe('UNPROCESSABLE_CONTENT')
+  })
+
+  it('falls back to BAD_REQUEST for an unmapped 4xx and INTERNAL_SERVER_ERROR otherwise', () => {
+    expect(mapError(new SilkweaveError('teapot', 'teapot', 418)).code).toBe('BAD_REQUEST')
+    expect(mapError(new SilkweaveError('loop', 'loop', 508)).code).toBe('INTERNAL_SERVER_ERROR')
   })
 
   it('maps a plain Error to INTERNAL_SERVER_ERROR, preserving message and cause', () => {

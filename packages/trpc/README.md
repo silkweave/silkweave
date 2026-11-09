@@ -311,10 +311,11 @@ Thrown `SilkweaveError` instances are mapped to `TRPCError` by status code:
 | `403` | `FORBIDDEN` |
 | `404` | `NOT_FOUND` |
 | `409` | `CONFLICT` |
+| `422` | `UNPROCESSABLE_CONTENT` |
 | `429` | `TOO_MANY_REQUESTS` |
 | `500` (default) | `INTERNAL_SERVER_ERROR` |
 
-Zod validation errors from the input schema are automatically returned as `BAD_REQUEST`. Any other thrown value falls through to `INTERNAL_SERVER_ERROR`.
+Every status tRPC has a code for is mapped (also `402`, `405`, `408`, `412`, `413`, `415`, `428`, `499`, `501`-`504`). Any other `4xx` maps to `BAD_REQUEST` and any other status to `INTERNAL_SERVER_ERROR`, so a caller error never surfaces as a 500. Zod validation errors from the input schema are automatically returned as `BAD_REQUEST`. Any other thrown value falls through to `INTERNAL_SERVER_ERROR`.
 
 ## See Also
 
