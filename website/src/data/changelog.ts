@@ -39,6 +39,18 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '7.1.0',
+    date: '2026-11-09',
+    summary: 'Tool-call telemetry tells client errors from server faults.',
+    changes: [
+      {
+        type: 'feature',
+        text: "`onToolCall` events for failed calls now carry `statusCode` (HTTP-equivalent) and `fault: 'client' | 'server'`, so you can log bad input, not-found and auth denials at warning and real defects at error - no `errorCode` mapping needed. Works for `SilkweaveError`s, NestJS `HttpException`s (over MCP and tRPC) and invalid-arguments events (400).",
+        commit: '2886c6a'
+      }
+    ]
+  },
+  {
     version: '7.0.0',
     date: '2026-11-09',
     summary:

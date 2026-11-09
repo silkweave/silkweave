@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/skills",
-  "version": "7.0.0",
+  "version": "7.1.0",
   "description": "Silkweave Skills Package - serve Agent Skills (SKILL.md) over MCP",
   "license": "MIT",
   "homepage": "https://www.silkweave.dev",
