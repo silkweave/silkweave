@@ -51,7 +51,7 @@ await silkweave({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .start()
 ```
 
-Exposes a single stateless `POST /mcp` (each call builds a fresh server; progress streams over SSE per call). No `Mcp-Session-Id`, no `GET`/`DELETE` reconnect. Built on Express and the MCP SDK v2 (`createMcpHandler` + `toNodeHandler`): clients speaking protocol 2026-07-28 (incl. `server/discover`) are served natively, 2025-era clients through the SDK's stateless legacy path, so both keep working.
+Exposes a single stateless `POST /mcp` (each call builds a fresh server; progress streams over SSE per call). No `Mcp-Session-Id`, no `GET`/`DELETE` reconnect. Built on Express and the MCP SDK v2 (`createMcpHandler` + `toNodeHandler`). Built on the MCP SDK v2 and speaks **protocol 2026-07-28 only** (incl. `server/discover`). A 2025-era client gets the SDK's unsupported-protocol-version error; set `legacy: true` to also serve 2025-era clients (older Claude Code versions, v1 SDK clients) through the SDK's stateless legacy path.
 
 | Option | Type | Description |
 |--------|------|-------------|
@@ -61,6 +61,7 @@ Exposes a single stateless `POST /mcp` (each call builds a fresh server; progres
 | `cors` | `CorsOptions \| boolean` | CORS config. `false` to disable, `true`/omit for permissive defaults (`origin: '*'`), or a [cors](https://www.npmjs.com/package/cors) options object. MCP-required headers are always exposed. |
 | `filterActions` | `FilterActions` | Per-request tool filter - see [Per-request tool filtering](#per-request-tool-filtering-filteractions) |
 | `onToolCall` | `OnToolCall` | Telemetry hook - see [Telemetry](#telemetry-ontoolcall) |
+| `legacy` | `boolean` | Also serve 2025-era MCP clients (the `initialize` handshake) through the SDK's stateless legacy path. Off by default: protocol 2026-07-28 only |
 | `skills` | `(Skill \| SkillDefinition)[]` | Agent Skills to serve: `skill://` file resources + `ListSkills`/`GetSkill` tools + a server-instructions pointer. Requires the optional peer [`@silkweave/skills`](../skills); install/update client-side with `npx silkweave skills sync` |
 
 #### Per-request tool filtering (`filterActions`)
@@ -113,7 +114,7 @@ http({
 
 MCP CLI proxy client - connects to a running HTTP MCP server and invokes tools from the command line. Imported from the dedicated `@silkweave/mcp/cli-proxy` subpath (kept out of the package root so importing the `stdio`/`http` servers does not pull the CLI client's `commander` into the server path). `commander` is an **optional peer dependency** - install it alongside `@silkweave/mcp` when you use the CLI proxy.
 
-> **Protocol:** the client connects with the 2025-era handshake (the MCP SDK v2 client's default `versionNegotiation: 'legacy'`), which every current server accepts, Silkweave 6 included. A server that serves *only* protocol 2026-07-28 (`legacy: 'reject'`) is not reachable yet.
+> **Protocol:** connects with protocol 2026-07-28 only. Against a server that speaks only 2025-era MCP the connect fails with a hint - pass `--legacy` (cliProxy: `legacy: true`) to fall back to the 2025-era handshake.
 
 ```typescript
 import { silkweave } from '@silkweave/core'

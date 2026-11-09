@@ -30,6 +30,10 @@ beforeAll(async () => {
     createContext({ adapter: 'http' }),
     actions,
     {
+      // These suites post raw 2025-style JSON-RPC (no 2026-07-28 envelope) to
+      // test era-independent filter/telemetry behavior; eras.test.ts pins the
+      // protocol policy itself.
+      legacy: true,
       filterActions: (all, request) => {
         seen.push(request)
         const role = request.headers['x-role']
@@ -134,6 +138,7 @@ describe('mcpTransport onToolCall telemetry', () => {
       createContext({ adapter: 'http' }),
       [strict],
       {
+        legacy: true, // raw 2025-style JSON-RPC, see above
         onToolCall: (event) => {
           events.push(event)
         }
@@ -198,7 +203,7 @@ describe('mcpTransport methodNotAllowed', () => {
       { name: 'test', description: 'test', version: '0.0.0' },
       createContext({ adapter: 'http' }),
       [testAction('a', [])],
-      {}
+      { legacy: true } // raw 2025-style JSON-RPC, see above
     )
     app.post('/mcp', express.json(), transport.post)
     app.get('/mcp', transport.methodNotAllowed)

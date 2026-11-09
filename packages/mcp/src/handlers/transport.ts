@@ -52,6 +52,14 @@ export interface McpTransportOptions {
   /** Telemetry hook invoked once per tool call (fire-and-forget). */
   onToolCall?: OnToolCall
   /**
+   * Also serve 2025-era MCP clients (the `initialize` handshake) through the
+   * SDK's stateless legacy path. Off by default: Silkweave speaks protocol
+   * 2026-07-28 only, and a 2025-only client gets the SDK's
+   * unsupported-protocol-version error. Enable it for hosts that have not
+   * moved to 2026-07-28 yet (older Claude Code versions, v1 SDK clients).
+   */
+  legacy?: boolean
+  /**
    * Agent skills to serve: `skill://` file resources + `ListSkills`/`GetSkill`
    * tools + a server-instructions pointer. Requires `@silkweave/skills`
    * (optional peer); resolved once, reused across per-request servers.
@@ -71,9 +79,8 @@ export interface McpTransportOptions {
  *
  * Stateless: each `POST /mcp` builds a fresh server (via the MCP SDK v2
  * `createMcpHandler`) for exactly that request, streaming progress over SSE
- * when the call carries a `progressToken`. Modern (2026-07-28) clients get the
- * per-request protocol incl. `server/discover`; 2025-era clients are served by
- * the SDK's stateless legacy leg. No `Mcp-Session-Id`, no session map, no
+ * when the call carries a `progressToken`. Speaks protocol 2026-07-28 (incl.
+ * `server/discover`); 2025-era clients only with the `legacy` opt-in. No `Mcp-Session-Id`, no session map, no
  * `GET`/`DELETE` reconnect - any request can hit any instance.
  */
 export function mcpTransport(
@@ -146,12 +153,14 @@ export function mcpTransport(
       // request still proceeds to the SDK for its native rejection.
       await emitInvalidArguments(req.body, active, reqContext, options.onToolCall)
       // A per-request handler whose factory closes over this request's filtered
-      // actions + forked context. The SDK serves 2026-07-28 traffic (incl.
-      // `server/discover`) natively and 2025-era traffic through its stateless
-      // legacy leg (`legacy: 'stateless'`) - both from the same factory.
+      // actions + forked context. Protocol 2026-07-28 (incl. `server/discover`);
+      // 2025-era traffic only with the `legacy` opt-in (the SDK's stateless leg).
       const handler = createMcpHandler(
         () => createMcpServer(silkweaveOptions, active, reqContext, options.onToolCall, serving),
-        { legacy: 'stateless', onerror: (error) => console.error('MCP handler error:', error) }
+        {
+          legacy: options.legacy ? 'stateless' : 'reject',
+          onerror: (error) => console.error('MCP handler error:', error)
+        }
       )
       await toNodeHandler(handler)(req, res, req.body)
     } catch (error) {

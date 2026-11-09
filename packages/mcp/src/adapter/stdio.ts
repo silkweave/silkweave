@@ -22,6 +22,14 @@ export interface StdioAdapterOptions {
   skills?: (Skill | SkillDefinition)[]
   /** EXPERIMENTAL: also serve the SEP-2640 draft extension (`skills/list`/`skills/get` + capability). */
   skillsExtension?: boolean
+  /**
+   * Also serve 2025-era MCP clients (the `initialize` handshake) on the same
+   * connection. Off by default: Silkweave speaks protocol
+   * 2026-07-28 only, and a 2025-only client gets the SDK's
+   * unsupported-protocol-version error. Enable it for hosts that have not
+   * moved to 2026-07-28 yet (older Claude Code versions, v1 SDK clients).
+   */
+  legacy?: boolean
 }
 
 export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions) => {
@@ -51,7 +59,11 @@ export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions
               ...(serving ? { instructions: serving.instructions } : {})
             }
           )
-          registerTools(server, all, context, { logStream: false, onToolCall: adapterOptions?.onToolCall })
+          registerTools(server, all, context, {
+            logStream: false,
+            onToolCall: adapterOptions?.onToolCall,
+            serverInfo: { name: options.name, version: options.version }
+          })
           serving?.register(server)
           return server
         }
@@ -60,11 +72,11 @@ export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions
         // did before, instead of surfacing on the first handshake as an
         // opaque internal error. serveStdio's factory is lazy.
         await factory().close()
-        // `legacy: 'serve'`: 2025-era clients (the initialize handshake) keep
-        // working next to 2026-07-28 clients. Errors go to stderr - stdout is
-        // the protocol channel - since serveStdio reports only via onerror.
+        // Protocol 2026-07-28; 2025-era clients (the initialize handshake) only
+        // with the `legacy` opt-in. Errors go to stderr - stdout is the
+        // protocol channel - since serveStdio reports only via onerror.
         handle = serveStdio(factory, {
-          legacy: 'serve',
+          legacy: adapterOptions?.legacy ? 'serve' : 'reject',
           onerror: (error) => console.error('MCP stdio error:', error)
         })
       },

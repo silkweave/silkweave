@@ -27,6 +27,11 @@ export interface McpAdapterOptions {
    * routes; note Express 5 matches `'/:spaceId'` against every single segment.
    */
   transportPaths?: string[]
+  /**
+   * Also serve 2025-era MCP clients (the `initialize` handshake) through the
+   * SDK's stateless legacy path. Off by default: protocol 2026-07-28 only.
+   */
+  legacy?: boolean
   /** Mount the sideload resource route at `${basePath}/resource/:id`. Default `true`. */
   sideloadResources?: boolean
   /** Directory the sideload route reads from. Default `'resources'`. */
@@ -145,7 +150,8 @@ export function mcp(options: McpAdapterOptions = {}): NestSilkweaveAdapter {
 
       const transport = mcpTransport(silkweaveOptions, baseContext, actions, {
         filterActions: options.filterActions,
-        onToolCall
+        onToolCall,
+        legacy: options.legacy
       })
       for (const path of [basePath, ...(options.transportPaths ?? [])]) {
         adapter.post(path, ...prefix(corsHandler, express.json(), protect(transport.post)))

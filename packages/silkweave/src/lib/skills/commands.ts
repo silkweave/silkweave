@@ -18,6 +18,7 @@ function withCommonOptions(command: Command): Command {
     .option('-u, --url <url>', 'MCP endpoint URL (or SILKWEAVE_URL), e.g. https://host:8080/mcp')
     .option('-t, --token <token>', 'bearer token (or SILKWEAVE_TOKEN)')
     .option('-H, --header <key=value...>', 'extra request header (repeatable)')
+    .option('--legacy', 'also connect to servers that speak only 2025-era MCP', false)
     .option('--target <dir>', 'install directory', defaultTarget())
 }
 

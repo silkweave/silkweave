@@ -30,7 +30,10 @@ export function createMcpServer(
       ...(skillsVisible && serving ? { instructions: serving.instructions } : {})
     }
   )
-  registerTools(server, actions, context, { onToolCall })
+  registerTools(server, actions, context, {
+    onToolCall,
+    serverInfo: { name: options.name, version: options.version }
+  })
   if (skillsVisible) {
     serving?.register(server)
   }

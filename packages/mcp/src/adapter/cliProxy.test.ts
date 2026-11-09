@@ -1,4 +1,4 @@
-import { UnauthorizedError } from '@modelcontextprotocol/client'
+import { SdkError, UnauthorizedError, type SdkErrorCode } from '@modelcontextprotocol/client'
 import { createContext } from '@silkweave/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cliProxy, type CliProxyOptions } from './cliProxy.js'
@@ -236,6 +236,13 @@ describe('cliProxy connect failures', () => {
     await run(['create-identity', 'abc'])
     expect(mocks.callTool).not.toHaveBeenCalled()
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('authentication failed'))
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('points at --legacy when the server speaks only 2025-era MCP', async () => {
+    mocks.connect.mockRejectedValue(new SdkError('ERA_NEGOTIATION_FAILED' as SdkErrorCode, 'no 2026-07-28'))
+    await run(['create-identity', 'abc'])
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('retry with --legacy'))
     expect(process.exitCode).toBe(1)
   })
 

@@ -230,6 +230,7 @@ Mounts the MCP Streamable HTTP transport directly at `basePath`, with sideload (
 | `sideloadResources` | `boolean` | `true` | Mount `{basePath}/resource/:id` |
 | `resourceDir` | `string` | `'resources'` | Directory the sideload route reads from |
 | `filterActions` | `FilterActions` | - | Per-request tool filter, applied before tools are registered on every `POST {basePath}` (the stateless transport recomputes the tool list per request, so e.g. API-key permission changes apply on the next `tools/list`). Receives the synthesized actions (with their `@Mcp({ tags })`) and a request stand-in `{ headers, url, method, toolName }`; may be async. A throw surfaces as its `SilkweaveError.statusCode` (e.g. 401 for an invalid key) with a JSON-RPC error body, or 500 for other errors - never an empty tool list |
+| `legacy` | `boolean` | `false` | Also serve 2025-era MCP clients (the `initialize` handshake) through the SDK's stateless legacy path. Off by default: protocol 2026-07-28 only |
 
 ## tRPC
 

@@ -1,11 +1,13 @@
 import { Client } from '@modelcontextprotocol/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { connectErrorMessage, mergeRequestInit } from '@silkweave/mcp/cli-proxy'
+import { connectErrorMessage, mergeRequestInit, versionNegotiation } from '@silkweave/mcp/cli-proxy'
 
 /** Common remote-connection options shared by `skills` and `proxy` commands. */
 export interface RemoteOptions {
   token?: string
   header?: string[]
+  /** `--legacy`: also connect to servers that speak only 2025-era MCP. */
+  legacy?: boolean
 }
 
 /**
@@ -41,7 +43,10 @@ export interface RemoteConnection {
  * (auth-specific on 401/403, mirroring cliProxy) and exits.
  */
 export async function connectRemote(url: URL, options: RemoteOptions): Promise<RemoteConnection> {
-  const client = new Client({ name: 'silkweave-cli', version: '0.0.0' })
+  const client = new Client(
+    { name: 'silkweave-cli', version: '0.0.0' },
+    { versionNegotiation: versionNegotiation(options.legacy) }
+  )
   const transport = new StreamableHTTPClientTransport(url, {
     requestInit: mergeRequestInit(undefined, remoteHeaders(options))
   })

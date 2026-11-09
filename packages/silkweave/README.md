@@ -57,7 +57,7 @@ npx silkweave proxy http://localhost:8080/mcp hello Tobias     # call a tool
 npx silkweave proxy --token $TOKEN https://api.example.com/mcp screenshot --url https://x.dev -o shot.png
 ```
 
-> **Protocol:** the client connects with the 2025-era handshake (the MCP SDK v2 client's default `versionNegotiation: 'legacy'`), which every current server accepts, Silkweave 6 included. A server that serves *only* protocol 2026-07-28 (`legacy: 'reject'`) is not reachable yet.
+> **Protocol:** connects with protocol 2026-07-28 only. Against a server that speaks only 2025-era MCP the connect fails with a hint - pass `--legacy` (cliProxy: `legacy: true`) to fall back to the 2025-era handshake.
 
 Proxy flags (`--token`, `--header`, `--silent`) go **before** the URL - everything after the first positional is passed through to the remote tool untouched, so tool flags never collide with proxy flags.
 

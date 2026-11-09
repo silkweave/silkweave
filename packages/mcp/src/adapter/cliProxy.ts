@@ -1,5 +1,6 @@
 import {
   Client,
+  SdkError,
   SdkHttpError,
   StreamableHTTPClientTransport,
   UnauthorizedError,
@@ -18,6 +19,18 @@ import { writeFile } from 'fs/promises'
 import { parseResourceMessage } from '../util/result.js'
 
 export type CLIFormatterFn = (message: ContentBlock, index: number, messages: ContentBlock[]) => string | undefined
+
+/** The MCP protocol revision Silkweave clients and servers speak. */
+export const MCP_PROTOCOL_VERSION = '2026-07-28'
+
+/**
+ * Client version negotiation: pinned to `MCP_PROTOCOL_VERSION` (2026-07-28
+ * only), or with `legacy` the SDK's `auto` mode (probe 2026-07-28, fall back
+ * to the 2025-era `initialize` handshake).
+ */
+export function versionNegotiation(legacy?: boolean): { mode: 'auto' | { pin: string } } {
+  return { mode: legacy ? 'auto' : { pin: MCP_PROTOCOL_VERSION } }
+}
 
 export interface CliProxyOptions {
   url: URL
@@ -40,6 +53,12 @@ export interface CliProxyOptions {
    * server reset the clock, so this bounds only a silent call.
    */
   toolTimeoutMs?: number
+  /**
+   * Also connect to servers that speak only 2025-era MCP (falls back to the
+   * `initialize` handshake when the server offers no 2026-07-28). Off by
+   * default: the proxy speaks protocol 2026-07-28 only.
+   */
+  legacy?: boolean
 }
 
 /** Default `toolTimeoutMs`: long enough for imports and backfills that report no progress. */
@@ -384,6 +403,9 @@ export function connectErrorMessage(error: unknown, url: URL): string {
   ) {
     return `authentication failed for ${url.origin} - check your token`
   }
+  if (error instanceof SdkError && error.code === 'ERA_NEGOTIATION_FAILED') {
+    return `${url} speaks only 2025-era MCP (no protocol ${MCP_PROTOCOL_VERSION}) - retry with --legacy (cliProxy: legacy: true)`
+  }
   return `cannot reach MCP server at ${url}: ${error instanceof Error ? error.message : String(error)}`
 }
 
@@ -404,7 +426,8 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({
   requestInit,
   fetch: fetchImpl,
   authProvider,
-  toolTimeoutMs = DEFAULT_TOOL_TIMEOUT_MS
+  toolTimeoutMs = DEFAULT_TOOL_TIMEOUT_MS,
+  legacy
 }) => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'cliProxy' })
@@ -417,11 +440,14 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({
     return {
       context,
       start: async () => {
-        const client = new Client({
-          name: options.name,
-          description: options.description,
-          version: options.version
-        })
+        const client = new Client(
+          {
+            name: options.name,
+            description: options.description,
+            version: options.version
+          },
+          { versionNegotiation: versionNegotiation(legacy) }
+        )
         const resolvedHeaders = typeof headers === 'function' ? await headers() : headers
         const transport = new StreamableHTTPClientTransport(url, {
           requestInit: mergeRequestInit(requestInit, resolvedHeaders),

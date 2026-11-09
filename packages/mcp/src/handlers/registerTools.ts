@@ -1,4 +1,9 @@
-import type { CallToolResult, McpServer, ServerContext } from '@modelcontextprotocol/server'
+import {
+  SERVER_INFO_META_KEY,
+  type CallToolResult,
+  type McpServer,
+  type ServerContext
+} from '@modelcontextprotocol/server'
 import {
   Action,
   ActionRun,
@@ -43,6 +48,23 @@ export interface RegisterToolsOptions {
    * `smartToolResult` offloaded to an embedded resource).
    */
   onToolCall?: OnToolCall
+  /**
+   * Server identity stamped (without `description`) into each tool result's
+   * `_meta["io.modelcontextprotocol/serverInfo"]` on 2026-07-28 exchanges.
+   * The SDK otherwise stamps the full server info - incl. the free-text
+   * description - onto every result, and hosts that hand whole tool results
+   * to the model (e.g. `@ai-sdk/mcp`) repeat it in context on every call. The
+   * full description stays in `server/discover` / `initialize`.
+   */
+  serverInfo?: { name: string; version: string }
+}
+
+/** Pre-stamp a slim serverInfo; the SDK never overwrites one a handler set. */
+function withSlimServerInfo(result: CallToolResult, extra: ToolExtra, serverInfo?: { name: string; version: string }) {
+  if (!serverInfo || extra.mcpReq.envelope === undefined) {
+    return result
+  }
+  return { ...result, _meta: { ...result._meta, [SERVER_INFO_META_KEY]: serverInfo } }
 }
 
 /**
@@ -285,7 +307,7 @@ export function registerTools(
             ok: formatted.isError !== true,
             ...(options.onToolCall ? resultMeta(result, formatted, res) : {})
           })
-          return formatted
+          return withSlimServerInfo(formatted, extra, options.serverInfo)
         } catch (error) {
           emitToolCall(options.onToolCall, {
             ...base,
@@ -293,7 +315,7 @@ export function registerTools(
             ok: false,
             ...errorMeta(error)
           })
-          return handleToolError(error)
+          return withSlimServerInfo(handleToolError(error), extra, options.serverInfo)
         }
       }
     )

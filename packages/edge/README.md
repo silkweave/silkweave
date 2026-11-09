@@ -56,7 +56,7 @@ See the full [`examples/cloudflare`](https://github.com/silkweave/silkweave/tree
 
 ## How It Works
 
-- Built on the MCP SDK v2: protocol 2026-07-28 clients (incl. `server/discover`) are served by `createMcpHandler`; 2025-era clients are routed (`isLegacyRequest`) to a stateless `WebStandardStreamableHTTPServerTransport` (`sessionIdGenerator: undefined`), so `enableJsonResponse` keeps applying to them
+- Built on the MCP SDK v2 and speaks **protocol 2026-07-28 only** (incl. `server/discover`). A 2025-era client gets the SDK's unsupported-protocol-version error; set `legacy: true` to also serve 2025-era clients (older Claude Code versions, v1 SDK clients) through the SDK's stateless legacy path. `enableJsonResponse` applies to 2026-07-28 exchanges; the legacy path always answers over SSE.
 - Each request gets a fresh `McpServer` with its (filtered) tools and returns a Web Standard `Response`
 - Only `POST` carries JSON-RPC; `GET` (standing SSE stream) and `DELETE` (session teardown) return `405`, since stateless mode has no session to attach a stream to or tear down (a `GET` stream would otherwise hang the request on serverless runtimes like Cloudflare Workers)
 - Actions are registered as MCP tools using `PascalCase` names (same as the stdio and http adapters)
@@ -97,6 +97,7 @@ const { adapter, handler } = edge({
 | `corsOrigin` | `string` | `*` | The `Access-Control-Allow-Origin` value. Set to a specific origin (pair with `allowedOrigins`) instead of reflecting every origin |
 | `filterActions` | `FilterActions` | - | Per-request tool filter, applied before tools are registered on every POST (the stateless transport recomputes the tool list per request, so permission changes apply on the next `tools/list`). Receives the actions (with their `tags`) and a request stand-in `{ headers, url, method, toolName }` - `method` is the JSON-RPC method (skip DB lookups on `initialize`/`ping`), `toolName` is set for `tools/call`. May be async. A throw surfaces as its `SilkweaveError.statusCode` (e.g. 401) with a JSON-RPC error body, or 500 for other errors - never an empty tool list |
 | `onToolCall` | `OnToolCall` | - | Telemetry hook invoked once per tool call, fire-and-forget (never awaited on the result path; errors logged and swallowed). Events carry `{ action, tool, transport: 'mcp', durationMs, ok, errorCode?, errorMessage?, args?, resultBytes?, sideloaded?, context }` - `args` is the parsed (post-zod) input on success events and the raw offered input on validation failures. A `tools/call` failing input validation also emits (`ok: false`, `errorCode: 'INVALID_ARGUMENTS'`, `durationMs: 0`) via emit-only pre-validation - the SDK still produces its native rejection on the wire. `args` is unredacted; redact/truncate before persisting |
+| `legacy` | `boolean` | `false` | Also serve 2025-era MCP clients (the `initialize` handshake) through the SDK's stateless legacy path. Off by default: protocol 2026-07-28 only |
 | `skills` | `(Skill \| SkillDefinition)[]` | - | Agent Skills to serve: `skill://` file resources + `ListSkills`/`GetSkill` tools + a server-instructions pointer. Requires the optional peer [`@silkweave/skills`](../skills); on Workers use `defineSkill({ files })` (no filesystem) |
 
 ## Compound Return Pattern

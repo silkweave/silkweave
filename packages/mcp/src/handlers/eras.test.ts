@@ -34,35 +34,69 @@ const actions = [
   }
 ] as unknown as Action[]
 
-let server: Server
-let url: URL
+let strict: Server
+let compat: Server
+let strictUrl: URL
+let compatUrl: URL
 
-beforeAll(async () => {
+function serve(legacy: boolean): [Server, URL] {
   const app = express()
   const transport = mcpTransport(
-    { name: 'eras', description: 'eras', version: '0.0.0' },
+    { name: 'eras', description: 'A long free-text server description', version: '0.0.0' },
     createContext({ adapter: 'http' }),
-    actions
+    actions,
+    { legacy }
   )
   app.post('/mcp', express.json(), transport.post)
-  server = app.listen(0)
-  url = new URL(`http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`)
+  const server = app.listen(0)
+  return [server, new URL(`http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`)]
+}
+
+beforeAll(() => {
+  ;[strict, strictUrl] = serve(false)
+  ;[compat, compatUrl] = serve(true)
 })
 
 afterAll(() => {
-  server.close()
+  strict.close()
+  compat.close()
 })
 
-async function connect(mode: VersionNegotiationMode) {
+async function connectTo(url: URL, mode: VersionNegotiationMode) {
   const client = new Client({ name: 'eras-client', version: '0.0.0' }, { versionNegotiation: { mode } })
   await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { 'x-test': 'hello' } } }))
   return client
 }
 
+describe('protocol policy', () => {
+  it('rejects a 2025-era client by default', async () => {
+    await expect(connectTo(strictUrl, 'legacy')).rejects.toThrow()
+  })
+
+  it('serves a 2025-era client with legacy: true', async () => {
+    const client = await connectTo(compatUrl, 'legacy')
+    expect((await client.listTools()).tools.length).toBeGreaterThan(0)
+    await client.close()
+  })
+
+  it('stamps a slim serverInfo (no description) on 2026-07-28 tool results only', async () => {
+    const modern = await connectTo(strictUrl, { pin: '2026-07-28' })
+    const result = await modern.callTool({ name: 'EchoHeader', arguments: { text: 'a' } })
+    expect(result._meta?.['io.modelcontextprotocol/serverInfo']).toEqual({ name: 'eras', version: '0.0.0' })
+    await modern.close()
+    const legacy = await connectTo(compatUrl, 'legacy')
+    const old = await legacy.callTool({ name: 'EchoHeader', arguments: { text: 'a' } })
+    expect(old._meta?.['io.modelcontextprotocol/serverInfo']).toBeUndefined()
+    await legacy.close()
+  })
+})
+
 describe.each([
-  ['modern (2026-07-28)', { pin: '2026-07-28' } as VersionNegotiationMode],
-  ['legacy (2025)', 'legacy' as VersionNegotiationMode]
-])('mcpTransport with a %s client', (_label, mode) => {
+  ['modern (2026-07-28)', { pin: '2026-07-28' } as VersionNegotiationMode, false],
+  ['legacy (2025)', 'legacy' as VersionNegotiationMode, true]
+])('mcpTransport with a %s client', (_label, mode, legacy) => {
+  const connect = (negotiation: VersionNegotiationMode) => connectTo(legacy ? compatUrl : strictUrl, negotiation)
+
   it('lists tools with JSON Schema derived from the zod input', async () => {
     const client = await connect(mode)
     const { tools } = await client.listTools()

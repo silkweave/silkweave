@@ -2,6 +2,7 @@ import { createContext, defineSkill, type Action } from '@silkweave/core'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { edge, type EdgeAdapterOptions } from './edge.js'
+import { jsonFromSse } from './testUtil.js'
 
 const SKILL_MD = `---
 name: deploy-checklist
@@ -29,11 +30,12 @@ const hello: Action = {
   run: async () => ({ ok: true })
 } as Action
 
+// raw 2025-style JSON-RPC (no 2026-07-28 envelope): these suites test era-independent behavior; eras.test.ts pins the protocol policy
 async function startEdge(options: EdgeAdapterOptions = {}) {
-  const app = edge({ enableJsonResponse: true, skills, ...options })
+  const app = edge({ legacy: true, enableJsonResponse: true, skills, ...options })
   const generated = app.adapter({ name: 'test', description: 'test', version: '0.0.0' }, createContext())
   await generated.start([hello])
-  return app
+  return jsonFromSse(app)
 }
 
 function post(body: object, headers: Record<string, string> = {}) {
@@ -218,7 +220,12 @@ describe('edge skills serving', () => {
   })
 
   it('fails start when skillsMarketplace is set but no skill carries an npmPackage', async () => {
-    const app = edge({ enableJsonResponse: true, skills, skillsMarketplace: { owner: { name: 'Atomic' } } })
+    const app = edge({
+      legacy: true,
+      enableJsonResponse: true,
+      skills,
+      skillsMarketplace: { owner: { name: 'Atomic' } }
+    })
     const generated = app.adapter({ name: 'test', description: 'test', version: '0.0.0' }, createContext())
     await expect(generated.start([hello])).rejects.toThrow(/npmPackage/)
   })

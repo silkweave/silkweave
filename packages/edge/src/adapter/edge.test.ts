@@ -2,6 +2,7 @@ import { createContext, SilkweaveError, type Action, type ToolCallEvent } from '
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { edge, type EdgeAdapterOptions } from './edge.js'
+import { jsonFromSse } from './testUtil.js'
 
 function testAction(name: string, tags: string[]): Action {
   return {
@@ -16,11 +17,12 @@ function testAction(name: string, tags: string[]): Action {
 const actions = [testAction('leads.list', ['read']), testAction('leads.delete', ['write'])]
 
 /** Build a started edge adapter (JSON responses for easy assertions). */
+// raw 2025-style JSON-RPC (no 2026-07-28 envelope): these suites test era-independent behavior; eras.test.ts pins the protocol policy
 async function startEdge(options: EdgeAdapterOptions = {}) {
-  const app = edge({ enableJsonResponse: true, ...options })
+  const app = edge({ legacy: true, enableJsonResponse: true, ...options })
   const generated = app.adapter({ name: 'test', description: 'test', version: '0.0.0' }, createContext())
   await generated.start(actions)
-  return app
+  return jsonFromSse(app)
 }
 
 function post(body: object, headers: Record<string, string> = {}) {
@@ -98,6 +100,7 @@ describe('edge onToolCall telemetry', () => {
   async function startWithHook() {
     const events: ToolCallEvent[] = []
     const app = edge({
+      legacy: true,
       enableJsonResponse: true,
       onToolCall: (event) => {
         events.push(event)
@@ -105,7 +108,7 @@ describe('edge onToolCall telemetry', () => {
     })
     const generated = app.adapter({ name: 'test', description: 'test', version: '0.0.0' }, createContext())
     await generated.start([strict])
-    return { app, events }
+    return { app: jsonFromSse(app), events }
   }
 
   const call = (args: unknown) =>

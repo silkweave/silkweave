@@ -4,9 +4,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { edge } from './edge.js'
 
-// End-to-end through the Web-Standard handler: the MCP SDK v2 client in both
-// protocol eras, with and without `enableJsonResponse` (2025-era traffic is
-// routed to a v1-identical stateless transport so that option keeps applying).
+// End-to-end through the Web-Standard handler: protocol 2026-07-28 by default
+// (with and without `enableJsonResponse`), 2025-era clients only with the
+// `legacy` opt-in.
 
 const actions = [
   {
@@ -33,8 +33,8 @@ const actions = [
 
 const url = new URL('http://localhost/mcp')
 
-async function startEdge(enableJsonResponse: boolean) {
-  const app = edge({ enableJsonResponse })
+async function startEdge(enableJsonResponse: boolean, legacy = false) {
+  const app = edge({ enableJsonResponse, legacy })
   const generated = app.adapter({ name: 'eras', description: 'eras', version: '0.0.0' }, createContext())
   await generated.start(actions)
   return app
@@ -53,14 +53,20 @@ async function connect(mode: VersionNegotiationMode) {
   return client
 }
 
+describe('edge protocol policy', () => {
+  it('rejects a 2025-era client by default', async () => {
+    app = await startEdge(false)
+    await expect(connect('legacy')).rejects.toThrow()
+  })
+})
+
 describe.each([
-  ['modern (2026-07-28)', { pin: '2026-07-28' } as VersionNegotiationMode, false],
-  ['legacy (2025)', 'legacy' as VersionNegotiationMode, false],
-  ['modern (2026-07-28)', { pin: '2026-07-28' } as VersionNegotiationMode, true],
-  ['legacy (2025)', 'legacy' as VersionNegotiationMode, true]
-])('edge with a %s client (enableJsonResponse: %s)', (_label, mode, json) => {
+  ['modern (2026-07-28)', { pin: '2026-07-28' } as VersionNegotiationMode, false, false],
+  ['modern (2026-07-28)', { pin: '2026-07-28' } as VersionNegotiationMode, true, false],
+  ['legacy (2025, legacy: true)', 'legacy' as VersionNegotiationMode, false, true]
+])('edge with a %s client (enableJsonResponse: %s)', (_label, mode, json, legacy) => {
   beforeAll(async () => {
-    app = await startEdge(json)
+    app = await startEdge(json, legacy)
   })
 
   it('lists tools with JSON Schema derived from the zod input', async () => {

@@ -1,9 +1,4 @@
-import {
-  createMcpHandler,
-  isLegacyRequest,
-  WebStandardStreamableHTTPServerTransport,
-  type McpHttpHandler
-} from '@modelcontextprotocol/server'
+import { createMcpHandler, type McpHttpHandler } from '@modelcontextprotocol/server'
 import {
   AuthConfig,
   generateProtectedResourceMetadata,
@@ -39,6 +34,12 @@ import {
 
 export interface EdgeAdapterOptions {
   enableJsonResponse?: boolean
+  /**
+   * Also serve 2025-era MCP clients (the `initialize` handshake) through the
+   * SDK's stateless legacy path. Off by default: protocol 2026-07-28 only, and
+   * a 2025-only client gets the SDK's unsupported-protocol-version error.
+   */
+  legacy?: boolean
   auth?: AuthConfig
   path?: string
   /**
@@ -417,12 +418,12 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       }
     : null
 
-  // Per-request state for the shared modern handler's factory, keyed by the
-  // Request identity (weak: entries vanish with the request).
+  // Per-request state for the shared handler's factory, keyed by the Request
+  // identity (weak: entries vanish with the request).
   const pending = new WeakMap<Request, { actions: Action[]; context: SilkweaveContext }>()
-  let _modernHandler: McpHttpHandler | undefined
-  const modernHandler = () => {
-    _modernHandler ??= createMcpHandler(
+  let _mcpHandler: McpHttpHandler | undefined
+  const mcpHandler = () => {
+    _mcpHandler ??= createMcpHandler(
       ({ requestInfo }) => {
         const state = requestInfo ? pending.get(requestInfo) : undefined
         if (!state) {
@@ -431,14 +432,15 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
         return createMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
       },
       {
-        // Legacy traffic is routed above (isLegacyRequest); anything that still
-        // reaches this handler as legacy is rejected rather than half-served.
-        legacy: 'reject',
+        // Protocol 2026-07-28; 2025-era clients only with the `legacy` opt-in
+        // (the SDK's stateless legacy leg - always SSE, `enableJsonResponse`
+        // applies to 2026-07-28 exchanges only).
+        legacy: options.legacy ? 'stateless' : 'reject',
         ...(options.enableJsonResponse ? { responseMode: 'json' as const } : {}),
         onerror: (error) => console.error('MCP handler error:', error)
       }
     )
-    return _modernHandler
+    return _mcpHandler
   }
 
   const handleRequestInner = async (request: Request): Promise<Response> => {
@@ -534,24 +536,11 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
     // request still proceeds to the SDK for its native rejection.
     await emitInvalidArguments(rawBody, activeActions, requestContext, options.onToolCall)
 
-    const state = { actions: activeActions, context: requestContext }
-    // 2025-era clients: the v1 stateless idiom, verbatim (a fresh transport +
-    // server per request) - so `enableJsonResponse` keeps applying to them; the
-    // SDK's built-in legacy leg would always answer over SSE.
-    if (await isLegacyRequest(request, rawBody)) {
-      const transport = new WebStandardStreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: options.enableJsonResponse
-      })
-      const server = createMcpServer(_options!, state.actions, state.context, options.onToolCall, _serving)
-      await server.connect(transport)
-      return transport.handleRequest(request, { parsedBody: rawBody })
-    }
-    // 2026-07-28 clients (incl. `server/discover`): one handler, built once;
-    // its factory finds this request's filtered actions + context by identity
-    // (the SDK hands the factory the same Request passed to `fetch`).
-    pending.set(request, state)
-    return modernHandler().fetch(request, { parsedBody: rawBody })
+    // One handler, built once; its factory finds this request's filtered
+    // actions + context by identity (the SDK hands the factory the same
+    // Request passed to `fetch`).
+    pending.set(request, { actions: activeActions, context: requestContext })
+    return mcpHandler().fetch(request, { parsedBody: rawBody })
   }
 
   // Top-level guard: any throw (malformed OAuth body, a boot-failure rejection
@@ -596,9 +585,9 @@ export function edge(options: EdgeAdapterOptions = {}): EdgeAdapter {
       },
       stop: async () => {
         _actions = []
-        // Abort in-flight modern exchanges; legacy serving holds nothing.
-        await _modernHandler?.close()
-        _modernHandler = undefined
+        // Abort in-flight exchanges; the legacy leg holds nothing.
+        await _mcpHandler?.close()
+        _mcpHandler = undefined
       }
     }
   }

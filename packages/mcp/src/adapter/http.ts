@@ -56,6 +56,11 @@ export interface StartMcpHttpOptions extends CreateMcpExpressAppOptions {
   /** Telemetry hook invoked once per tool call (fire-and-forget). */
   onToolCall?: OnToolCall
   /**
+   * Also serve 2025-era MCP clients (the `initialize` handshake) through the
+   * SDK's stateless legacy path. Off by default: protocol 2026-07-28 only.
+   */
+  legacy?: boolean
+  /**
    * Agent skills to serve: `skill://` file resources + `ListSkills`/`GetSkill`
    * tools + a server-instructions pointer. Requires `@silkweave/skills`
    * (optional peer); resolved once at start.
@@ -94,6 +99,7 @@ export function buildMcpExpressApp(
     resourceDir,
     filterActions,
     onToolCall,
+    legacy,
     skills,
     skillsExtension,
     skillsMarketplace,
@@ -158,6 +164,7 @@ export function buildMcpExpressApp(
   const transport = mcpTransport(silkweaveOptions, context, actions, {
     filterActions,
     onToolCall,
+    legacy,
     skills,
     skillsExtension,
     skillsMarketplace

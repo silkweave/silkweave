@@ -23,6 +23,7 @@ export function registerProxyCommand(program: Command): void {
     .argument('[command...]', 'remote tool command and its options (omit to list available commands)')
     .option('-t, --token <token>', 'bearer token (or SILKWEAVE_TOKEN)')
     .option('-H, --header <key=value...>', 'extra request header (repeatable)')
+    .option('--legacy', 'also connect to servers that speak only 2025-era MCP', false)
     .option('-s, --silent', 'suppress log messages', false)
     .action(async (urlValue: string, rest: string[], options: ProxyOptions) => {
       const url = parseUrl(urlValue)
