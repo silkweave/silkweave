@@ -1,6 +1,6 @@
 {
   "name": "@silkweave/example-cloudflare",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "description": "Silkweave MCP on Cloudflare Workers - stateless Streamable HTTP + Google Workspace OAuth, KV-backed store",
   "private": true,
   "type": "module",

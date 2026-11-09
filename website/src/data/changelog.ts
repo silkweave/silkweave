@@ -39,6 +39,34 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '7.0.0',
+    date: '2026-11-09',
+    summary:
+      'One protocol: Silkweave now speaks MCP 2026-07-28 only, with a one-line opt-in for 2025-era clients - and leaner tool results in model context.',
+    changes: [
+      {
+        type: 'breaking',
+        text: 'MCP servers (`http()`, `mcpTransport()`, `edge()`, `stdio()`, NestJS `mcp()`) reject 2025-era clients by default. Set `legacy: true` to also serve them (older Claude Code versions, v1 SDK clients) - current Claude Code and `@ai-sdk/mcp` connect over 2026-07-28 out of the box.',
+        commit: '078e0b3'
+      },
+      {
+        type: 'breaking',
+        text: '`cliProxy` and `silkweave proxy` / `silkweave skills` connect over 2026-07-28 only. Pass `legacy: true` / `--legacy` for servers that speak only 2025-era MCP; a failed connect now says so.',
+        commit: '078e0b3'
+      },
+      {
+        type: 'improvement',
+        text: 'Tool results carry a slim `serverInfo` (name + version) instead of the full server description, which hosts like `@ai-sdk/mcp` repeated in the model context on every tool call.',
+        commit: '078e0b3'
+      },
+      {
+        type: 'improvement',
+        text: '`edge()` drops its own legacy routing - `enableJsonResponse` now applies to 2026-07-28 exchanges (the opt-in legacy path answers over SSE).',
+        commit: '078e0b3'
+      }
+    ]
+  },
+  {
     version: '6.0.0',
     date: '2026-11-09',
     summary:
