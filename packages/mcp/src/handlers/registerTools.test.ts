@@ -332,8 +332,35 @@ describe('registerTools onToolCall telemetry', () => {
     const client = await connect([failing], { onToolCall })
     const result = await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
     expect(result.isError).toBe(true)
-    expect(events[0]).toMatchObject({ ok: false, errorCode: 'forbidden', errorMessage: 'nope' })
+    expect(events[0]).toMatchObject({
+      ok: false,
+      errorCode: 'forbidden',
+      errorMessage: 'nope',
+      statusCode: 403,
+      fault: 'client'
+    })
     expect(events[0].resultBytes).toBeUndefined()
+  })
+
+  it('grades an unannotated throw as a 500 server fault', async () => {
+    const { events, onToolCall } = collect()
+    const failing = action({
+      run: async () => {
+        throw new TypeError('boom')
+      }
+    })
+    const client = await connect([failing], { onToolCall })
+    await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
+    expect(events[0]).toMatchObject({ ok: false, errorCode: 'TypeError', statusCode: 500, fault: 'server' })
+  })
+
+  it('leaves statusCode/fault unset on success', async () => {
+    const { events, onToolCall } = collect()
+    const client = await connect([action({})], { onToolCall })
+    await client.callTool({ name: 'HelloWorld', arguments: { name: 'x' } })
+    expect(events[0].ok).toBe(true)
+    expect(events[0].statusCode).toBeUndefined()
+    expect(events[0].fault).toBeUndefined()
   })
 
   it('never fails or slows the call when the hook throws or rejects', async () => {

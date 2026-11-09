@@ -1,4 +1,10 @@
-import { emitToolCall, type Action, type OnToolCall, type SilkweaveContext } from '@silkweave/core'
+import {
+  emitToolCall,
+  invalidArgumentsMeta,
+  type Action,
+  type OnToolCall,
+  type SilkweaveContext
+} from '@silkweave/core'
 import type { TrpcHandlerContext } from '@silkweave/trpc'
 import type { TRPCError } from '@trpc/server'
 import { camelCase } from 'change-case'
@@ -48,8 +54,7 @@ export function buildValidationErrorEmitter(
       transport: 'trpc',
       durationMs: 0,
       ok: false,
-      errorCode: 'INVALID_ARGUMENTS',
-      errorMessage: error.message,
+      ...invalidArgumentsMeta(error.message),
       args: input,
       context: ctx?.silkweaveContext ?? baseContext
     })

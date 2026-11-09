@@ -56,6 +56,8 @@ describe('buildValidationErrorEmitter', () => {
       durationMs: 0,
       ok: false,
       errorCode: 'INVALID_ARGUMENTS',
+      statusCode: 400,
+      fault: 'client',
       args: { day: 42 },
       context: baseContext
     })

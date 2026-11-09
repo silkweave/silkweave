@@ -97,7 +97,7 @@ One hook observes every tool call - available on `stdio()`, `http()`, `mcpTransp
 http({
   host: 'localhost', port: 8080,
   onToolCall: (event) => {
-    // { action, tool, transport: 'mcp', durationMs, ok, errorCode?, errorMessage?, args?, resultBytes?, sideloaded?, context }
+    // { action, tool, transport: 'mcp', durationMs, ok, errorCode?, errorMessage?, statusCode?, fault?, args?, resultBytes?, sideloaded?, context }
     const auth = event.context.getOptional('auth')
     console.log(JSON.stringify({ event: 'tool_call', ...event, context: undefined, args: undefined, userId: auth?.userId }))
   }
@@ -107,8 +107,9 @@ http({
 - **Fire-and-forget**: never awaited on the result path; sync throws and async rejections are logged and swallowed - the hook can never fail, slow, or reorder a call.
 - Fires after result formatting, so events carry `resultBytes` (serialized raw-result size) and `sideloaded` (whether `smartToolResult` offloaded to an embedded resource).
 - `ok` is `false` when the action threw (with `errorCode`/`errorMessage` - a `SilkweaveError`'s `code`, else the error's name) or when the formatted result is an `isError` tool result.
+- **Severity without code mapping**: a failed call carries `statusCode` (HTTP-equivalent - a `SilkweaveError`'s `statusCode`, a thrown error's own 4xx/5xx status via `getStatus()`/`statusCode`/`status`, `400` for `INVALID_ARGUMENTS`, else `500`) and `fault` (`'client'` when `statusCode < 500`, else `'server'`). Log `fault: 'client'` at warning and everything else at error: `const level = e.ok ? 'info' : e.fault === 'client' ? 'warn' : 'error'`. Both are unset on success and on an `isError` result produced without a throw (treat that as a server fault). Throw `notFound()`/`badRequest()`/`forbidden()` (or a 4xx `SilkweaveError`) so caller errors grade as client faults.
 - `args` is the call's input: the parsed (post-zod) input the action ran with - defaults applied, unknown keys stripped. **Unredacted** - like `event.context` (which carries the raw request incl. `Authorization` headers), redact and truncate before persisting.
-- **Invalid arguments emit too**: the SDK rejects a `tools/call` that fails the input schema *before* the handler runs, so `http()`, `mcpTransport()`, and `edge()` pre-validate (emit-only - the SDK still produces its native rejection on the wire) and emit `ok: false` with the stable `errorCode: 'INVALID_ARGUMENTS'`, `errorMessage` naming the failing fields, `durationMs: 0`, and `args` set to the **raw offered input** exactly as the client sent it. A misbehaving agent hammering wrong schemas is now visible in metrics. `stdio()` does not emit these (no request seam). These events are cheap to trigger at high rate - batch/sample in the hook rather than writing per event.
+- **Invalid arguments emit too**: the SDK rejects a `tools/call` that fails the input schema *before* the handler runs, so `http()`, `mcpTransport()`, and `edge()` pre-validate (emit-only - the SDK still produces its native rejection on the wire) and emit `ok: false` with the stable `errorCode: 'INVALID_ARGUMENTS'` (`statusCode: 400`, `fault: 'client'`), `errorMessage` naming the failing fields, `durationMs: 0`, and `args` set to the **raw offered input** exactly as the client sent it. A misbehaving agent hammering wrong schemas is now visible in metrics. `stdio()` does not emit these (no request seam). These events are cheap to trigger at high rate - batch/sample in the hook rather than writing per event.
 - Streaming actions report `durationMs` across full generator consumption.
 - `@silkweave/nestjs` wires this through DI instead - `forRoot({ telemetry: MyTelemetryService })` covers MCP **and** tRPC calls (including tRPC input-validation failures).
 

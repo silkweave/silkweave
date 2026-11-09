@@ -48,6 +48,8 @@ describe('emitInvalidArguments', () => {
       durationMs: 0,
       ok: false,
       errorCode: 'INVALID_ARGUMENTS',
+      statusCode: 400,
+      fault: 'client',
       args: raw,
       context
     })

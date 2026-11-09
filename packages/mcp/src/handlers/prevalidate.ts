@@ -1,4 +1,4 @@
-import { Action, emitToolCall, OnToolCall, SilkweaveContext } from '@silkweave/core'
+import { Action, emitToolCall, invalidArgumentsMeta, OnToolCall, SilkweaveContext } from '@silkweave/core'
 import { pascalCase } from 'change-case'
 
 /**
@@ -56,8 +56,7 @@ export async function emitInvalidArguments(
       transport: 'mcp',
       durationMs: 0,
       ok: false,
-      errorCode: 'INVALID_ARGUMENTS',
-      errorMessage: `Invalid arguments for tool ${tool}: ${details}`,
+      ...invalidArgumentsMeta(`Invalid arguments for tool ${tool}: ${details}`),
       args: message.params.arguments,
       context
     })

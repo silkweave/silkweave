@@ -10,6 +10,7 @@ import {
   binarySchemaMeta,
   createLogger,
   emitToolCall,
+  toolCallErrorMeta,
   isStreamingAction,
   OnToolCall,
   resourceBytes,
@@ -194,17 +195,6 @@ function resultMeta(
   }
 }
 
-/** Error identity for telemetry: a SilkweaveError's `code`, else the error's name. */
-function errorMeta(error: unknown): Pick<ToolCallEvent, 'errorCode' | 'errorMessage'> {
-  if (error instanceof SilkweaveError) {
-    return { errorCode: error.code, errorMessage: error.message }
-  }
-  if (error instanceof Error) {
-    return { errorCode: error.name, errorMessage: error.message }
-  }
-  return { errorCode: 'unknown' }
-}
-
 /** Format via the action's `toolResult` hook, else resource mapping, else the resolved disposition. */
 function formatToolResult(
   action: Action,
@@ -313,7 +303,7 @@ export function registerTools(
             ...base,
             durationMs: Date.now() - started,
             ok: false,
-            ...errorMeta(error)
+            ...toolCallErrorMeta(error)
           })
           return withSlimServerInfo(handleToolError(error), extra, options.serverInfo)
         }

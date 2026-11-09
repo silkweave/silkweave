@@ -4,6 +4,7 @@ import {
   binary,
   emitToolCall,
   SilkweaveError,
+  toolCallErrorMeta,
   type Action,
   type ActionKind,
   type OnToolCall,
@@ -410,14 +411,7 @@ function emitTrpcEvent(
   if (!hook || context.getOptional<string>('adapter') !== 'trpc') {
     return
   }
-  const meta =
-    error == null
-      ? {}
-      : error instanceof SilkweaveError
-        ? { errorCode: error.code, errorMessage: error.message }
-        : error instanceof Error
-          ? { errorCode: error.name, errorMessage: error.message }
-          : { errorCode: 'unknown' }
+  const meta = error == null ? {} : toolCallErrorMeta(error)
   emitToolCall(hook, {
     action: name,
     tool: camelKey(name),

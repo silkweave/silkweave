@@ -300,7 +300,9 @@ describe('ControllerDiscovery telemetry (trpc wrapper)', () => {
       ok: false,
       transport: 'trpc',
       errorCode: 'http_error',
-      errorMessage: 'no access'
+      errorMessage: 'no access',
+      statusCode: 403,
+      fault: 'client'
     })
   })
 
