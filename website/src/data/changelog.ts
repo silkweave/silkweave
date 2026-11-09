@@ -39,6 +39,18 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '7.1.1',
+    date: '2026-11-09',
+    summary: 'tRPC maps every HTTP status it can.',
+    changes: [
+      {
+        type: 'fix',
+        text: 'tRPC adapters map 402, 405, 415, 422 and 428 to their tRPC codes (a NestJS `UnprocessableEntityException` used to reach the client as a 500), and any other 4xx to `BAD_REQUEST` instead of `INTERNAL_SERVER_ERROR`.',
+        commit: '87c97c7'
+      }
+    ]
+  },
+  {
     version: '7.1.0',
     date: '2026-11-09',
     summary: 'Tool-call telemetry tells client errors from server faults.',
