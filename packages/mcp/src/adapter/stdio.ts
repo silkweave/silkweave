@@ -47,9 +47,18 @@ export const stdio: AdapterFactory<StdioAdapterOptions | void> = (adapterOptions
           serving?.register(server)
           return server
         }
+        // Build one instance eagerly so a registration error (e.g. two action
+        // names colliding as the same PascalCase tool) rejects start() as it
+        // did before, instead of surfacing on the first handshake as an
+        // opaque internal error. serveStdio's factory is lazy.
+        await factory().close()
         // `legacy: 'serve'`: 2025-era clients (the initialize handshake) keep
-        // working next to 2026-07-28 clients.
-        handle = serveStdio(factory, { legacy: 'serve' })
+        // working next to 2026-07-28 clients. Errors go to stderr - stdout is
+        // the protocol channel - since serveStdio reports only via onerror.
+        handle = serveStdio(factory, {
+          legacy: 'serve',
+          onerror: (error) => console.error('MCP stdio error:', error)
+        })
       },
       stop: async () => {
         await handle?.close()
