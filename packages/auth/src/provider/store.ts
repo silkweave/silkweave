@@ -4,7 +4,8 @@ export interface AuthCodeData {
   codeChallenge: string
   codeChallengeMethod: string
   scopes: string[]
-  upstreamAccessToken: string
+  /** Upstream IdP tokens - set by `createOAuthProxy`, absent for `createOAuthServer`. */
+  upstreamAccessToken?: string
   upstreamIdToken?: string
   email?: string
   sub?: string
@@ -44,6 +45,21 @@ export interface RefreshTokenData {
    * default-audience tokens, exactly what they already were.
    */
   resource?: string
+  /**
+   * Stable id of the approved connection (the grant), minted at the code
+   * exchange and kept across every rotation. Carried in the access token as
+   * `grant_id`. Absent on records minted before 7.2.
+   */
+  grantId?: string
+  /** When the grant was approved (epoch seconds). */
+  createdAt?: number
+  /**
+   * Set when this token has been rotated (epoch seconds). The record is kept,
+   * not deleted, so a later replay is recognized: within the grace window it
+   * rotates again, after it the whole grant is revoked via `revokeGrant`.
+   */
+  rotatedAt?: number
+  /** Absolute expiry (epoch seconds) - carried over unchanged by rotation. */
   expiresAt: number
 }
 
@@ -66,4 +82,13 @@ export interface OAuthStore {
   saveRefreshToken(token: string, data: RefreshTokenData): Promise<void>
   getRefreshToken(token: string): Promise<RefreshTokenData | undefined>
   deleteRefreshToken(token: string): Promise<void>
+  /**
+   * Delete every refresh token belonging to a grant (all rotations). Called when
+   * a rotated refresh token is replayed after the grace window - the chain is
+   * treated as stolen. Optional: without it only the replayed token is deleted.
+   * Stores that list grants per user (e.g. a "Connected apps" page) also call
+   * this for user-initiated revocation; pair it with `isGrantActive` so the
+   * grant's current access token stops working before it expires.
+   */
+  revokeGrant?(grantId: string): Promise<void>
 }

@@ -1,7 +1,7 @@
 {
   "name": "@silkweave/example-mcp",
   "version": "7.1.1",
-  "description": "Silkweave MCP adapters (stdio, http, http+auth, http+oauth, cli-proxy)",
+  "description": "Silkweave MCP adapters (stdio, http, http+auth, http+oauth, http+local-oauth, cli-proxy)",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "http": "tsx --conditions=@silkweave/source src/http.ts",
     "http-auth": "tsx --conditions=@silkweave/source src/http-auth.ts",
     "http-oauth": "tsx --conditions=@silkweave/source src/http-oauth.ts",
+    "http-local-oauth": "tsx --conditions=@silkweave/source src/http-local-oauth.ts",
     "http-multi-resource": "tsx --conditions=@silkweave/source src/http-multi-resource.ts",
     "cli-proxy": "tsx --conditions=@silkweave/source src/cli-proxy.ts",
     "typecheck": "tsc --noEmit",

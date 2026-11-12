@@ -84,9 +84,13 @@ const provider = createOAuthProxy({
 | `redirectUris` | `string[]` | -- | Allowed redirect URI patterns |
 | `requiredScopes` | `string[]` | `[]` | Scopes to request upstream |
 | `callbackPath` | `string` | `'/auth/callback'` | Path for the OAuth callback endpoint |
-| `signingKey` | `string` | random | Secret for signing JWTs |
+| `signingKey` | `string \| Uint8Array` | random | Secret for signing JWTs (HS256). Random means tokens die with the process |
 | `tokenTtl` | `number` | `3600` | Access token lifetime in seconds |
+| `refreshTokenTtl` | `number` | 30 days | Absolute refresh-token lifetime; rotation never extends it |
+| `refreshGraceSeconds` | `number` | `30` | How long a rotated refresh token is still honored (concurrent refresh); a replay after that revokes the grant |
 | `store` | `OAuthStore` | memory | Store adapter for OAuth state |
+| `allowedResources` | `AllowedResources` | -- | RFC 8707 indicators this AS mints an `aud` for (see Multi-resource) |
+| `isGrantActive` | `(grant: GrantRef) => boolean \| Promise<boolean>` | -- | Per-call revocation check, run on every `verifyToken` and every refresh grant |
 
 ### `OAuthProvider` interface
 
@@ -114,6 +118,51 @@ const auth: AuthConfig = {
   provider
 }
 ```
+
+## Your app as the identity provider: `createOAuthServer()`
+
+When your app already knows who the person is (a signed-in session, your own login page), there is no upstream IdP to proxy. `createOAuthServer()` is the same OAuth 2.1 authorization server - discovery, dynamic client registration, CIMD, PKCE, refresh rotation with replay detection, RFC 8707 resource indicators - but `/authorize` hands the browser to **your consent page** instead of an upstream IdP. MCP clients (Claude Code, Claude Desktop / claude.ai connectors, Codex) connect with just the server URL.
+
+```typescript
+import { createOAuthServer } from '@silkweave/auth/oauth'
+
+const oauth = createOAuthServer({
+  resourceUrl: 'https://app.example.com/mcp',
+  redirectUris: ['http://localhost:*', 'http://127.0.0.1:*', 'https://claude.ai/*'],
+  signingKey: process.env.OAUTH_SIGNING_KEY!,
+  store,
+  // /authorize validated the client request and stored it as pending: send the
+  // browser to your consent page. Return a full OAuthResponse to also set a
+  // cookie binding the request to this browser.
+  onAuthorize: (pending) => `https://app.example.com/connect?request=${pending.id}`,
+  // Revocation that applies immediately, on every call and every refresh.
+  isGrantActive: async ({ grantId, sub }) => (await grants.isActive(grantId)) && (await users.isActive(sub))
+})
+
+// Consent page backend (signed-in session + CSRF protection):
+const pending = await oauth.pending(id)            // client name, cimd/dcr, redirect host, scopes - for the page
+const { redirectTo } = (await oauth.approve(id, { sub: user.id }))!   // or oauth.deny(id)
+// -> the page navigates to redirectTo (code + state + iss); the client redeems the code at /token
+```
+
+Mount it like any provider (`auth.provider`, with `verifyToken: (t) => oauth.verifyToken(t)`). It has no callback endpoint - the decision arrives through `approve()` / `deny()`, which are **single use** and return `undefined` for an unknown, expired (10 minutes) or already-decided request. A runnable version (toy session + consent page) is `examples/mcp/src/http-local-oauth.ts`.
+
+`OAuthServerConfig` takes every option in the `OAuthProxyConfig` table that is not upstream-specific (`resourceUrl`, `redirectUris`, `signingKey`, `tokenTtl`, `refreshTokenTtl`, `refreshGraceSeconds`, `store`, `allowedResources`, `isGrantActive`), plus:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `onAuthorize` | `(pending: PendingAuthorization, req) => string \| OAuthResponse` | Where to send the browser after `/authorize` validated the request |
+| `scopesSupported` | `string[]` | Advertised as `scopes_supported` |
+
+**Consent page checklist** (the package cannot do these for you): render `clientName` escaped and mark `clientKind: 'dcr'` clients as unverified (the name is attacker-chosen; `redirectHost` is the honest signal), send `Content-Security-Policy: frame-ancestors 'none'` (an Allow button must not be clickjackable), only approve from a signed-in browser session behind CSRF protection (never from a bearer token), and bind the pending request to the browser that opened it.
+
+### Grants, tokens and revocation
+
+Every approval creates a **grant** with a stable `grantId`, kept across refresh-token rotation. Access tokens carry `sub` (the person), `client_id` (the OAuth client) and `grant_id`; `verifyToken` returns them as `AuthInfo.sub`, `AuthInfo.oauthClientId` and `AuthInfo.grantId`. (`AuthInfo.clientId` keeps its historical meaning - the token subject - for compatibility.)
+
+- **Refresh rotation:** every refresh returns a new refresh token; the old one is kept, marked `rotatedAt`. Reusing it within `refreshGraceSeconds` (30s) rotates again (clients refreshing concurrently); reusing it later is treated as theft and the whole grant is revoked via `OAuthStore.revokeGrant`.
+- **Revocation:** delete the grant's tokens (`store.revokeGrant(grantId)`) and have `isGrantActive` return `false` for it - the hook runs on every `verifyToken` and every refresh, so the current access token stops working immediately instead of at `exp`. While `isGrantActive` is set, tokens without a grant id (minted before 7.2) are rejected.
+- Listing a person's connections ("Connected apps") is a store concern: index `RefreshTokenData.grantId` / `sub` / `clientId` / `createdAt` in your store.
 
 ## Token Validation
 
@@ -334,9 +383,12 @@ const store: OAuthStore = {
   getClient(clientId) { /* ... */ },
   saveRefreshToken(token, data) { /* ... */ },
   getRefreshToken(token) { /* ... */ },
-  deleteRefreshToken(token) { /* ... */ }
+  deleteRefreshToken(token) { /* ... */ },
+  revokeGrant(grantId) { /* optional: delete every refresh token with this grantId */ }
 }
 ```
+
+Refresh-token semantics: after rotation the server re-saves the **presented** token with `rotatedAt` set (and its original `expiresAt`), so `getRefreshToken(old)` must keep returning that record for replay detection. A store that cannot keep it may return `undefined` - a replay then simply fails, without revoking the grant. `revokeGrant` is optional; the memory, JSON and Redis stores implement it.
 
 ## How It Works
 
@@ -349,10 +401,12 @@ The OAuth proxy sits between MCP clients and the upstream identity provider:
 5. MCP client exchanges that code at `/token` (with PKCE verification) and receives a signed JWT access token + refresh token
 6. Subsequent requests include the JWT as a Bearer token, verified locally via `jose`
 
-The proxy also supports:
-- **Dynamic client registration** at `/register` (RFC 7591)
-- **Client Information Metadata Documents (CIMD)** -- clients with HTTPS URLs as `client_id` are auto-registered by fetching their metadata document
-- **Refresh tokens** with 30-day expiry for long-lived sessions
+Both `createOAuthProxy()` and `createOAuthServer()` also support:
+- **Dynamic client registration** at `/register` (RFC 7591). Every client is public (PKCE, `token_endpoint_auth_method: 'none'`) - no client secret is minted
+- **Client ID Metadata Documents (CIMD)** -- clients with HTTPS URLs as `client_id` are auto-registered by fetching their metadata document, which must name itself (`client_id` equal to its URL)
+- **Loopback redirects on any port** (RFC 8252 §7.3) -- a registered `http://127.0.0.1:4100/callback` also matches `:5999`; host, path and query must still match exactly
+- **RFC 9207 `iss`** in every authorization response (code or error)
+- **Refresh tokens** with a 30-day absolute expiry, rotated on every use, with replay detection
 
 ## See Also
 

@@ -65,3 +65,44 @@ function matchPattern(target: URL, pattern: string): boolean {
   const targetTail = (target.port ? `:${target.port}` : '') + target.pathname + target.search + target.hash
   return componentRegex(tail).test(targetTail)
 }
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', '[::1]', 'localhost'])
+
+/**
+ * Match a `redirect_uri` presented at /authorize against a client's registered
+ * redirect URIs. Exact string match, except for loopback redirects (RFC 8252
+ * §7.3): native clients (Claude Code, Codex, desktop apps) bind whichever port
+ * is free at sign-in time, so an `http` loopback URI matches a registered one
+ * that differs only in port. Scheme, host, path and query must still be equal -
+ * `localhost` and `127.0.0.1` are not interchangeable.
+ */
+export function matchRegisteredRedirectUri(uri: string, registered: string[]): boolean {
+  if (registered.includes(uri)) {
+    return true
+  }
+  let target: URL
+  try {
+    target = new URL(uri)
+  } catch {
+    return false
+  }
+  if (target.protocol !== 'http:' || !LOOPBACK_HOSTS.has(target.hostname) || target.username || target.password) {
+    return false
+  }
+  return registered.some((candidate) => {
+    let reg: URL
+    try {
+      reg = new URL(candidate)
+    } catch {
+      return false
+    }
+    return (
+      reg.protocol === 'http:' &&
+      reg.hostname === target.hostname &&
+      !reg.username &&
+      !reg.password &&
+      reg.pathname === target.pathname &&
+      reg.search === target.search
+    )
+  })
+}
