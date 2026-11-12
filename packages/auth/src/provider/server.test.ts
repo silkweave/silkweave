@@ -300,6 +300,32 @@ describe('createOAuthServer - redirect URIs', () => {
   })
 })
 
+describe('createOAuthServer - resource indicators (single resource)', () => {
+  it('accepts the resource with or without a trailing slash and mints for resourceUrl', async () => {
+    for (const resource of [at(), `${at()}/`]) {
+      const ctx = build()
+      const clientId = await registerClient(ctx.server)
+      const pkce = clientPkce()
+      const url = new URL(authorizeUrl(clientId, pkce.challenge))
+      url.searchParams.set('resource', resource)
+      await ctx.server.authorize(req(url.toString()))
+      const approved = await ctx.server.approve(ctx.seen[0].id, { sub: 'user-1' })
+      const token = await ctx.server.token(
+        req(at('/token'), {
+          grant_type: 'authorization_code',
+          code: new URL(approved!.redirectTo).searchParams.get('code')!,
+          code_verifier: pkce.verifier,
+          client_id: clientId,
+          redirect_uri: REDIRECT,
+          resource
+        })
+      )
+      expect(token.status).toBe(200)
+      expect(decodeJwt(body(token).access_token).aud).toBe(at())
+    }
+  })
+})
+
 describe('createOAuthServer - client ID metadata documents', () => {
   const CIMD = 'https://cimd.example.com/client.json'
 
@@ -318,6 +344,15 @@ describe('createOAuthServer - client ID metadata documents', () => {
     )
     expect(res.status).toBe(302)
     expect(ctx.seen[0]).toMatchObject({ clientKind: 'cimd', clientName: 'Claude' })
+  })
+
+  it('accepts port-less loopback redirects (Codex) and any port at authorize', async () => {
+    stubMetadata({ client_id: CIMD, redirect_uris: ['http://127.0.0.1/callback', 'http://localhost/callback'] })
+    const ctx = build()
+    const res = await ctx.server.authorize(
+      req(authorizeUrl(CIMD, clientPkce().challenge, 'http://127.0.0.1:64361/callback'))
+    )
+    expect(res.status).toBe(302)
   })
 
   it('rejects a document whose client_id is not its own URL', async () => {
