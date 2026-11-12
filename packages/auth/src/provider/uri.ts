@@ -18,7 +18,24 @@ export function matchRedirectUri(uri: string, patterns: string[]): boolean {
   } catch {
     return false
   }
-  return patterns.some((pattern) => matchPattern(target, pattern))
+  if (patterns.some((pattern) => matchPattern(target, pattern))) {
+    return true
+  }
+  // A port-less loopback redirect (`http://127.0.0.1/callback`, RFC 8252 style -
+  // Codex's CIMD document lists these) stands for "whatever port the client
+  // binds at sign-in", so it must satisfy an any-port pattern such as
+  // `http://127.0.0.1:*`. Re-test it with a concrete port; exact patterns
+  // without a port already matched above.
+  if (isLoopbackHttp(target) && target.port === '') {
+    const withPort = new URL(target.href)
+    withPort.port = '65535'
+    return patterns.some((pattern) => pattern.includes(':*') && matchPattern(withPort, pattern))
+  }
+  return false
+}
+
+function isLoopbackHttp(url: URL): boolean {
+  return url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname) && !url.username && !url.password
 }
 
 /** Escape regex metacharacters, then expand `*` to `.*` (component-scoped). */
@@ -86,7 +103,7 @@ export function matchRegisteredRedirectUri(uri: string, registered: string[]): b
   } catch {
     return false
   }
-  if (target.protocol !== 'http:' || !LOOPBACK_HOSTS.has(target.hostname) || target.username || target.password) {
+  if (!isLoopbackHttp(target)) {
     return false
   }
   return registered.some((candidate) => {

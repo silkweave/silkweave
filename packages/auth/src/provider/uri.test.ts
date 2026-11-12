@@ -55,3 +55,20 @@ describe('matchRedirectUri', () => {
     })
   })
 })
+
+describe('matchRedirectUri - port-less loopback (RFC 8252, Codex CIMD)', () => {
+  it('accepts a port-less loopback URI against an any-port pattern', () => {
+    expect(matchRedirectUri('http://127.0.0.1/callback', ['http://127.0.0.1:*'])).toBe(true)
+    expect(matchRedirectUri('http://localhost/callback', ['http://localhost:*'])).toBe(true)
+  })
+
+  it('does not cross loopback hosts or widen non-loopback patterns', () => {
+    expect(matchRedirectUri('http://127.0.0.1/callback', ['http://localhost:*'])).toBe(false)
+    expect(matchRedirectUri('http://example.com/callback', ['http://example.com:*'])).toBe(false)
+    expect(matchRedirectUri('https://127.0.0.1/callback', ['http://127.0.0.1:*'])).toBe(false)
+  })
+
+  it('keeps a port-scoped pattern port-scoped', () => {
+    expect(matchRedirectUri('http://127.0.0.1/callback', ['http://127.0.0.1:4100/*'])).toBe(false)
+  })
+})
