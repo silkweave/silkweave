@@ -39,6 +39,23 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '7.3.0',
+    date: '2026-11-12',
+    summary: 'Bind OAuth grants to the consent they came from.',
+    changes: [
+      {
+        type: 'feature',
+        text: '`approve(id, { sub, context })` binds an opaque JSON object to the grant (e.g. a user auth epoch). It is carried onto the grant refresh records and through every rotation, and handed to `isGrantActive` at code redemption and on refresh.',
+        commit: 'f479360'
+      },
+      {
+        type: 'improvement',
+        text: '`isGrantActive` now also runs before the first token is minted, so a code approved before a revoke yields `invalid_grant` and no tokens (`createOAuthServer` and `createOAuthProxy`).',
+        commit: 'f479360'
+      }
+    ]
+  },
+  {
     version: '7.2.0',
     date: '2026-11-12',
     summary: 'Your app as its own OAuth 2.1 authorization server.',
