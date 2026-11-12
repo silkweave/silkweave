@@ -357,12 +357,17 @@ describe('strict rotation (refreshGraceSeconds: 0)', () => {
 describe('hardening', () => {
   it('fails closed with an OAuth error when isGrantActive throws', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    let down = false
     const ctx = serverWith(createMemoryStore(), {
       isGrantActive: () => {
-        throw new Error('db down')
+        if (down) {
+          throw new Error('db down')
+        }
+        return true
       }
     })
     const { clientId, token } = await connectAlice(ctx)
+    down = true // the first mint is covered in server.test.ts (grant context)
     expect(await ctx.server.verifyToken(token.access_token)).toBeUndefined()
     const res = await refreshWith(ctx, token.refresh_token, clientId)
     expect(res.status).toBe(400)

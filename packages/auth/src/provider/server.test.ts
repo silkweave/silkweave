@@ -2,6 +2,7 @@ import { decodeJwt } from 'jose'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryStore } from '../store/memory-store.js'
 import { createOAuthServer, OAuthServerConfig, PendingAuthorization } from './server.js'
+import { GrantContext, RefreshTokenData } from './store.js'
 import { clientPkce, oauthRequest, REDIRECT, responseBody } from './testUtil.js'
 
 const CONSENT = 'https://box.example.com/connect'
@@ -44,12 +45,12 @@ function authorizeUrl(clientId: string, challenge: string, redirect = REDIRECT, 
 }
 
 /** Register, authorize, approve as `sub`, redeem - returns the token response + client id. */
-async function connect(ctx: ReturnType<typeof build>, sub = 'user-1') {
+async function connect(ctx: ReturnType<typeof build>, sub = 'user-1', context?: GrantContext) {
   const clientId = await registerClient(ctx.server)
   const pkce = clientPkce()
   const authorized = await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, pkce.challenge)))
   const id = new URL(authorized.headers.Location).searchParams.get('request')!
-  const approved = await ctx.server.approve(id, { sub, email: `${sub}@example.com` })
+  const approved = await ctx.server.approve(id, { sub, email: `${sub}@example.com`, context })
   const code = new URL(approved!.redirectTo).searchParams.get('code')!
   const token = await ctx.server.token(
     oauthRequest(at('/token'), {
@@ -259,6 +260,115 @@ describe('createOAuthServer - isGrantActive', () => {
     const refreshed = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
     expect(refreshed.status).toBe(400)
     expect(responseBody(refreshed).error).toBe('invalid_grant')
+  })
+})
+
+describe('createOAuthServer - grant context', () => {
+  const CONTEXT = { principalId: 'p-42', authEpoch: 7, consentedAt: '2026-11-12T00:00:00Z', mcpUrl: at() }
+
+  function recordSaves(ctx: ReturnType<typeof build>): RefreshTokenData[] {
+    const saved: RefreshTokenData[] = []
+    const save = ctx.store.saveRefreshToken.bind(ctx.store)
+    ctx.store.saveRefreshToken = async (token, data) => {
+      saved.push(structuredClone(data))
+      return save(token, data)
+    }
+    return saved
+  }
+
+  it('carries the approve() context verbatim through the code exchange and every rotation', async () => {
+    const isGrantActive = vi.fn((_grant: { context?: GrantContext }) => true)
+    const ctx = build({ isGrantActive })
+    const saved = recordSaves(ctx)
+    const { token, clientId } = await connect(ctx, 'user-1', CONTEXT)
+    let current = responseBody(token).refresh_token
+    for (let i = 0; i < 5; i += 1) {
+      const refreshed = await refresh(ctx.server, current, clientId)
+      expect(refreshed.status).toBe(200)
+      current = responseBody(refreshed).refresh_token
+    }
+    const grantId = decodeJwt(responseBody(token).access_token).grant_id
+    // First save = the grant's first record (where an app writes its grant row).
+    expect(saved[0]).toMatchObject({ grantId, sub: 'user-1', clientId, context: CONTEXT })
+    expect(saved.length).toBeGreaterThan(5)
+    for (const record of saved) {
+      expect(record.context).toEqual(CONTEXT)
+    }
+    // Redemption + 5 refreshes all hand the context to the hook.
+    const withContext = isGrantActive.mock.calls.filter(([grant]) => grant.context)
+    expect(withContext.length).toBeGreaterThanOrEqual(6)
+    for (const [grant] of withContext) {
+      expect(grant).toEqual({ grantId, sub: 'user-1', clientId, context: CONTEXT })
+    }
+  })
+
+  it('runs isGrantActive before the first mint: false yields invalid_grant and no tokens', async () => {
+    const isGrantActive = vi.fn((grant: { context?: GrantContext }) => grant.context?.authEpoch === 8)
+    const ctx = build({ isGrantActive })
+    const saved = recordSaves(ctx)
+    const { token } = await connect(ctx, 'user-1', CONTEXT) // approved at epoch 7, user now at 8
+    expect(token.status).toBe(400)
+    expect(responseBody(token).error).toBe('invalid_grant')
+    expect(responseBody(token).access_token).toBeUndefined()
+    expect(saved).toEqual([])
+    expect(isGrantActive).toHaveBeenCalledWith(expect.objectContaining({ sub: 'user-1', context: CONTEXT }))
+  })
+
+  it('fails closed when isGrantActive throws at the first mint', async () => {
+    const ctx = build({
+      isGrantActive: () => {
+        throw new Error('db down')
+      }
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { token } = await connect(ctx)
+    expect(token.status).toBe(400)
+    expect(responseBody(token).error).toBe('invalid_grant')
+  })
+
+  it('snapshots the context at approve() and rejects non-objects', async () => {
+    const ctx = build()
+    const saved = recordSaves(ctx)
+    const context: GrantContext = { authEpoch: 1 }
+    const clientId = await registerClient(ctx.server)
+    const pkce = clientPkce()
+    const authorized = await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, pkce.challenge)))
+    const id = new URL(authorized.headers.Location).searchParams.get('request')!
+    await expect(ctx.server.approve(id, { sub: 'u', context: [] as unknown as GrantContext })).rejects.toThrow(
+      'plain JSON object'
+    )
+    const approved = await ctx.server.approve(id, { sub: 'u', context })
+    context.authEpoch = 2
+    const code = new URL(approved!.redirectTo).searchParams.get('code')!
+    await ctx.server.token(
+      oauthRequest(at('/token'), {
+        grant_type: 'authorization_code',
+        code,
+        code_verifier: pkce.verifier,
+        client_id: clientId,
+        redirect_uri: REDIRECT
+      })
+    )
+    expect(saved[0].context).toEqual({ authEpoch: 1 })
+  })
+
+  it('does not put the context in the access token or pass it on verify', async () => {
+    const isGrantActive = vi.fn(() => true)
+    const ctx = build({ isGrantActive })
+    const { token, clientId } = await connect(ctx, 'user-1', CONTEXT)
+    const claims = decodeJwt(responseBody(token).access_token)
+    expect(JSON.stringify(claims)).not.toContain('p-42')
+    isGrantActive.mockClear()
+    await ctx.server.verifyToken(responseBody(token).access_token)
+    expect(isGrantActive).toHaveBeenCalledWith({ grantId: claims.grant_id, sub: 'user-1', clientId })
+  })
+
+  it('keeps grants without context working unchanged', async () => {
+    const ctx = build({ isGrantActive: () => true })
+    const saved = recordSaves(ctx)
+    const { token } = await connect(ctx)
+    expect(token.status).toBe(200)
+    expect('context' in saved[0]).toBe(false)
   })
 })
 

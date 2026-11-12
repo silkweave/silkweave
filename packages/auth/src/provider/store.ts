@@ -1,3 +1,14 @@
+/**
+ * Opaque, JSON-serialisable app context bound to a grant at `approve()` - e.g.
+ * the consent's principal id, a user auth epoch, the consent time. The provider
+ * never interprets it: it is carried verbatim from the authorization code onto
+ * the grant's first refresh record, copied on every rotation, and handed to
+ * `isGrantActive` at code redemption and on every refresh. It is NOT in the
+ * access token (clients can read JWTs), so `isGrantActive` gets no context on
+ * `verifyToken` - look it up by `grantId` in your own grant record instead.
+ */
+export type GrantContext = Record<string, unknown>
+
 export interface AuthCodeData {
   clientId: string
   redirectUri: string
@@ -11,6 +22,11 @@ export interface AuthCodeData {
   sub?: string
   /** RFC 8707 resource indicator captured at /authorize, carried into the mint. */
   resource?: string
+  /**
+   * Opaque app context captured at `approve()` (e.g. the consent's principal id
+   * and auth epoch), carried verbatim. See `GrantContext`.
+   */
+  context?: GrantContext
   expiresAt: number
 }
 
@@ -53,6 +69,11 @@ export interface RefreshTokenData {
   grantId?: string
   /** When the grant was approved (epoch seconds). */
   createdAt?: number
+  /**
+   * Opaque app context captured at `approve()` (e.g. the consent's principal id
+   * and auth epoch), carried verbatim. See `GrantContext`.
+   */
+  context?: GrantContext
   /**
    * Set when this token has been rotated (epoch seconds). The record is kept,
    * not deleted, so a later replay is recognized: within the grace window it

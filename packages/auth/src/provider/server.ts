@@ -8,7 +8,7 @@ import {
   redirectResponse,
   takePendingAuth
 } from './core.js'
-import { OAuthStore, PendingAuthData } from './store.js'
+import { GrantContext, OAuthStore, PendingAuthData } from './store.js'
 import { AuthInfo, OAuthProvider, OAuthRequest, OAuthResponse } from './types.js'
 
 /** A validated authorization request waiting for the person's decision - what a consent page shows. */
@@ -49,6 +49,14 @@ export interface ApprovedIdentity {
   /** Your user id. Becomes the access token's `sub` and `GrantRef.sub`. */
   sub: string
   email?: string
+  /**
+   * Opaque, JSON-serialisable context bound to the grant (e.g. principal id,
+   * auth epoch, consent time). Snapshotted here (a JSON copy - later mutation
+   * of your object has no effect), carried verbatim onto the grant's refresh
+   * records and handed to `isGrantActive` at code redemption and on refresh.
+   * See `GrantContext`.
+   */
+  context?: GrantContext
 }
 
 export interface OAuthServerConfig extends AuthorizationServerConfig {
@@ -123,6 +131,21 @@ async function loadPending(store: OAuthStore, id: string): Promise<PendingAuthDa
   return pending
 }
 
+/**
+ * Snapshot an approval's context: must be a plain JSON object; the JSON copy
+ * makes the stored value immune to later mutation of the caller's object and
+ * fails fast (at approve, not at a store write) on values that cannot persist.
+ */
+function snapshotContext(context: GrantContext | undefined): GrantContext | undefined {
+  if (context === undefined) {
+    return undefined
+  }
+  if (context === null || typeof context !== 'object' || Array.isArray(context)) {
+    throw new Error('approve() context must be a plain JSON object')
+  }
+  return JSON.parse(JSON.stringify(context)) as GrantContext
+}
+
 async function describePending(store: OAuthStore, id: string, pending: PendingAuthData): Promise<PendingAuthorization> {
   const client = await store.getClient(pending.clientId)
   return {
@@ -194,11 +217,12 @@ export function createOAuthServer(config: OAuthServerConfig): OAuthServer {
       if (!identity?.sub) {
         throw new Error('approve() requires an identity with a sub')
       }
+      const context = snapshotContext(identity.context)
       const pending = await takePendingAuth(store, id)
       if (!pending) {
         return undefined
       }
-      return { redirectTo: await core.issueCode(pending, identity) }
+      return { redirectTo: await core.issueCode(pending, { sub: identity.sub, email: identity.email, context }) }
     },
 
     async deny(id, opts = {}) {

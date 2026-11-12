@@ -17,6 +17,7 @@ import {
   AuthCodeData,
   ClientRegistration,
   OAuthStore,
+  GrantContext,
   PendingAuthData,
   RefreshRotation,
   RefreshTokenData
@@ -51,6 +52,12 @@ export interface GrantRef {
   sub: string
   /** The OAuth client the grant was issued to. */
   clientId: string
+  /**
+   * The `context` passed to `approve()` (createOAuthServer). Present at code
+   * redemption and on refresh; always `undefined` on `verifyToken` (the access
+   * token does not carry it) - look it up by `grantId` there.
+   */
+  context?: GrantContext
 }
 
 /**
@@ -91,6 +98,7 @@ export interface AuthorizationServerConfig {
 export interface AuthorizationIdentity {
   sub?: string
   email?: string
+  context?: GrantContext
 }
 
 /** A validated /authorize request, ready to be stored as pending. */
@@ -324,7 +332,7 @@ async function signAccessToken(
 /** Run the app's grant check. Fails closed for grant-less tokens when configured. */
 async function grantActive(
   ctx: CoreContext,
-  ref: { grantId?: string; sub?: string; clientId?: string }
+  ref: { grantId?: string; sub?: string; clientId?: string; context?: GrantContext }
 ): Promise<boolean> {
   if (!ctx.config.isGrantActive) {
     return true
@@ -333,7 +341,11 @@ async function grantActive(
     return false
   }
   try {
-    return (await ctx.config.isGrantActive({ grantId: ref.grantId, sub: ref.sub, clientId: ref.clientId })) === true
+    const grant: GrantRef = { grantId: ref.grantId, sub: ref.sub, clientId: ref.clientId }
+    if (ref.context !== undefined) {
+      grant.context = ref.context
+    }
+    return (await ctx.config.isGrantActive(grant)) === true
   } catch (error) {
     // Fail closed with an OAuth error (or a rejected token), never a thrown endpoint.
     console.error('isGrantActive hook error:', error)
@@ -544,6 +556,7 @@ async function issueCode(
     // email-only upstream identity used to verify but never refresh).
     sub: identity.sub ?? identity.email ?? pending.clientId,
     resource: ctx.multiResource ? pending.resource : undefined,
+    context: identity.context,
     expiresAt: nowSeconds() + PENDING_TTL
   })
   return clientRedirect(ctx, pending, { code })
@@ -713,7 +726,7 @@ async function authorizationCodeGrant(ctx: CoreContext, body: Record<string, str
     return errorResponse(400, 'invalid_target', 'Unknown or unsupported resource')
   }
   const now = nowSeconds()
-  return mintPair(ctx, {
+  const data: RefreshTokenData & { grantId: string } = {
     clientId: authCode.clientId,
     scopes: authCode.scopes,
     email: authCode.email,
@@ -722,7 +735,16 @@ async function authorizationCodeGrant(ctx: CoreContext, body: Record<string, str
     grantId: randomUUID(),
     createdAt: now,
     expiresAt: Math.floor(now) + ctx.refreshTtl
-  })
+  }
+  if (authCode.context !== undefined) {
+    data.context = authCode.context
+  }
+  // The grant check runs BEFORE the first mint too: a code approved before the
+  // user (or their consent context) was revoked must not mint a live grant.
+  if (!(await grantActive(ctx, data))) {
+    return errorResponse(400, 'invalid_grant', 'Grant is not active')
+  }
+  return mintPair(ctx, data)
 }
 
 async function refreshTokenGrant(ctx: CoreContext, body: Record<string, string>): Promise<OAuthResponse> {
