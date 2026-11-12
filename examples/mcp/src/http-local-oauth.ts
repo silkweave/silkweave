@@ -7,6 +7,11 @@
 //
 //   pnpm -F @silkweave/example-mcp http-local-oauth
 //   claude mcp add --transport http local-oauth http://localhost:8080/mcp
+//
+// Behind a tunnel or reverse proxy (e.g. to test claude.ai, whose servers must
+// reach the MCP endpoint), set MCP_ORIGIN / APP_ORIGIN to the public origins.
+// Serve both under ONE origin (route /login, /connect, /consent to :8081) so
+// the browser-binding cookie set on /authorize reaches the consent page.
 
 import { createServer, IncomingMessage, ServerResponse } from 'node:http'
 import { AuthConfig, AuthInfo } from '@silkweave/auth'
@@ -15,8 +20,8 @@ import { createAction, silkweave } from '@silkweave/core'
 import { http } from '@silkweave/mcp/server'
 import z from 'zod/v4'
 
-const MCP_ORIGIN = 'http://localhost:8080'
-const APP_ORIGIN = 'http://localhost:8081'
+const MCP_ORIGIN = process.env.MCP_ORIGIN ?? 'http://localhost:8080'
+const APP_ORIGIN = process.env.APP_ORIGIN ?? 'http://localhost:8081'
 
 // Grants the person revoked from "Connected apps" - consulted on every token
 // verification and refresh, so revocation is immediate.
@@ -165,7 +170,7 @@ async function main() {
   await new Promise<void>((resolve) => app.listen(8081, 'localhost', resolve))
   console.log(`Consent app listening on ${APP_ORIGIN}`)
   await silkweave({ name: 'silkweave-local-oauth', description: 'Silkweave as its own OAuth server', version: '1.0.0' })
-    .adapter(http({ host: 'localhost', port: 8080, allowedHosts: ['localhost'], auth }))
+    .adapter(http({ host: 'localhost', port: 8080, allowedHosts: ['localhost', new URL(MCP_ORIGIN).hostname], auth }))
     .action(WhoAmI)
     .start()
 }
