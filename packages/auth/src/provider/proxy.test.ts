@@ -1,25 +1,13 @@
-import { createHash, randomBytes } from 'crypto'
 import { decodeJwt } from 'jose'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryStore } from '../store/memory-store.js'
 import { AllowedResources, createOAuthProxy } from './proxy.js'
-import { OAuthProvider, OAuthRequest, OAuthResponse } from './types.js'
+import { clientPkce, oauthRequest, REDIRECT } from './testUtil.js'
+import { OAuthProvider, OAuthResponse } from './types.js'
 
 const AS = 'https://mcp.example.com'
 const TENANT_A = 'https://mcp.example.com/yoexoexl'
 const TENANT_B = 'https://mcp.example.com/kqwrmach'
-const REDIRECT = 'https://client.example.com/callback'
-
-/** Client-side PKCE pair, as a real MCP client would generate. */
-function clientPkce(): { verifier: string; challenge: string } {
-  const verifier = randomBytes(32).toString('base64url')
-  const challenge = createHash('sha256').update(verifier).digest('base64url')
-  return { verifier, challenge }
-}
-
-function req(url: string, body?: Record<string, string>): OAuthRequest {
-  return { method: body ? 'POST' : 'GET', url: new URL(url), headers: {}, body }
-}
 
 function build(allowedResources?: AllowedResources): {
   provider: OAuthProvider
@@ -86,14 +74,14 @@ async function runFlow(
     authorizeUrl.searchParams.set('resource', opts.authorizeResource)
   }
 
-  const authorized = await provider.authorize(req(authorizeUrl.toString()))
+  const authorized = await provider.authorize(oauthRequest(authorizeUrl.toString()))
   if (authorized.status !== 302) {
     return authorized
   }
 
   const upstreamState = new URL(authorized.headers.Location).searchParams.get('state')!
   const callbackUrl = `${AS}/auth/callback?code=upstream-code&state=${upstreamState}`
-  const callback = await provider.callback(req(callbackUrl))
+  const callback = await provider.callback(oauthRequest(callbackUrl))
   if (callback.status !== 302) {
     return callback
   }
@@ -101,7 +89,7 @@ async function runFlow(
   const code = new URL(callback.headers.Location).searchParams.get('code')!
 
   return provider.token(
-    req(`${AS}/token`, {
+    oauthRequest(`${AS}/token`, {
       grant_type: 'authorization_code',
       code,
       code_verifier: pkce.verifier,
@@ -210,7 +198,7 @@ describe('createOAuthProxy - multi-resource minting', () => {
     url.searchParams.append('resource', TENANT_A)
     url.searchParams.append('resource', TENANT_B)
 
-    const response = await provider.authorize(req(url.toString()))
+    const response = await provider.authorize(oauthRequest(url.toString()))
     expect(response.status).toBe(400)
     expect((response.body as { error: string }).error).toBe('invalid_target')
   })
@@ -232,7 +220,7 @@ describe('createOAuthProxy - refresh preserves the audience', () => {
 
   const refresh = (provider: OAuthProvider, token: string, resource?: string) =>
     provider.token(
-      req(`${AS}/token`, {
+      oauthRequest(`${AS}/token`, {
         grant_type: 'refresh_token',
         refresh_token: token,
         client_id: 'test-client',

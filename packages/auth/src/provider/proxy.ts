@@ -4,7 +4,8 @@ import {
   AuthorizationServerConfig,
   createAuthorizationCore,
   errorResponse,
-  redirectResponse
+  redirectResponse,
+  takePendingAuth
 } from './core.js'
 import { OAuthStore } from './store.js'
 import { AuthInfo, OAuthProvider, OAuthResponse } from './types.js'
@@ -134,16 +135,16 @@ export function createOAuthProxy(config: OAuthProxyConfig): OAuthProvider {
       if (!upstreamCode || !proxyState) {
         return errorResponse(400, 'invalid_request', 'Missing code or state')
       }
-      const pending = await store.getPendingAuth(proxyState)
-      if (!pending || pending.expiresAt < Date.now() / 1000) {
+      // Atomic single use: a replayed upstream callback cannot mint a second code.
+      const pending = await takePendingAuth(store, proxyState)
+      if (!pending) {
         return errorResponse(400, 'invalid_request', 'Unknown or expired state')
       }
       const pkceVerifier = await store.getPkceVerifier(proxyState)
+      await store.deletePkceVerifier(proxyState)
       if (!pkceVerifier) {
         return errorResponse(400, 'invalid_request', 'Missing PKCE verifier')
       }
-      await store.deletePendingAuth(proxyState)
-      await store.deletePkceVerifier(proxyState)
 
       const upstream = await exchangeUpstreamCode(upstreamCode, config, callbackPath, pkceVerifier)
       if ('status' in upstream) {

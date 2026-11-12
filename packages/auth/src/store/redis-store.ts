@@ -1,10 +1,21 @@
-import type { OAuthStore } from '../provider/store.js'
+import type { OAuthStore, RefreshTokenData } from '../provider/store.js'
 
+/**
+ * The Redis commands the store needs (Upstash's client fits as-is). For the
+ * atomic guarantees (single-use codes and consent, compare-and-set refresh
+ * rotation) the adapter must honor `nx` (return `null` when the key exists, as
+ * Redis `SET NX` does) and should provide `getdel` (Redis >= 6.2). Without
+ * them the store still works, but those operations degrade to get-then-write.
+ */
 export interface RedisClient {
   get(key: string): Promise<unknown>
-  set(key: string, value: string, options?: { ex?: number }): Promise<unknown>
+  set(key: string, value: string, options?: { ex?: number; nx?: boolean }): Promise<unknown>
   del(key: string): Promise<unknown>
+  getdel?(key: string): Promise<unknown>
 }
+
+/** Revocation tombstones outlive any refresh chain (30 days by default). */
+const TOMBSTONE_TTL = 400 * 24 * 3600
 
 export interface RedisStoreOptions {
   client: RedisClient
@@ -42,6 +53,20 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
 
   async function remove(namespace: string, id: string) {
     await client.del(key(namespace, id))
+  }
+
+  /** Atomic read-and-delete via GETDEL when available. */
+  async function take<T>(namespace: string, id: string): Promise<T | undefined> {
+    if (!client.getdel) {
+      const value = await load<T>(namespace, id)
+      await remove(namespace, id)
+      return value
+    }
+    const raw = await client.getdel(key(namespace, id))
+    if (raw == null) {
+      return undefined
+    }
+    return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T
   }
 
   return {
@@ -87,8 +112,10 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
     async saveRefreshToken(token, data) {
       await save('refresh-token', token, data, data.expiresAt)
       // Index the grant's tokens (the client has no SCAN) so revokeGrant can
-      // find every rotation. Rotation carries the absolute expiry over, so the
-      // index can expire with the chain.
+      // delete every rotation. The read-modify-write can drop a member under
+      // concurrent saves; that only leaks storage until expiry - the grant
+      // tombstone (isGrantRevoked) is what makes a revoked chain unusable.
+      // Rotation carries the absolute expiry over, so the index expires with it.
       if (data.grantId) {
         const tokens = (await load<string[]>('grant', data.grantId)) ?? []
         if (!tokens.includes(token)) {
@@ -103,7 +130,38 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
     async deleteRefreshToken(token) {
       await remove('refresh-token', token)
     },
+    async takeAuthCode(code) {
+      return take('auth-code', code)
+    },
+    async takePendingAuth(state) {
+      return take('pending-auth', state)
+    },
+    async rotateRefreshToken(token, rotation) {
+      const data = await load<RefreshTokenData>('refresh-token', token)
+      if (!data || data.rotatedAt !== undefined) {
+        return data
+      }
+      // SET NX on a per-token marker decides the single winner of the rotation.
+      const ttl = ttlFromExpiry(data.expiresAt)
+      const won = await client.set(key('rotation', token), JSON.stringify(rotation), {
+        nx: true,
+        ...(ttl ? { ex: ttl } : {})
+      })
+      if (won == null) {
+        const winner = await load<typeof rotation>('rotation', token)
+        return winner ? { ...data, ...winner } : data
+      }
+      const rotated = { ...data, ...rotation }
+      await save('refresh-token', token, rotated, data.expiresAt)
+      return rotated
+    },
+    async isGrantRevoked(grantId) {
+      return (await client.get(key('revoked-grant', grantId))) != null
+    },
     async revokeGrant(grantId) {
+      // Tombstone first, then delete: a refresh racing this revocation either
+      // has its successor deleted below or sees the tombstone on its re-check.
+      await client.set(key('revoked-grant', grantId), '1', { ex: TOMBSTONE_TTL })
       const tokens = (await load<string[]>('grant', grantId)) ?? []
       await Promise.all(tokens.map((token) => remove('refresh-token', token)))
       await remove('grant', grantId)

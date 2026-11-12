@@ -1,23 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createRedisStore, RedisClient } from './redis-store.js'
+import { fakeRedis } from '../provider/testUtil.js'
+import { createRedisStore } from './redis-store.js'
 
-function fakeRedis(): RedisClient & { keys: Map<string, string> } {
-  const keys = new Map<string, string>()
-  return {
-    keys,
-    async get(key) {
-      return keys.get(key) ?? null
-    },
-    async set(key, value) {
-      keys.set(key, value)
-    },
-    async del(key) {
-      keys.delete(key)
-    }
-  }
-}
-
-const record = (grantId?: string) => ({
+const refreshRecord = (grantId?: string) => ({
   clientId: 'c',
   scopes: [],
   sub: 'u',
@@ -29,11 +14,11 @@ describe('createRedisStore - revokeGrant', () => {
   it('deletes every refresh token of the grant and only that grant', async () => {
     const client = fakeRedis()
     const store = createRedisStore({ client })
-    await store.saveRefreshToken('t1', record('g1'))
-    await store.saveRefreshToken('t2', record('g1'))
-    await store.saveRefreshToken('t1', { ...record('g1'), rotatedAt: 1 }) // re-save does not duplicate
-    await store.saveRefreshToken('t3', record('g2'))
-    await store.saveRefreshToken('t4', record())
+    await store.saveRefreshToken('t1', refreshRecord('g1'))
+    await store.saveRefreshToken('t2', refreshRecord('g1'))
+    await store.saveRefreshToken('t1', { ...refreshRecord('g1'), rotatedAt: 1 }) // re-save does not duplicate
+    await store.saveRefreshToken('t3', refreshRecord('g2'))
+    await store.saveRefreshToken('t4', refreshRecord())
 
     await store.revokeGrant!('g1')
 

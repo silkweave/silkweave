@@ -1,22 +1,11 @@
-import { createHash, randomBytes } from 'crypto'
 import { decodeJwt } from 'jose'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryStore } from '../store/memory-store.js'
 import { createOAuthServer, OAuthServerConfig, PendingAuthorization } from './server.js'
-import { OAuthRequest, OAuthResponse } from './types.js'
+import { clientPkce, oauthRequest, REDIRECT, responseBody } from './testUtil.js'
 
 const CONSENT = 'https://box.example.com/connect'
-const REDIRECT = 'https://client.example.com/callback'
 const at = (path = ''): string => `https://box.example.com/mcp${path}`
-
-function clientPkce(): { verifier: string; challenge: string } {
-  const verifier = randomBytes(32).toString('base64url')
-  return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') }
-}
-
-function req(url: string, body?: Record<string, string>): OAuthRequest {
-  return { method: body ? 'POST' : 'GET', url: new URL(url), headers: {}, body }
-}
 
 function build(overrides: Partial<OAuthServerConfig> = {}) {
   const store = createMemoryStore()
@@ -37,7 +26,7 @@ function build(overrides: Partial<OAuthServerConfig> = {}) {
 
 async function registerClient(server: ReturnType<typeof build>['server'], redirect = REDIRECT): Promise<string> {
   const res = await server.register(
-    req(at('/register'), { redirect_uris: JSON.stringify([redirect]), client_name: 'Test <Client>' })
+    oauthRequest(at('/register'), { redirect_uris: JSON.stringify([redirect]), client_name: 'Test <Client>' })
   )
   return (res.body as { client_id: string }).client_id
 }
@@ -58,12 +47,12 @@ function authorizeUrl(clientId: string, challenge: string, redirect = REDIRECT, 
 async function connect(ctx: ReturnType<typeof build>, sub = 'user-1') {
   const clientId = await registerClient(ctx.server)
   const pkce = clientPkce()
-  const authorized = await ctx.server.authorize(req(authorizeUrl(clientId, pkce.challenge)))
+  const authorized = await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, pkce.challenge)))
   const id = new URL(authorized.headers.Location).searchParams.get('request')!
   const approved = await ctx.server.approve(id, { sub, email: `${sub}@example.com` })
   const code = new URL(approved!.redirectTo).searchParams.get('code')!
   const token = await ctx.server.token(
-    req(at('/token'), {
+    oauthRequest(at('/token'), {
       grant_type: 'authorization_code',
       code,
       code_verifier: pkce.verifier,
@@ -74,11 +63,9 @@ async function connect(ctx: ReturnType<typeof build>, sub = 'user-1') {
   return { token, clientId }
 }
 
-const body = (res: OAuthResponse) => res.body as Record<string, string>
-
 function refresh(server: ReturnType<typeof build>['server'], refreshToken: string, clientId: string) {
   return server.token(
-    req(at('/token'), { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId })
+    oauthRequest(at('/token'), { grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId })
   )
 }
 
@@ -98,14 +85,16 @@ describe('createOAuthServer - metadata and registration', () => {
   })
 
   it('registers a public client without minting a secret', async () => {
-    const res = await build().server.register(req(at('/register'), { redirect_uris: JSON.stringify([REDIRECT]) }))
+    const res = await build().server.register(
+      oauthRequest(at('/register'), { redirect_uris: JSON.stringify([REDIRECT]) })
+    )
     expect(res.status).toBe(201)
-    expect(body(res).token_endpoint_auth_method).toBe('none')
-    expect(body(res).client_secret).toBeUndefined()
+    expect(responseBody(res).token_endpoint_auth_method).toBe('none')
+    expect(responseBody(res).client_secret).toBeUndefined()
   })
 
   it('has no callback endpoint', async () => {
-    expect((await build().server.callback(req(at('/auth/callback')))).status).toBe(404)
+    expect((await build().server.callback(oauthRequest(at('/auth/callback')))).status).toBe(404)
   })
 })
 
@@ -113,7 +102,7 @@ describe('createOAuthServer - authorize and consent', () => {
   it('validates the request, stores it pending and hands the browser to onAuthorize', async () => {
     const ctx = build()
     const clientId = await registerClient(ctx.server)
-    const res = await ctx.server.authorize(req(authorizeUrl(clientId, clientPkce().challenge)))
+    const res = await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, clientPkce().challenge)))
     expect(res.status).toBe(302)
     expect(res.headers.Location).toMatch(new RegExp(`^${CONSENT}\\?request=`))
     const [pending] = ctx.seen
@@ -138,13 +127,13 @@ describe('createOAuthServer - authorize and consent', () => {
       })
     })
     const clientId = await registerClient(ctx.server)
-    const res = await ctx.server.authorize(req(authorizeUrl(clientId, clientPkce().challenge)))
+    const res = await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, clientPkce().challenge)))
     expect(res.headers['Set-Cookie']).toMatch(/^bind=/)
   })
 
   it('rejects an invalid request before onAuthorize runs', async () => {
     const ctx = build()
-    const res = await ctx.server.authorize(req(authorizeUrl('unknown-client', clientPkce().challenge)))
+    const res = await ctx.server.authorize(oauthRequest(authorizeUrl('unknown-client', clientPkce().challenge)))
     expect(res.status).toBe(400)
     expect(ctx.seen).toHaveLength(0)
   })
@@ -152,7 +141,7 @@ describe('createOAuthServer - authorize and consent', () => {
   it('approve returns the client redirect with code, state and iss - once', async () => {
     const ctx = build()
     const clientId = await registerClient(ctx.server)
-    await ctx.server.authorize(req(authorizeUrl(clientId, clientPkce().challenge)))
+    await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, clientPkce().challenge)))
     const { id } = ctx.seen[0]
     const approved = await ctx.server.approve(id, { sub: 'user-1' })
     const redirect = new URL(approved!.redirectTo)
@@ -168,7 +157,7 @@ describe('createOAuthServer - authorize and consent', () => {
   it('deny returns access_denied with state and iss', async () => {
     const ctx = build()
     const clientId = await registerClient(ctx.server)
-    await ctx.server.authorize(req(authorizeUrl(clientId, clientPkce().challenge)))
+    await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, clientPkce().challenge)))
     const denied = await ctx.server.deny(ctx.seen[0].id)
     const redirect = new URL(denied!.redirectTo)
     expect(redirect.searchParams.get('error')).toBe('access_denied')
@@ -181,7 +170,7 @@ describe('createOAuthServer - authorize and consent', () => {
     vi.useFakeTimers()
     const ctx = build()
     const clientId = await registerClient(ctx.server)
-    await ctx.server.authorize(req(authorizeUrl(clientId, clientPkce().challenge)))
+    await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, clientPkce().challenge)))
     vi.advanceTimersByTime(601_000)
     expect(await ctx.server.pending(ctx.seen[0].id)).toBeUndefined()
     expect(await ctx.server.approve(ctx.seen[0].id, { sub: 'user-1' })).toBeUndefined()
@@ -190,7 +179,7 @@ describe('createOAuthServer - authorize and consent', () => {
   it('refuses an approval without a subject', async () => {
     const ctx = build()
     const clientId = await registerClient(ctx.server)
-    await ctx.server.authorize(req(authorizeUrl(clientId, clientPkce().challenge)))
+    await ctx.server.authorize(oauthRequest(authorizeUrl(clientId, clientPkce().challenge)))
     await expect(ctx.server.approve(ctx.seen[0].id, { sub: '' })).rejects.toThrow('sub')
   })
 })
@@ -200,28 +189,28 @@ describe('createOAuthServer - tokens', () => {
     const ctx = build()
     const { token, clientId } = await connect(ctx)
     expect(token.status).toBe(200)
-    const claims = decodeJwt(body(token).access_token)
+    const claims = decodeJwt(responseBody(token).access_token)
     expect(claims).toMatchObject({ sub: 'user-1', client_id: clientId, iss: at(), aud: at(), scope: 'mcp' })
     expect(typeof claims.grant_id).toBe('string')
-    const info = await ctx.server.verifyToken(body(token).access_token)
+    const info = await ctx.server.verifyToken(responseBody(token).access_token)
     expect(info).toMatchObject({ sub: 'user-1', clientId: 'user-1', oauthClientId: clientId, grantId: claims.grant_id })
   })
 
   it('keeps the grant id across refresh rotation', async () => {
     const ctx = build()
     const { token, clientId } = await connect(ctx)
-    const grantId = decodeJwt(body(token).access_token).grant_id
-    const refreshed = await refresh(ctx.server, body(token).refresh_token, clientId)
+    const grantId = decodeJwt(responseBody(token).access_token).grant_id
+    const refreshed = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
     expect(refreshed.status).toBe(200)
-    expect(decodeJwt(body(refreshed).access_token).grant_id).toBe(grantId)
-    expect(body(refreshed).refresh_token).not.toBe(body(token).refresh_token)
+    expect(decodeJwt(responseBody(refreshed).access_token).grant_id).toBe(grantId)
+    expect(responseBody(refreshed).refresh_token).not.toBe(responseBody(token).refresh_token)
   })
 
   it('honors a concurrent reuse of the previous refresh token within the grace window', async () => {
     const ctx = build()
     const { token, clientId } = await connect(ctx)
-    const first = await refresh(ctx.server, body(token).refresh_token, clientId)
-    const second = await refresh(ctx.server, body(token).refresh_token, clientId)
+    const first = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
+    const second = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
     expect(first.status).toBe(200)
     expect(second.status).toBe(200)
   })
@@ -230,13 +219,13 @@ describe('createOAuthServer - tokens', () => {
     vi.useFakeTimers()
     const ctx = build()
     const { token, clientId } = await connect(ctx)
-    const rotated = await refresh(ctx.server, body(token).refresh_token, clientId)
+    const rotated = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
     vi.advanceTimersByTime(31_000)
-    const replay = await refresh(ctx.server, body(token).refresh_token, clientId)
+    const replay = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
     expect(replay.status).toBe(400)
-    expect(body(replay).error).toBe('invalid_grant')
+    expect(responseBody(replay).error).toBe('invalid_grant')
     // The legitimate successor dies with the chain.
-    const successor = await refresh(ctx.server, body(rotated).refresh_token, clientId)
+    const successor = await refresh(ctx.server, responseBody(rotated).refresh_token, clientId)
     expect(successor.status).toBe(400)
   })
 
@@ -245,9 +234,9 @@ describe('createOAuthServer - tokens', () => {
     const ctx = build({ refreshTokenTtl: 100 })
     const { token, clientId } = await connect(ctx)
     vi.advanceTimersByTime(50_000)
-    const rotated = await refresh(ctx.server, body(token).refresh_token, clientId)
+    const rotated = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
     vi.advanceTimersByTime(51_000)
-    expect((await refresh(ctx.server, body(rotated).refresh_token, clientId)).status).toBe(400)
+    expect((await refresh(ctx.server, responseBody(rotated).refresh_token, clientId)).status).toBe(400)
   })
 })
 
@@ -256,8 +245,8 @@ describe('createOAuthServer - isGrantActive', () => {
     const isGrantActive = vi.fn(() => true)
     const ctx = build({ isGrantActive })
     const { token, clientId } = await connect(ctx)
-    const grantId = decodeJwt(body(token).access_token).grant_id
-    expect(await ctx.server.verifyToken(body(token).access_token)).toBeDefined()
+    const grantId = decodeJwt(responseBody(token).access_token).grant_id
+    expect(await ctx.server.verifyToken(responseBody(token).access_token)).toBeDefined()
     expect(isGrantActive).toHaveBeenCalledWith({ grantId, sub: 'user-1', clientId })
   })
 
@@ -266,10 +255,10 @@ describe('createOAuthServer - isGrantActive', () => {
     const ctx = build({ isGrantActive: () => active })
     const { token, clientId } = await connect(ctx)
     active = false
-    expect(await ctx.server.verifyToken(body(token).access_token)).toBeUndefined()
-    const refreshed = await refresh(ctx.server, body(token).refresh_token, clientId)
+    expect(await ctx.server.verifyToken(responseBody(token).access_token)).toBeUndefined()
+    const refreshed = await refresh(ctx.server, responseBody(token).refresh_token, clientId)
     expect(refreshed.status).toBe(400)
-    expect(body(refreshed).error).toBe('invalid_grant')
+    expect(responseBody(refreshed).error).toBe('invalid_grant')
   })
 })
 
@@ -277,7 +266,7 @@ describe('createOAuthServer - redirect URIs', () => {
   async function authorizeWith(registered: string, presented: string) {
     const ctx = build()
     const clientId = await registerClient(ctx.server, registered)
-    return ctx.server.authorize(req(authorizeUrl(clientId, clientPkce().challenge, presented)))
+    return ctx.server.authorize(oauthRequest(authorizeUrl(clientId, clientPkce().challenge, presented)))
   }
 
   it('matches a loopback redirect on any port (RFC 8252)', async () => {
@@ -294,7 +283,7 @@ describe('createOAuthServer - redirect URIs', () => {
     const ctx = build({ redirectUris: ['https://client.example.com:*'] })
     const clientId = await registerClient(ctx.server, 'https://client.example.com:8443/callback')
     const res = await ctx.server.authorize(
-      req(authorizeUrl(clientId, clientPkce().challenge, 'https://client.example.com:9443/callback'))
+      oauthRequest(authorizeUrl(clientId, clientPkce().challenge, 'https://client.example.com:9443/callback'))
     )
     expect(res.status).toBe(400)
   })
@@ -308,10 +297,10 @@ describe('createOAuthServer - resource indicators (single resource)', () => {
       const pkce = clientPkce()
       const url = new URL(authorizeUrl(clientId, pkce.challenge))
       url.searchParams.set('resource', resource)
-      await ctx.server.authorize(req(url.toString()))
+      await ctx.server.authorize(oauthRequest(url.toString()))
       const approved = await ctx.server.approve(ctx.seen[0].id, { sub: 'user-1' })
       const token = await ctx.server.token(
-        req(at('/token'), {
+        oauthRequest(at('/token'), {
           grant_type: 'authorization_code',
           code: new URL(approved!.redirectTo).searchParams.get('code')!,
           code_verifier: pkce.verifier,
@@ -321,7 +310,7 @@ describe('createOAuthServer - resource indicators (single resource)', () => {
         })
       )
       expect(token.status).toBe(200)
-      expect(decodeJwt(body(token).access_token).aud).toBe(at())
+      expect(decodeJwt(responseBody(token).access_token).aud).toBe(at())
     }
   })
 })
@@ -340,7 +329,7 @@ describe('createOAuthServer - client ID metadata documents', () => {
     stubMetadata({ client_id: CIMD, client_name: 'Claude', redirect_uris: ['https://cimd.example.com/cb'] })
     const ctx = build()
     const res = await ctx.server.authorize(
-      req(authorizeUrl(CIMD, clientPkce().challenge, 'https://cimd.example.com/cb'))
+      oauthRequest(authorizeUrl(CIMD, clientPkce().challenge, 'https://cimd.example.com/cb'))
     )
     expect(res.status).toBe(302)
     expect(ctx.seen[0]).toMatchObject({ clientKind: 'cimd', clientName: 'Claude' })
@@ -350,7 +339,7 @@ describe('createOAuthServer - client ID metadata documents', () => {
     stubMetadata({ client_id: CIMD, redirect_uris: ['http://127.0.0.1/callback', 'http://localhost/callback'] })
     const ctx = build()
     const res = await ctx.server.authorize(
-      req(authorizeUrl(CIMD, clientPkce().challenge, 'http://127.0.0.1:64361/callback'))
+      oauthRequest(authorizeUrl(CIMD, clientPkce().challenge, 'http://127.0.0.1:64361/callback'))
     )
     expect(res.status).toBe(302)
   })
@@ -358,9 +347,9 @@ describe('createOAuthServer - client ID metadata documents', () => {
   it('rejects a document whose client_id is not its own URL', async () => {
     stubMetadata({ client_id: 'https://evil.example.com/x.json', redirect_uris: ['https://cimd.example.com/cb'] })
     const res = await build().server.authorize(
-      req(authorizeUrl(CIMD, clientPkce().challenge, 'https://cimd.example.com/cb'))
+      oauthRequest(authorizeUrl(CIMD, clientPkce().challenge, 'https://cimd.example.com/cb'))
     )
     expect(res.status).toBe(400)
-    expect(body(res).error).toBe('invalid_client')
+    expect(responseBody(res).error).toBe('invalid_client')
   })
 })

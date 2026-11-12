@@ -19,6 +19,18 @@ interface JsonStore {
   pkceVerifiers: Record<string, { verifier: string; expiresAt: number }>
   clients: Record<string, ClientRegistration>
   refreshTokens: Record<string, RefreshTokenData>
+  /** Revoked grant ids (durable tombstones), with the revocation time. */
+  revokedGrants: Record<string, number>
+}
+
+/** Drop expired entries - rotated refresh records are kept for replay detection until their absolute expiry. */
+function sweepExpired<T extends { expiresAt: number }>(obj: Record<string, T>): void {
+  const now = Date.now() / 1000
+  for (const [key, item] of Object.entries(obj)) {
+    if (item.expiresAt < now) {
+      delete obj[key]
+    }
+  }
 }
 
 function writeJsonStore(path: string, store: JsonStore) {
@@ -36,12 +48,16 @@ function readJsonStore(path: string): JsonStore {
       pendingAuths: {},
       pkceVerifiers: {},
       clients: {},
-      refreshTokens: {}
+      refreshTokens: {},
+      revokedGrants: {}
     }
   }
   const data = JSON.parse(readFileSync(path, 'utf-8'))
   if (!data.refreshTokens) {
     data.refreshTokens = {}
+  }
+  if (!data.revokedGrants) {
+    data.revokedGrants = {}
   }
   return data
 }
@@ -101,6 +117,7 @@ export function createJsonStore(path: string): OAuthStore {
     },
 
     async saveRefreshToken(token, data) {
+      sweepExpired(store.refreshTokens)
       store.refreshTokens[token] = data
       writeJsonStore(path, store)
     },
@@ -111,7 +128,34 @@ export function createJsonStore(path: string): OAuthStore {
       delete store.refreshTokens[token]
       writeJsonStore(path, store)
     },
+    // Atomic within the process: no await between read and write.
+    async takeAuthCode(code) {
+      const data = withTtl(store.authCodes, code)
+      delete store.authCodes[code]
+      writeJsonStore(path, store)
+      return data
+    },
+    async takePendingAuth(state) {
+      const data = withTtl(store.pendingAuths, state)
+      delete store.pendingAuths[state]
+      writeJsonStore(path, store)
+      return data
+    },
+    async rotateRefreshToken(token, rotation) {
+      const data = withTtl(store.refreshTokens, token)
+      if (!data || data.rotatedAt !== undefined) {
+        return data
+      }
+      const rotated = { ...data, ...rotation }
+      store.refreshTokens[token] = rotated
+      writeJsonStore(path, store)
+      return rotated
+    },
+    async isGrantRevoked(grantId) {
+      return grantId in store.revokedGrants
+    },
     async revokeGrant(grantId) {
+      store.revokedGrants[grantId] = Date.now() / 1000
       for (const [token, data] of Object.entries(store.refreshTokens)) {
         if (data.grantId === grantId) {
           delete store.refreshTokens[token]
