@@ -4,11 +4,6 @@
       "command": "pnpm",
       "args": ["mcp"]
     },
-    "roam-code": {
-      "type": "stdio",
-      "command": "roam",
-      "args": ["mcp"]
-    },
     "lighthouse": {
       "command": "npx",
       "args": ["@danielsogl/lighthouse-mcp"]

@@ -43,7 +43,6 @@
     "**/build": true,
     "**/.turbo": true,
     "**/.astro": true,
-    "**/.roam": true,
     "**/.vercel": true
   },
   "files.insertFinalNewline": true,

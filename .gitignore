@@ -1,6 +1,4 @@
-.roam/
 _docs/
-!.roam/fitness.yaml
 node_modules/
 build/
 .next/

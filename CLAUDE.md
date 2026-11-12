@@ -216,7 +216,7 @@ A server fronting N tenants needs a distinct URL per tenant (Claude clients dedu
 
 ### Local OAuth server (the app is the IdP)
 
-**(7.2)** `createOAuthServer()` (`packages/auth/src/provider/server.ts`, `@silkweave/auth/oauth`) is the authorization server for an app that already authenticates its users (session cookie, own login): no upstream IdP, no callback route. Both it and `createOAuthProxy()` are thin layers over one internal core, `createAuthorizationCore()` (`packages/auth/src/provider/core.ts`, **not exported**): metadata, DCR, CIMD, `/authorize` validation, PKCE, the token endpoint (code + refresh) and `verifyToken`. Core functions are module-level and take a `CoreContext` (resolved config, store, signing key) - keep it that way, a single closure tripped the fitness complexity cap (136 vs 40).
+**(7.2)** `createOAuthServer()` (`packages/auth/src/provider/server.ts`, `@silkweave/auth/oauth`) is the authorization server for an app that already authenticates its users (session cookie, own login): no upstream IdP, no callback route. Both it and `createOAuthProxy()` are thin layers over one internal core, `createAuthorizationCore()` (`packages/auth/src/provider/core.ts`, **not exported**): metadata, DCR, CIMD, `/authorize` validation, PKCE, the token endpoint (code + refresh) and `verifyToken`. Core functions are module-level and take a `CoreContext` (resolved config, store, signing key) - keep it that way, a single closure measured cognitive complexity 136.
 
 - **Consent flow** - `/authorize` validates, stores the request as pending under a 32-byte id, and calls `onAuthorize(pending, req)` → a URL or a full `OAuthResponse` (so the app can set a browser-binding cookie on the same redirect). The app's consent backend calls `pending(id)` (client name, `clientKind: 'cimd' | 'dcr'`, redirect host, scopes), then `approve(id, { sub, email? })` / `deny(id)` → `{ redirectTo }` (not a 302: a consent POST is usually a fetch, which does not navigate). Single use; `undefined` when unknown/expired (10 min)/decided. `callback()` answers 404.
 - **Grants** - the code exchange mints a stable `grantId` kept across rotation (`RefreshTokenData.grantId`/`createdAt`/`rotatedAt`). Access tokens carry `client_id` + `grant_id` claims; `verifyToken` returns `AuthInfo.sub`/`oauthClientId`/`grantId`. `AuthInfo.clientId` keeps its historical meaning (the token subject) - changing it would break proxy consumers (the cloudflare example reads it as the user); flip it in 8.0.
@@ -310,44 +310,6 @@ The `@silkweave/nextjs` model is **action-first projection** (the inverse of Nes
 - `buildTrpcRoute()` (`packages/nextjs/src/lib/trpcRoute.ts`) - wires actions through `trpcFetch()` (which strips its own `endpoint`, so no rewrite needed). Returns `{ GET, POST, OPTIONS }`; CORS is opt-in (`cors: true`) since a same-origin Next.js frontend needs none.
 - `normalizeBasePath()` / `rewriteRequestPath()` (`packages/nextjs/src/lib/stripPrefix.ts`) - the key glue. `@silkweave/edge` matches **absolute** pathnames (`/mcp`, `/authorize`, `/token`, `/.well-known/...`), but a Next route is mounted under a fixed prefix. `rewriteRequestPath(request, basePath)` strips `basePath` from the incoming URL (`/api/mcp` → `/mcp`, `/api/mcp/authorize` → `/authorize`, `/api/mcp/.well-known/...` → `/.well-known/...`), reconstructing the `Request` (preserving method/headers/body, with `duplex: 'half'` for streaming bodies) so one catch-all file serves the transport + OAuth + protected-resource metadata. `basePath` **must** equal the route file's directory (no reliable way to detect the mount at module load). Recommend `runtime = 'nodejs'` + `dynamic = 'force-dynamic'` in route files.
 
-## Tooling
-
-> Make sure to use the `roam` MCP server when exploring the codebase.
-
-- One `roam` command replaces 5-10 grep/read cycles. Always try roam first.
-- Use `roam search` instead of grep/glob for finding symbols - it understands
-  definitions vs. usage and ranks by importance.
-- `roam context` gives exact line ranges - more precise than reading whole files.
-- After `git pull`, run `roam index` to keep the graph fresh.
-- For disambiguation, use `file:symbol` syntax: `roam symbol myfile:MyClass`.
-
-### Code Quality Metrics
-
-**Do NOT use `roam health` as a quality metric** for this project. It penalizes
-architectural patterns that are correct for a multi-package library toolkit
-(adapter hubs → bottlenecks, disconnected packages → low connectivity,
-public API exports → "dead" symbols).
-
-Use these instead:
-- `roam fitness` - metric thresholds + trend guards in `.roam/fitness.yaml` (CI-friendly, exit 1 on failure)
-- `roam rules --ci` - custom architecture rules in `.roam/rules/` (layer violations, adapter isolation)
-- `roam check-rules --profile minimal` - built-in structural rules with false-positive-prone checks excluded
-- `roam complexity --threshold 15` - function-level cognitive complexity
-- `roam vibe-check` - AI rot score (target: < 10)
-- `roam ai-readiness` - agent-friendliness score
-- `roam trends --save` - save a snapshot after each release for trend guards
-
-### Roam in Sub-Agents
-
-All `mcp__roam-code__*` tools are available inside sub-agents (both `general-purpose` and `Explore` types). When spawning a sub-agent for codebase exploration, include these instructions in the prompt:
-
-> Use `mcp__roam-code__*` MCP tools for codebase exploration. Prefer roam over
-> grep/glob/read - it understands symbols, call graphs, and architecture.
-> Key tools: `roam_understand` (overview), `roam_context` (files for a symbol),
-> `roam_search_symbol` (find by name), `roam_trace` (dependency paths),
-> `roam_file_info` (file structure), `roam_impact` (blast radius).
-> Use ToolSearch to find the full tool schemas before calling them.
-
 ## Code Style
 
 - ESM-only (`"type": "module"` in package.json)
@@ -430,7 +392,7 @@ The website `/changelog` page (`website/src/pages/changelog.astro`) and the GitH
 
 Two GitHub Actions workflows live in `.github/workflows/`:
 
-- **`ci.yml`** - runs on every push to `master` and every pull request. Installs (`--frozen-lockfile`), builds, then runs `pnpm exec turbo lint check` (lint + typecheck across all workspace packages) followed by `pnpm exec turbo test` (the Vitest suites). A `pnpm format:check` step runs before them (the root `check` script's formatting gate, lifted out so CI reports it separately). It deliberately does **not** run the root `pnpm check`'s trailing `pnpm roam` step, since the roam CLI isn't available on CI runners.
+- **`ci.yml`** - runs on every push to `master` and every pull request. Installs (`--frozen-lockfile`), builds, then runs `pnpm exec turbo lint check` (lint + typecheck across all workspace packages) followed by `pnpm exec turbo test` (the Vitest suites). A `pnpm format:check` step runs before them (the root `check` script's formatting gate, lifted out so CI reports it separately).
 - **`publish.yml`** - runs when a `vX.Y.Z` tag is pushed. Builds, lints, tests, then runs `pnpm publish -r --access public --no-git-checks`. Publishing uses **npm trusted publishing (OIDC)** - there is **no `NPM_TOKEN`**; auth comes from the `id-token: write` permission, and npm auto-generates provenance attestations.
 
 Key facts for maintaining the publish flow:
