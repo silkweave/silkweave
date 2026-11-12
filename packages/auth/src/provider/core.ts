@@ -745,7 +745,7 @@ async function refreshTokenGrant(ctx: CoreContext, body: Record<string, string>)
 
   // Replay of an already-rotated token after the grace window: the token has
   // leaked - revoke the whole grant (RFC 9700 §4.14.2).
-  if (tokenData.rotatedAt !== undefined && nowSeconds() - tokenData.rotatedAt > ctx.grace) {
+  if (pastGrace(ctx, tokenData.rotatedAt)) {
     return revokeReplayed(ctx, refreshToken, tokenData)
   }
 
@@ -833,7 +833,7 @@ async function continueWinnerChain(
   if (stored.expiresAt < nowSeconds()) {
     return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
   }
-  if (stored.rotatedAt !== undefined && nowSeconds() - stored.rotatedAt > ctx.grace) {
+  if (pastGrace(ctx, stored.rotatedAt)) {
     return revokeReplayed(ctx, refreshToken, stored)
   }
   const successorRecord = await ctx.store.getRefreshToken(winner)
@@ -841,6 +841,18 @@ async function continueWinnerChain(
     return errorResponse(400, 'invalid_grant', 'Refresh token was already used')
   }
   return { ok: true }
+}
+
+/**
+ * Has a rotated token left its grace window? `refreshGraceSeconds: 0` means
+ * strict rotation: any reuse of a rotated token is past grace, even within
+ * the same clock tick.
+ */
+function pastGrace(ctx: CoreContext, rotatedAt: number | undefined): boolean {
+  if (rotatedAt === undefined) {
+    return false
+  }
+  return ctx.grace <= 0 || nowSeconds() - rotatedAt > ctx.grace
 }
 
 /** A rotated token reused after the grace window: revoke the grant (or at least the token). */

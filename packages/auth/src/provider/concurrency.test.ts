@@ -329,6 +329,31 @@ describe('the CAS-losing refresh (re-review)', () => {
   })
 })
 
+describe('strict rotation (refreshGraceSeconds: 0)', () => {
+  it('rejects a second use of a rotated token within the same clock tick, and revokes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const ctx = serverWith(createMemoryStore(), { refreshGraceSeconds: 0 })
+    const { clientId, token } = await connectAlice(ctx)
+    const first = await refreshWith(ctx, token.refresh_token, clientId)
+    expect(first.status).toBe(200)
+    const second = await refreshWith(ctx, token.refresh_token, clientId) // Date unchanged
+    expect(second.status).toBe(400)
+    expect((await refreshWith(ctx, responseBody(first).refresh_token, clientId)).status).toBe(400)
+  })
+
+  it('a parallel CAS loser under strict rotation gets no token', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const ctx = serverWith(createMemoryStore(), { refreshGraceSeconds: 0 })
+    const { clientId, token } = await connectAlice(ctx)
+    const results = await Promise.all([
+      refreshWith(ctx, token.refresh_token, clientId),
+      refreshWith(ctx, token.refresh_token, clientId)
+    ])
+    // Strict mode tolerates no concurrent reuse: never two tokens for one presentation.
+    expect(results.filter((r) => r.status === 200).length).toBeLessThanOrEqual(1)
+  })
+})
+
 describe('hardening', () => {
   it('fails closed with an OAuth error when isGrantActive throws', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
