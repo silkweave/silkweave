@@ -14,9 +14,6 @@ export interface RedisClient {
   getdel?(key: string): Promise<unknown>
 }
 
-/** Revocation tombstones outlive any refresh chain (30 days by default). */
-const TOMBSTONE_TTL = 400 * 24 * 3600
-
 export interface RedisStoreOptions {
   client: RedisClient
   prefix?: string
@@ -24,6 +21,12 @@ export interface RedisStoreOptions {
 
 export function createRedisStore(options: RedisStoreOptions): OAuthStore {
   const { client, prefix = 'silkweave:oauth:' } = options
+  if (typeof client.getdel !== 'function') {
+    console.warn(
+      '[silkweave/auth] Redis client has no getdel(): authorization codes and consent requests are redeemed ' +
+        'with non-atomic GET + DEL. Provide getdel (Redis >= 6.2) - and make sure set() honors { nx: true }.'
+    )
+  }
 
   function key(namespace: string, id: string) {
     return `${prefix}${namespace}:${id}`
@@ -161,7 +164,9 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
     async revokeGrant(grantId) {
       // Tombstone first, then delete: a refresh racing this revocation either
       // has its successor deleted below or sees the tombstone on its re-check.
-      await client.set(key('revoked-grant', grantId), '1', { ex: TOMBSTONE_TTL })
+      // No expiry: a tombstone must outlive every token of the grant, and the
+      // chain's lifetime is not known here (the index may have lost members).
+      await client.set(key('revoked-grant', grantId), '1')
       const tokens = (await load<string[]>('grant', grantId)) ?? []
       await Promise.all(tokens.map((token) => remove('refresh-token', token)))
       await remove('grant', grantId)

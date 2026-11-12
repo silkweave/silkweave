@@ -2,6 +2,7 @@ import {
   AuthorizationCore,
   AuthorizationServerConfig,
   createAuthorizationCore,
+  missingAtomicMethods,
   errorResponse,
   randomToken,
   redirectResponse,
@@ -65,6 +66,14 @@ export interface OAuthServerConfig extends AuthorizationServerConfig {
   ) => string | OAuthResponse | Promise<string | OAuthResponse>
   /** Advertised in metadata as `scopes_supported`. */
   scopesSupported?: string[]
+  /**
+   * Accept a custom `store` that lacks the atomic operations (`takeAuthCode`,
+   * `takePendingAuth`, `rotateRefreshToken`, `isGrantRevoked`, `revokeGrant`).
+   * Without this flag such a store is rejected at construction: under
+   * concurrency it permits double redemption, double consent and revocation
+   * races. The built-in stores implement all five.
+   */
+  allowNonAtomicStore?: boolean
 }
 
 /** The result of a consent decision: send the browser here (`window.location = redirectTo`). */
@@ -147,6 +156,15 @@ async function authorizeToConsent(
 }
 
 export function createOAuthServer(config: OAuthServerConfig): OAuthServer {
+  if (config.store && !config.allowNonAtomicStore) {
+    const missing = missingAtomicMethods(config.store)
+    if (missing.length > 0) {
+      throw new Error(
+        `createOAuthServer: the store lacks ${missing.join(', ')}. Implement them (see OAuthStore) ` +
+          'or pass allowNonAtomicStore: true to accept non-atomic redemption and rotation.'
+      )
+    }
+  }
   const core = createAuthorizationCore(config, { scopesSupported: config.scopesSupported })
   const { store } = core
 

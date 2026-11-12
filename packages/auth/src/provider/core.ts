@@ -244,9 +244,14 @@ const ATOMIC_METHODS = [
   'revokeGrant'
 ] as const
 
+/** The concurrency-safe store operations a store does not implement. */
+export function missingAtomicMethods(store: OAuthStore): string[] {
+  return ATOMIC_METHODS.filter((method) => typeof store[method] !== 'function')
+}
+
 /** Say once, at construction, when a custom store lacks the concurrency-safe operations. */
 function warnWeakStore(store: OAuthStore): void {
-  const missing = ATOMIC_METHODS.filter((method) => typeof store[method] !== 'function')
+  const missing = missingAtomicMethods(store)
   if (missing.length > 0) {
     console.warn(
       `[silkweave/auth] OAuthStore lacks ${missing.join(', ')}: single-use codes/consent, refresh rotation and ` +
@@ -763,41 +768,79 @@ async function refreshTokenGrant(ctx: CoreContext, body: Record<string, string>)
 
   // Records minted before 7.2 carry no grant id: adopt one at first rotation.
   const grantId = tokenData.grantId ?? randomUUID()
+  const data: RefreshTokenData & { grantId: string } = { ...tokenData, grantId, rotatedAt: undefined, next: undefined }
+  // Save the successor BEFORE publishing it on the parent: whatever `next` a
+  // concurrent or grace-window reuse reads must already exist. The original
+  // absolute expiry carries over, so rotation never extends a chain's life.
+  const successor = randomToken()
+  await ctx.store.saveRefreshToken(successor, data)
+
   // Rotate (OAuth 2.1 for public clients) with a compare-and-set: the first
   // refresh of this token records its successor (sealed under this token) and
   // keeps the record, so a later replay is recognized. A concurrent or
   // grace-window reuse gets the SAME successor back instead of a new branch -
   // every presenter of this token continues one chain, so a thief and the
   // legitimate client collide on the next rotation and trip replay detection.
-  const successor = randomToken()
   const stored = await rotateRefreshToken(ctx.store, refreshToken, tokenData, {
     rotatedAt: nowSeconds(),
     next: await sealSuccessor(refreshToken, successor),
     grantId
   })
-  if (!stored) {
+  const winner = stored?.next ? await openSuccessor(refreshToken, stored.next) : undefined
+  if (!stored || !winner) {
+    await ctx.store.deleteRefreshToken(successor)
     return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
   }
-  const data = { ...tokenData, grantId, rotatedAt: undefined, next: undefined }
-  const won = stored.next === undefined || (await openSuccessor(refreshToken, stored.next)) === successor
+  const won = winner === successor
+  let issued: RefreshTokenData & { grantId: string } = data
   if (!won) {
-    const existing = stored.next ? await openSuccessor(refreshToken, stored.next) : undefined
-    if (!existing) {
-      return errorResponse(400, 'invalid_grant', 'Refresh token was already used')
-    }
-    return accessTokenResponse(ctx, data, existing)
-  }
-  // The original absolute expiry carries over, so rotation never extends a
-  // leaked chain's life.
-  await ctx.store.saveRefreshToken(successor, data)
-  // A revocation that raced this refresh (e.g. a replay revoking the grant
-  // while we were saving) must win: re-check after the successor exists, so
-  // either revokeGrant deleted it or we see the tombstone here.
-  if (await grantDead(ctx, data)) {
+    // Another refresh rotated first: drop ours. Everything below is decided
+    // from the authoritative CAS result, never from our pre-CAS read.
     await ctx.store.deleteRefreshToken(successor)
+    const lost = await continueWinnerChain(ctx, refreshToken, stored, winner)
+    if ('status' in lost) {
+      return lost
+    }
+    // The winner's grant id (it differs from ours for an adopted pre-7.2 grant).
+    issued = { ...stored, grantId: stored.grantId ?? grantId, rotatedAt: undefined, next: undefined }
+  }
+  // A revocation that raced this refresh must win, on both paths: re-check
+  // after the successor exists, so either revokeGrant deleted it or we see the
+  // tombstone here.
+  if (await grantDead(ctx, issued)) {
+    if (won) {
+      await ctx.store.deleteRefreshToken(successor)
+    }
     return errorResponse(400, 'invalid_grant', 'Grant has been revoked')
   }
-  return accessTokenResponse(ctx, data, successor)
+  return accessTokenResponse(ctx, issued, winner)
+}
+
+/**
+ * Validate a CAS-losing (concurrent or grace-window) reuse against the stored
+ * record: the parent's own grace window and expiry, and that the shared
+ * successor has not itself been rotated yet. A stale retry whose successor
+ * already moved on gets `invalid_grant` WITHOUT revoking (it is the tolerated
+ * concurrency case, but must not receive an already-spent token); a reuse past
+ * the parent's grace window is a replay and revokes the grant.
+ */
+async function continueWinnerChain(
+  ctx: CoreContext,
+  refreshToken: string,
+  stored: RefreshTokenData,
+  winner: string
+): Promise<OAuthResponse | { ok: true }> {
+  if (stored.expiresAt < nowSeconds()) {
+    return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
+  }
+  if (stored.rotatedAt !== undefined && nowSeconds() - stored.rotatedAt > ctx.grace) {
+    return revokeReplayed(ctx, refreshToken, stored)
+  }
+  const successorRecord = await ctx.store.getRefreshToken(winner)
+  if (!successorRecord || successorRecord.rotatedAt !== undefined) {
+    return errorResponse(400, 'invalid_grant', 'Refresh token was already used')
+  }
+  return { ok: true }
 }
 
 /** A rotated token reused after the grace window: revoke the grant (or at least the token). */
