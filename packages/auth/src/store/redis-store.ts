@@ -86,12 +86,27 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
 
     async saveRefreshToken(token, data) {
       await save('refresh-token', token, data, data.expiresAt)
+      // Index the grant's tokens (the client has no SCAN) so revokeGrant can
+      // find every rotation. Rotation carries the absolute expiry over, so the
+      // index can expire with the chain.
+      if (data.grantId) {
+        const tokens = (await load<string[]>('grant', data.grantId)) ?? []
+        if (!tokens.includes(token)) {
+          tokens.push(token)
+          await save('grant', data.grantId, tokens, data.expiresAt)
+        }
+      }
     },
     async getRefreshToken(token) {
       return load('refresh-token', token)
     },
     async deleteRefreshToken(token) {
       await remove('refresh-token', token)
+    },
+    async revokeGrant(grantId) {
+      const tokens = (await load<string[]>('grant', grantId)) ?? []
+      await Promise.all(tokens.map((token) => remove('refresh-token', token)))
+      await remove('grant', grantId)
     }
   }
 }

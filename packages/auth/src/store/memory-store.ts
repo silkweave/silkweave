@@ -73,6 +73,13 @@ export function createMemoryStore(): OAuthStore {
     },
     async deleteRefreshToken(token) {
       refreshTokens.delete(token)
+    },
+    async revokeGrant(grantId) {
+      for (const [token, data] of refreshTokens) {
+        if (data.grantId === grantId) {
+          refreshTokens.delete(token)
+        }
+      }
     }
   }
 }

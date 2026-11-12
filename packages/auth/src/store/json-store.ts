@@ -110,6 +110,14 @@ export function createJsonStore(path: string): OAuthStore {
     async deleteRefreshToken(token) {
       delete store.refreshTokens[token]
       writeJsonStore(path, store)
+    },
+    async revokeGrant(grantId) {
+      for (const [token, data] of Object.entries(store.refreshTokens)) {
+        if (data.grantId === grantId) {
+          delete store.refreshTokens[token]
+        }
+      }
+      writeJsonStore(path, store)
     }
   }
 }

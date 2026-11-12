@@ -81,6 +81,26 @@ const auth = google({
   store: createJsonStore('store.json')
 })`
 
+const localOauthRaw = `import { createOAuthServer } from '@silkweave/auth/oauth'
+
+const oauth = createOAuthServer({
+  resourceUrl: 'https://app.example.com/mcp',
+  redirectUris: ['http://localhost:*', 'http://127.0.0.1:*', 'https://claude.ai/*'],
+  signingKey: process.env.OAUTH_SIGNING_KEY!,
+  store,
+  // send the browser to your consent page (a full OAuthResponse can also set a binding cookie)
+  onAuthorize: (pending) => \`https://app.example.com/connect?request=\${pending.id}\`,
+  // revocation that applies on the next call and the next refresh
+  isGrantActive: ({ grantId, sub }) => grants.isActive(grantId) && users.isActive(sub)
+})
+
+// consent backend, from a signed-in session behind CSRF protection:
+const pending = await oauth.pending(id)                  // client name, cimd | dcr, redirect host
+const { redirectTo } = (await oauth.approve(id, { sub: user.id }))!   // or oauth.deny(id)
+
+const auth = { verifyToken: (t) => oauth.verifyToken(t), required: true,
+  resourceUrl: 'https://app.example.com/mcp', authorizationServers: ['https://app.example.com/mcp'], provider: oauth }`
+
 const multiResourceRaw = `import { pathResolver } from '@silkweave/auth'
 import { google } from '@silkweave/auth/oauth'
 
@@ -1431,6 +1451,21 @@ if (auth) {
       <li><strong>Protected Resource Metadata</strong> - RFC 9728 discovery</li>
     </ul>
     <p>Storage backends (also from <code>@silkweave/auth/oauth</code>): <code>createMemoryStore()</code> (development), <code>createJsonStore(path)</code> (file-based), <code>createRedisStore(redis)</code> (production).</p>
+    <p>Hardening shared by every Silkweave authorization server: public clients only (PKCE, no client secrets), CIMD documents must name themselves, loopback redirects match on any port (RFC 8252), the RFC 9207 <code>iss</code> parameter on every authorization response, and refresh tokens rotated on every use with replay detection (reuse within 30 seconds is a concurrent refresh; later reuse revokes the whole grant).</p>
+  </section>
+
+  <section id="local-oauth">
+    <h3>Your App as the Identity Provider</h3>
+    <p>When your app already knows who the person is (a signed-in session, your own login page), there is no upstream IdP to proxy. <code>createOAuthServer()</code> is the same OAuth 2.1 authorization server, but <code>/authorize</code> hands the browser to <strong>your consent page</strong>. Claude Code, Claude Desktop / claude.ai connectors and Codex connect with just the server URL, and the tokens are bound to the person who approved.</p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span>server.ts</span>
+        <button class="copy-btn" data-copy-raw={localOauthRaw}>Copy</button>
+      </div>
+      <pre><code set:html={hl(localOauthRaw)} /></pre>
+    </div>
+    <p><code>approve()</code> and <code>deny()</code> are single use and return <code>{'{'} redirectTo {'}'}</code> for the page to navigate to (a consent POST is usually a fetch, which would not follow a redirect). Every approval is a <strong>grant</strong> with a stable <code>grantId</code> that survives refresh rotation; tokens carry <code>sub</code>, <code>client_id</code> and <code>grant_id</code>, surfaced as <code>AuthInfo.sub</code>, <code>oauthClientId</code> and <code>grantId</code>, so a "Connected apps" page can list and revoke connections. <code>isGrantActive</code> runs on every token verification and every refresh, so revoking a grant or a user takes effect on the next call.</p>
+    <p>On the consent page itself: render the client name escaped and mark dynamically registered clients as unverified (the name is attacker-chosen; the redirect host is the honest signal), send <code>frame-ancestors 'none'</code>, and only approve from a signed-in browser session. A runnable example with a toy session and consent page is <code>pnpm -F @silkweave/example-mcp http-local-oauth</code>.</p>
   </section>
 
   <section id="multi-resource">
