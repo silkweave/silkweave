@@ -195,7 +195,8 @@ describe('revocation cannot be undone by an in-flight refresh', () => {
 
   it('a refresh token the redis index lost is still dead after revocation (tombstone)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
-    const store = createRedisStore({ client: fakeRedis() })
+    const redis = fakeRedis()
+    const store = createRedisStore({ client: redis })
     const ctx = serverWith(store)
     const { clientId, token } = await connectAlice(ctx)
     const r1 = responseBody(await refreshWith(ctx, token.refresh_token, clientId)).refresh_token
@@ -204,10 +205,127 @@ describe('revocation cannot be undone by an in-flight refresh', () => {
     const orphan = await store.getRefreshToken(r1)
     await store.saveRefreshToken('orphan-token', { ...orphan!, rotatedAt: undefined, next: undefined })
     await store.saveRefreshToken('orphan-token-2', { ...orphan!, grantId: 'other', rotatedAt: undefined })
+    // Drop it from the grant index, as a lost concurrent read-modify-write would.
+    const indexKey = `silkweave:oauth:grant:${grantId}`
+    const index = JSON.parse(redis.keys.get(indexKey)!) as string[]
+    redis.keys.set(indexKey, JSON.stringify(index.filter((t) => t !== 'orphan-token')))
     vi.setSystemTime(Date.now() + 31_000)
     await refreshWith(ctx, token.refresh_token, clientId) // replay -> revoke grantId
     expect(await store.isGrantRevoked!(grantId)).toBe(true)
-    expect((await refreshWith(ctx, 'orphan-token', clientId)).status).toBe(400)
+    expect(await store.getRefreshToken('orphan-token')).toBeDefined() // survived the cleanup
+    expect((await refreshWith(ctx, 'orphan-token', clientId)).status).toBe(400) // tombstone rejects it
+  })
+})
+
+describe('the CAS-losing refresh (re-review)', () => {
+  /** A memory store whose rotateRefreshToken can be paused after the CAS resolves. */
+  function gatedRotation() {
+    const inner = createMemoryStore()
+    let gate: Promise<void> | undefined
+    let release!: () => void
+    let reached!: () => void
+    const paused = new Promise<void>((resolve) => (reached = resolve))
+    const store: OAuthStore = {
+      ...inner,
+      async rotateRefreshToken(token, rotation) {
+        const result = await inner.rotateRefreshToken!(token, rotation)
+        if (gate) {
+          reached()
+          await gate
+        }
+        return result
+      }
+    }
+    return {
+      store,
+      inner,
+      pause: () => (gate = new Promise<void>((resolve) => (release = resolve))),
+      paused,
+      release: () => release()
+    }
+  }
+
+  it('a grace retry paused across a revocation does not return a usable token', async () => {
+    const g = gatedRotation()
+    const ctx = serverWith(g.store)
+    const { clientId, token } = await connectAlice(ctx)
+    await refreshWith(ctx, token.refresh_token, clientId) // R0 -> R1 (winner, ungated)
+    g.pause()
+    const retry = refreshWith(ctx, token.refresh_token, clientId) // grace reuse: CAS loser, pauses
+    await g.paused
+    const grantId = decodeJwt(token.access_token).grant_id as string
+    await g.inner.revokeGrant!(grantId)
+    g.release()
+    const res = await retry
+    expect(res.status).toBe(400)
+  })
+
+  it('every refresh token handed out already exists (successor saved before it is published)', async () => {
+    const ctx = serverWith(createMemoryStore())
+    const { clientId, token } = await connectAlice(ctx)
+    const [a, b] = await Promise.all([
+      refreshWith(ctx, token.refresh_token, clientId),
+      refreshWith(ctx, token.refresh_token, clientId)
+    ])
+    expect(responseBody(a).refresh_token).toBe(responseBody(b).refresh_token)
+    const next = await refreshWith(ctx, responseBody(a).refresh_token, clientId)
+    expect(next.status).toBe(200)
+  })
+
+  it('a stale grace retry whose successor already rotated gets invalid_grant without revoking', async () => {
+    const ctx = serverWith(createMemoryStore())
+    const { clientId, token } = await connectAlice(ctx)
+    const r1 = responseBody(await refreshWith(ctx, token.refresh_token, clientId)).refresh_token
+    const r2 = responseBody(await refreshWith(ctx, r1, clientId)).refresh_token
+    const stale = await refreshWith(ctx, token.refresh_token, clientId) // R0 still inside its grace window
+    expect(stale.status).toBe(400)
+    expect(responseBody(stale).error).toBe('invalid_grant')
+    expect((await refreshWith(ctx, r2, clientId)).status).toBe(200) // family intact
+  })
+
+  it('a CAS loser that resumes after the grace window expired revokes instead of continuing', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const inner = createMemoryStore()
+    let gate: Promise<void> | undefined
+    let release!: () => void
+    let reached!: () => void
+    const paused = new Promise<void>((resolve) => (reached = resolve))
+    const store: OAuthStore = {
+      ...inner,
+      async rotateRefreshToken(token, rotation) {
+        if (gate) {
+          const wait = gate
+          gate = undefined
+          reached()
+          await wait
+        }
+        return inner.rotateRefreshToken!(token, rotation)
+      }
+    }
+    const ctx = serverWith(store)
+    const { clientId, token } = await connectAlice(ctx)
+    gate = new Promise<void>((resolve) => (release = resolve))
+    const b = refreshWith(ctx, token.refresh_token, clientId) // read unrotated R0, pauses before the CAS
+    await paused
+    expect((await refreshWith(ctx, token.refresh_token, clientId)).status).toBe(200) // A rotates R0
+    vi.setSystemTime(Date.now() + 31_000)
+    release()
+    expect((await b).status).toBe(400)
+    expect(await inner.isGrantRevoked!(decodeJwt(token.access_token).grant_id as string)).toBe(true)
+  })
+
+  it('a pre-7.2 record adopted concurrently yields one grant id', async () => {
+    const store = createMemoryStore()
+    const ctx = serverWith(store)
+    const { clientId, token } = await connectAlice(ctx)
+    // Turn the chain into a pre-7.2 record: no grant id, never rotated.
+    const record = await store.getRefreshToken(token.refresh_token)
+    await store.saveRefreshToken('legacy', { ...record!, grantId: undefined, createdAt: undefined })
+    const [a, b] = await Promise.all([refreshWith(ctx, 'legacy', clientId), refreshWith(ctx, 'legacy', clientId)])
+    expect(responseBody(a).refresh_token).toBe(responseBody(b).refresh_token)
+    const grantA = decodeJwt(responseBody(a).access_token).grant_id
+    expect(decodeJwt(responseBody(b).access_token).grant_id).toBe(grantA)
+    expect((await store.getRefreshToken(responseBody(a).refresh_token))?.grantId).toBe(grantA)
   })
 })
 
@@ -244,7 +362,8 @@ describe('hardening', () => {
       revokeGrant: _e,
       ...weak
     } = createMemoryStore()
-    serverWith(weak)
+    expect(() => serverWith(weak)).toThrow('takeAuthCode')
+    serverWith(weak, { allowNonAtomicStore: true })
     expect(warn).toHaveBeenCalledTimes(1)
     expect(warn.mock.calls[0][0]).toContain('takeAuthCode')
   })
