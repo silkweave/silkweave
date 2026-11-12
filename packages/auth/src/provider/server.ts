@@ -4,7 +4,8 @@ import {
   createAuthorizationCore,
   errorResponse,
   randomToken,
-  redirectResponse
+  redirectResponse,
+  takePendingAuth
 } from './core.js'
 import { OAuthStore, PendingAuthData } from './store.js'
 import { AuthInfo, OAuthProvider, OAuthRequest, OAuthResponse } from './types.js'
@@ -25,6 +26,12 @@ export interface PendingAuthorization {
    * anonymously via dynamic client registration (nothing about it is verified).
    */
   clientKind: 'cimd' | 'dcr'
+  /**
+   * For `cimd` clients, the host serving the client's metadata document (e.g.
+   * `claude.ai`) - the verified identity to show. `clientName` is self-asserted
+   * even for CIMD clients. Undefined for `dcr` clients.
+   */
+  clientHost?: string
   /** Where the browser returns after the decision. */
   redirectUri: string
   /** Host of `redirectUri` - the most honest "who gets access" signal for a DCR client. */
@@ -114,21 +121,13 @@ async function describePending(store: OAuthStore, id: string, pending: PendingAu
     clientId: pending.clientId,
     clientName: client?.clientName,
     clientKind: pending.clientId.startsWith('https://') ? 'cimd' : 'dcr',
+    clientHost: pending.clientId.startsWith('https://') ? new URL(pending.clientId).host : undefined,
     redirectUri: pending.redirectUri,
     redirectHost: new URL(pending.redirectUri).host,
     scopes: pending.scope.split(' ').filter(Boolean),
     resource: pending.resource,
     expiresAt: pending.expiresAt
   }
-}
-
-/** Consume a pending request (single use) - the decision is made exactly once. */
-async function takePending(store: OAuthStore, id: string): Promise<PendingAuthData | undefined> {
-  const pending = await loadPending(store, id)
-  if (pending) {
-    await store.deletePendingAuth(id)
-  }
-  return pending
 }
 
 /** Validate /authorize, store the request as pending, and hand the browser to the app. */
@@ -177,7 +176,7 @@ export function createOAuthServer(config: OAuthServerConfig): OAuthServer {
       if (!identity?.sub) {
         throw new Error('approve() requires an identity with a sub')
       }
-      const pending = await takePending(store, id)
+      const pending = await takePendingAuth(store, id)
       if (!pending) {
         return undefined
       }
@@ -185,7 +184,7 @@ export function createOAuthServer(config: OAuthServerConfig): OAuthServer {
     },
 
     async deny(id, opts = {}) {
-      const pending = await takePending(store, id)
+      const pending = await takePendingAuth(store, id)
       if (!pending) {
         return undefined
       }

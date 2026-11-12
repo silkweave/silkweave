@@ -13,7 +13,14 @@ import { SignJWT, jwtVerify } from 'jose'
 import { normalizeResourceUri } from '../resolve.js'
 import { createMemoryStore } from '../store/memory-store.js'
 import { assertSafeMetadataUrl } from './ssrf.js'
-import { ClientRegistration, OAuthStore, PendingAuthData, RefreshTokenData } from './store.js'
+import {
+  AuthCodeData,
+  ClientRegistration,
+  OAuthStore,
+  PendingAuthData,
+  RefreshRotation,
+  RefreshTokenData
+} from './store.js'
 import { AuthInfo, OAuthRequest, OAuthResponse } from './types.js'
 import { matchRedirectUri, matchRegisteredRedirectUri } from './uri.js'
 
@@ -229,8 +236,30 @@ interface CoreContext {
   getSigningKey: () => Uint8Array
 }
 
+const ATOMIC_METHODS = [
+  'takeAuthCode',
+  'takePendingAuth',
+  'rotateRefreshToken',
+  'isGrantRevoked',
+  'revokeGrant'
+] as const
+
+/** Say once, at construction, when a custom store lacks the concurrency-safe operations. */
+function warnWeakStore(store: OAuthStore): void {
+  const missing = ATOMIC_METHODS.filter((method) => typeof store[method] !== 'function')
+  if (missing.length > 0) {
+    console.warn(
+      `[silkweave/auth] OAuthStore lacks ${missing.join(', ')}: single-use codes/consent, refresh rotation and ` +
+        'replay revocation fall back to non-atomic get-then-write sequences. See the OAuthStore docs.'
+    )
+  }
+}
+
 function createCoreContext(config: AuthorizationServerConfig, opts: { scopesSupported?: string[] }): CoreContext {
   let signingKey: Uint8Array | null = null
+  if (config.store) {
+    warnWeakStore(config.store)
+  }
   const issuer = config.resourceUrl
   return {
     config,
@@ -298,7 +327,13 @@ async function grantActive(
   if (!ref.grantId || !ref.sub || !ref.clientId) {
     return false
   }
-  return ctx.config.isGrantActive({ grantId: ref.grantId, sub: ref.sub, clientId: ref.clientId })
+  try {
+    return (await ctx.config.isGrantActive({ grantId: ref.grantId, sub: ref.sub, clientId: ref.clientId })) === true
+  } catch (error) {
+    // Fail closed with an OAuth error (or a rejected token), never a thrown endpoint.
+    console.error('isGrantActive hook error:', error)
+    return false
+  }
 }
 
 async function readAuthorizeResource(
@@ -499,7 +534,10 @@ async function issueCode(
     scopes: pending.scope.split(' ').filter(Boolean),
     ...extra,
     email: identity.email,
-    sub: identity.sub,
+    // Resolve the subject ONCE and persist it: the access token's `sub`, the
+    // refresh record and `isGrantActive` must all see the same value (an
+    // email-only upstream identity used to verify but never refresh).
+    sub: identity.sub ?? identity.email ?? pending.clientId,
     resource: ctx.multiResource ? pending.resource : undefined,
     expiresAt: nowSeconds() + PENDING_TTL
   })
@@ -510,21 +548,114 @@ function errorRedirect(ctx: CoreContext, pending: PendingAuthData, error: string
   return clientRedirect(ctx, pending, description ? { error, error_description: description } : { error })
 }
 
-async function mintPair(
+/** Atomic get+delete of an authorization code, falling back to get-then-delete. */
+async function takeAuthCode(store: OAuthStore, code: string): Promise<AuthCodeData | undefined> {
+  if (store.takeAuthCode) {
+    return store.takeAuthCode(code)
+  }
+  const data = await store.getAuthCode(code)
+  if (data) {
+    await store.deleteAuthCode(code)
+  }
+  return data
+}
+
+/** Atomic get+delete of a pending authorization, falling back to get-then-delete. */
+export async function takePendingAuth(store: OAuthStore, state: string): Promise<PendingAuthData | undefined> {
+  if (!state) {
+    return undefined
+  }
+  const data = store.takePendingAuth ? await store.takePendingAuth(state) : await store.getPendingAuth(state)
+  if (data && !store.takePendingAuth) {
+    await store.deletePendingAuth(state)
+  }
+  return data && data.expiresAt >= nowSeconds() ? data : undefined
+}
+
+/** Compare-and-set rotation, falling back to read-check-write. */
+async function rotateRefreshToken(
+  store: OAuthStore,
+  token: string,
+  current: RefreshTokenData,
+  rotation: RefreshRotation
+): Promise<RefreshTokenData | undefined> {
+  if (store.rotateRefreshToken) {
+    return store.rotateRefreshToken(token, rotation)
+  }
+  const latest = (await store.getRefreshToken(token)) ?? current
+  if (latest.rotatedAt !== undefined) {
+    return latest
+  }
+  const rotated = { ...latest, ...rotation }
+  await store.saveRefreshToken(token, rotated)
+  return rotated
+}
+
+/** AES-GCM key derived from the raw predecessor token - only its holder can read `next`. */
+async function successorKey(token: string): Promise<CryptoKey> {
+  const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(token), 'HKDF', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new Uint8Array(0),
+      info: new TextEncoder().encode('silkweave/refresh-next/v1')
+    },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
+async function sealSuccessor(token: string, successor: string): Promise<string> {
+  const iv = randomBytes(12)
+  const sealed = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    await successorKey(token),
+    new TextEncoder().encode(successor)
+  )
+  return Buffer.concat([iv, Buffer.from(sealed)]).toString('base64url')
+}
+
+async function openSuccessor(token: string, next: string): Promise<string | undefined> {
+  try {
+    const raw = Buffer.from(next, 'base64url')
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: raw.subarray(0, 12) },
+      await successorKey(token),
+      raw.subarray(12)
+    )
+    return new TextDecoder().decode(plain)
+  } catch {
+    return undefined
+  }
+}
+
+/** Revoked durably by the store (`revokeGrant` tombstone) or by the app (`isGrantActive`)? */
+async function grantDead(
   ctx: CoreContext,
-  data: Omit<RefreshTokenData, 'rotatedAt'> & { grantId: string },
-  audience: string | undefined
-): Promise<OAuthResponse> {
+  data: { grantId?: string; sub?: string; clientId: string }
+): Promise<boolean> {
+  if (data.grantId && ctx.store.isGrantRevoked && (await ctx.store.isGrantRevoked(data.grantId))) {
+    return true
+  }
+  return !(await grantActive(ctx, data))
+}
+
+async function accessTokenResponse(
+  ctx: CoreContext,
+  data: RefreshTokenData & { grantId: string },
+  refreshToken: string
+) {
   const accessToken = await signAccessToken(ctx, {
     scopes: data.scopes,
     email: data.email,
     sub: data.sub,
     clientId: data.clientId,
     grantId: data.grantId,
-    audience
+    audience: data.resource
   })
-  const refreshToken = randomToken()
-  await ctx.store.saveRefreshToken(refreshToken, data)
   return jsonResponse(200, {
     access_token: accessToken,
     token_type: 'Bearer',
@@ -532,6 +663,12 @@ async function mintPair(
     scope: data.scopes.join(' '),
     refresh_token: refreshToken
   })
+}
+
+async function mintPair(ctx: CoreContext, data: RefreshTokenData & { grantId: string }): Promise<OAuthResponse> {
+  const refreshToken = randomToken()
+  await ctx.store.saveRefreshToken(refreshToken, data)
+  return accessTokenResponse(ctx, data, refreshToken)
 }
 
 async function authorizationCodeGrant(ctx: CoreContext, body: Record<string, string>): Promise<OAuthResponse> {
@@ -543,11 +680,12 @@ async function authorizationCodeGrant(ctx: CoreContext, body: Record<string, str
   if (!requested.ok) {
     return errorResponse(400, 'invalid_target', 'Invalid resource indicator')
   }
-  const authCode = await ctx.store.getAuthCode(code)
+  // Atomic single-use redemption: two parallel exchanges of one code must not
+  // both mint (RFC 6749 §4.1.2).
+  const authCode = await takeAuthCode(ctx.store, code)
   if (!authCode || authCode.expiresAt < nowSeconds()) {
     return errorResponse(400, 'invalid_grant', 'Invalid or expired authorization code')
   }
-  await ctx.store.deleteAuthCode(code)
   if (authCode.clientId !== clientId) {
     return errorResponse(400, 'invalid_grant', 'client_id mismatch')
   }
@@ -570,20 +708,16 @@ async function authorizationCodeGrant(ctx: CoreContext, body: Record<string, str
     return errorResponse(400, 'invalid_target', 'Unknown or unsupported resource')
   }
   const now = nowSeconds()
-  return mintPair(
-    ctx,
-    {
-      clientId: authCode.clientId,
-      scopes: authCode.scopes,
-      email: authCode.email,
-      sub: authCode.sub,
-      resource: effectiveResource,
-      grantId: randomUUID(),
-      createdAt: now,
-      expiresAt: Math.floor(now) + ctx.refreshTtl
-    },
-    effectiveResource
-  )
+  return mintPair(ctx, {
+    clientId: authCode.clientId,
+    scopes: authCode.scopes,
+    email: authCode.email,
+    sub: authCode.sub,
+    resource: effectiveResource,
+    grantId: randomUUID(),
+    createdAt: now,
+    expiresAt: Math.floor(now) + ctx.refreshTtl
+  })
 }
 
 async function refreshTokenGrant(ctx: CoreContext, body: Record<string, string>): Promise<OAuthResponse> {
@@ -600,17 +734,14 @@ async function refreshTokenGrant(ctx: CoreContext, body: Record<string, string>)
   if (!tokenData || tokenData.expiresAt < nowSeconds()) {
     return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
   }
+  if (tokenData.grantId && ctx.store.isGrantRevoked && (await ctx.store.isGrantRevoked(tokenData.grantId))) {
+    return errorResponse(400, 'invalid_grant', 'Grant has been revoked')
+  }
 
-  // Replay of an already-rotated token. Inside the grace window it is a
-  // concurrent refresh by the legitimate client and rotates again; after it,
-  // the token has leaked - revoke the whole grant (OAuth 2.1 / Security BCP).
+  // Replay of an already-rotated token after the grace window: the token has
+  // leaked - revoke the whole grant (RFC 9700 §4.14.2).
   if (tokenData.rotatedAt !== undefined && nowSeconds() - tokenData.rotatedAt > ctx.grace) {
-    if (tokenData.grantId && ctx.store.revokeGrant) {
-      await ctx.store.revokeGrant(tokenData.grantId)
-    } else {
-      await ctx.store.deleteRefreshToken(refreshToken)
-    }
-    return errorResponse(400, 'invalid_grant', 'Refresh token was already used')
+    return revokeReplayed(ctx, refreshToken, tokenData)
   }
 
   // A refresh token must not be a lateral move to a different audience. The
@@ -626,34 +757,61 @@ async function refreshTokenGrant(ctx: CoreContext, body: Record<string, string>)
   if (body.client_id && body.client_id !== tokenData.clientId) {
     return errorResponse(400, 'invalid_grant', 'refresh_token was not issued to this client')
   }
-
-  // Records minted before 7.2 carry no grant id: adopt one at first rotation.
-  const grantId = tokenData.grantId ?? randomUUID()
-  if (!(await grantActive(ctx, { grantId: tokenData.grantId, sub: tokenData.sub, clientId: tokenData.clientId }))) {
-    await ctx.store.deleteRefreshToken(refreshToken)
+  if (await grantDead(ctx, tokenData)) {
     return errorResponse(400, 'invalid_grant', 'Grant has been revoked')
   }
 
-  // Rotate (OAuth 2.1 for public clients). The presented token is kept,
-  // marked rotated, so a later replay is recognized; the original absolute
-  // expiry carries over, so rotation never extends a leaked chain's life.
-  if (tokenData.rotatedAt === undefined) {
-    await ctx.store.saveRefreshToken(refreshToken, { ...tokenData, grantId, rotatedAt: nowSeconds() })
+  // Records minted before 7.2 carry no grant id: adopt one at first rotation.
+  const grantId = tokenData.grantId ?? randomUUID()
+  // Rotate (OAuth 2.1 for public clients) with a compare-and-set: the first
+  // refresh of this token records its successor (sealed under this token) and
+  // keeps the record, so a later replay is recognized. A concurrent or
+  // grace-window reuse gets the SAME successor back instead of a new branch -
+  // every presenter of this token continues one chain, so a thief and the
+  // legitimate client collide on the next rotation and trip replay detection.
+  const successor = randomToken()
+  const stored = await rotateRefreshToken(ctx.store, refreshToken, tokenData, {
+    rotatedAt: nowSeconds(),
+    next: await sealSuccessor(refreshToken, successor),
+    grantId
+  })
+  if (!stored) {
+    return errorResponse(400, 'invalid_grant', 'Invalid or expired refresh token')
   }
-  return mintPair(
-    ctx,
-    {
-      clientId: tokenData.clientId,
-      scopes: tokenData.scopes,
-      email: tokenData.email,
-      sub: tokenData.sub,
-      resource: tokenData.resource,
-      grantId,
-      createdAt: tokenData.createdAt,
-      expiresAt: tokenData.expiresAt
-    },
-    tokenData.resource
-  )
+  const data = { ...tokenData, grantId, rotatedAt: undefined, next: undefined }
+  const won = stored.next === undefined || (await openSuccessor(refreshToken, stored.next)) === successor
+  if (!won) {
+    const existing = stored.next ? await openSuccessor(refreshToken, stored.next) : undefined
+    if (!existing) {
+      return errorResponse(400, 'invalid_grant', 'Refresh token was already used')
+    }
+    return accessTokenResponse(ctx, data, existing)
+  }
+  // The original absolute expiry carries over, so rotation never extends a
+  // leaked chain's life.
+  await ctx.store.saveRefreshToken(successor, data)
+  // A revocation that raced this refresh (e.g. a replay revoking the grant
+  // while we were saving) must win: re-check after the successor exists, so
+  // either revokeGrant deleted it or we see the tombstone here.
+  if (await grantDead(ctx, data)) {
+    await ctx.store.deleteRefreshToken(successor)
+    return errorResponse(400, 'invalid_grant', 'Grant has been revoked')
+  }
+  return accessTokenResponse(ctx, data, successor)
+}
+
+/** A rotated token reused after the grace window: revoke the grant (or at least the token). */
+async function revokeReplayed(
+  ctx: CoreContext,
+  refreshToken: string,
+  tokenData: RefreshTokenData
+): Promise<OAuthResponse> {
+  if (tokenData.grantId && ctx.store.revokeGrant) {
+    await ctx.store.revokeGrant(tokenData.grantId)
+  } else {
+    await ctx.store.deleteRefreshToken(refreshToken)
+  }
+  return errorResponse(400, 'invalid_grant', 'Refresh token was already used')
 }
 
 /**

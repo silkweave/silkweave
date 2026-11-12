@@ -12,6 +12,10 @@
  * carries userinfo.
  */
 export function matchRedirectUri(uri: string, patterns: string[]): boolean {
+  // RFC 6749 §3.1.2: a redirection endpoint MUST NOT include a fragment.
+  if (uri.includes('#')) {
+    return false
+  }
   let target: URL
   try {
     target = new URL(uri)
@@ -94,6 +98,9 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', '[::1]', 'localhost'])
  * `localhost` and `127.0.0.1` are not interchangeable.
  */
 export function matchRegisteredRedirectUri(uri: string, registered: string[]): boolean {
+  if (uri.includes('#')) {
+    return false
+  }
   if (registered.includes(uri)) {
     return true
   }

@@ -154,14 +154,14 @@ Mount it like any provider (`auth.provider`, with `verifyToken: (t) => oauth.ver
 | `onAuthorize` | `(pending: PendingAuthorization, req) => string \| OAuthResponse` | Where to send the browser after `/authorize` validated the request |
 | `scopesSupported` | `string[]` | Advertised as `scopes_supported` |
 
-**Consent page checklist** (the package cannot do these for you): render `clientName` escaped and mark `clientKind: 'dcr'` clients as unverified (the name is attacker-chosen; `redirectHost` is the honest signal), send `Content-Security-Policy: frame-ancestors 'none'` (an Allow button must not be clickjackable), only approve from a signed-in browser session behind CSRF protection (never from a bearer token), and bind the pending request to the browser that opened it.
+**Consent page checklist** (the package cannot do these for you): render `clientName` escaped - it is self-asserted even for CIMD clients - and show the verified identity instead: `clientHost` (the host serving a CIMD client's metadata document, e.g. `claude.ai`) or, for `clientKind: 'dcr'` clients, an "unverified" label plus `redirectHost`; reject requested `scopes` the person may not grant before calling `approve()` (`scopesSupported` is metadata only - the requested scopes are minted as asked); send `Content-Security-Policy: frame-ancestors 'none'` (an Allow button must not be clickjackable), only approve from a signed-in browser session behind CSRF protection (never from a bearer token), and bind the pending request to the browser that opened it.
 
 ### Grants, tokens and revocation
 
-Every approval creates a **grant** with a stable `grantId`, kept across refresh-token rotation. Access tokens carry `sub` (the person), `client_id` (the OAuth client) and `grant_id`; `verifyToken` returns them as `AuthInfo.sub`, `AuthInfo.oauthClientId` and `AuthInfo.grantId`. (`AuthInfo.clientId` keeps its historical meaning - the token subject - for compatibility.)
+Every redeemed approval is a **grant** with a stable `grantId`, kept across refresh-token rotation. The id is minted when the client redeems the authorization code (not inside `approve()`), and it reaches your store as `RefreshTokenData.grantId` (with `sub`, `clientId`, `createdAt`) in the first `saveRefreshToken` call for it - that is where a "Connected apps" store records a new grant row. Access tokens carry `sub` (the person), `client_id` (the OAuth client) and `grant_id`; `verifyToken` returns them as `AuthInfo.sub`, `AuthInfo.oauthClientId` and `AuthInfo.grantId`. (`AuthInfo.clientId` keeps its historical meaning - the token subject - for compatibility.)
 
-- **Refresh rotation:** every refresh returns a new refresh token; the old one is kept, marked `rotatedAt`. Reusing it within `refreshGraceSeconds` (30s) rotates again (clients refreshing concurrently); reusing it later is treated as theft and the whole grant is revoked via `OAuthStore.revokeGrant`.
-- **Revocation:** delete the grant's tokens (`store.revokeGrant(grantId)`) and have `isGrantActive` return `false` for it - the hook runs on every `verifyToken` and every refresh, so the current access token stops working immediately instead of at `exp`. While `isGrantActive` is set, tokens without a grant id (minted before 7.2) are rejected.
+- **Refresh rotation:** every refresh returns a new refresh token; the old one is kept, marked `rotatedAt`, with its successor sealed under the old token (`next`, AES-GCM with a key derived from the raw old token - unreadable to the store). Reusing the old token within `refreshGraceSeconds` (30s) returns the **same** successor (clients refreshing concurrently) - every presenter continues one chain, so a thief and the legitimate client collide at the next rotation. Reusing it after the window is treated as theft and the whole grant is revoked (RFC 9700 §4.14.2). The first rotation is a compare-and-set, so parallel refreshes cannot fork the chain either.
+- **Revocation:** `store.revokeGrant(grantId)` records a durable tombstone and deletes the grant's tokens; every refresh checks the tombstone first and again after saving its successor, so an in-flight refresh cannot resurrect a revoked grant. Have `isGrantActive` return `false` too - the hook runs on every `verifyToken` and every refresh, so the current access token stops working immediately instead of at `exp`. While `isGrantActive` is set, tokens without a grant id (minted before 7.2) are rejected.
 - Listing a person's connections ("Connected apps") is a store concern: index `RefreshTokenData.grantId` / `sub` / `clientId` / `createdAt` in your store.
 
 ## Token Validation
@@ -350,7 +350,7 @@ const store = createJsonStore('oauth-store.json')
 
 ### Redis
 
-For production multi-process deployments. Accepts any Redis client with `get`/`set`/`del` methods (compatible with `ioredis` and `redis`):
+For production multi-process deployments. Accepts any Redis client with `get`/`set`/`del` (Upstash's client fits as-is; wrap `ioredis`/`redis` in a small adapter). For the atomic guarantees the adapter must honor `set(key, value, { nx: true })` (return `null` when the key exists) and should provide `getdel` (Redis >= 6.2); without them single-use codes/consent and refresh rotation degrade to get-then-write:
 
 ```typescript
 import { createRedisStore } from '@silkweave/auth/oauth'
@@ -384,11 +384,18 @@ const store: OAuthStore = {
   saveRefreshToken(token, data) { /* ... */ },
   getRefreshToken(token) { /* ... */ },
   deleteRefreshToken(token) { /* ... */ },
-  revokeGrant(grantId) { /* optional: delete every refresh token with this grantId */ }
+  // Optional, strongly recommended (a warning is logged when any is missing):
+  revokeGrant(grantId) { /* tombstone FIRST, then delete every refresh token of the grant */ },
+  isGrantRevoked(grantId) { /* is there a tombstone? */ },
+  takeAuthCode(code) { /* atomic get + delete, e.g. DELETE ... RETURNING */ },
+  takePendingAuth(state) { /* atomic get + delete */ },
+  rotateRefreshToken(token, rotation) { /* set rotatedAt/next/grantId only if not yet rotated; return the stored record */ }
 }
 ```
 
-Refresh-token semantics: after rotation the server re-saves the **presented** token with `rotatedAt` set (and its original `expiresAt`), so `getRefreshToken(old)` must keep returning that record for replay detection. A store that cannot keep it may return `undefined` - a replay then simply fails, without revoking the grant. `revokeGrant` is optional; the memory, JSON and Redis stores implement it.
+Refresh-token semantics: rotation records `rotatedAt`, `next` (the sealed successor, opaque) and `grantId` on the **presented** token's record (keeping its original `expiresAt`), so `getRefreshToken(old)` must keep returning that record for grace reuse and replay detection. A store that cannot keep it may return `undefined` - a replay then simply fails, without revoking the grant. Persist `next` verbatim; it is ciphertext only the holder of the old token can open.
+
+The atomic methods matter under concurrency: without them two parallel redemptions of one code, two approvals of one consent request, or two first refreshes of one token can each succeed. The built-in memory and JSON stores are atomic within one process; the Redis store is atomic across processes when the client honors `nx`/`getdel`. Retained rotation records expire at their chain's absolute expiry (the memory and JSON stores sweep expired records on save).
 
 ## How It Works
 

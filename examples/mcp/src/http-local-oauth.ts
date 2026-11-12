@@ -26,6 +26,8 @@ const oauth = createOAuthServer({
   resourceUrl: MCP_ORIGIN,
   redirectUris: ['http://localhost:*', 'http://127.0.0.1:*', 'https://claude.ai/*', 'https://claude.com/*'],
   signingKey: 'local-oauth-example-signing-key-change-me',
+  // TOKEN_TTL=60 makes clients refresh within a minute (watch rotation work).
+  tokenTtl: Number(process.env.TOKEN_TTL ?? 3600),
   store: createMemoryStore(),
   isGrantActive: ({ grantId }) => !revokedGrants.has(grantId),
   // Hand the browser to the app's consent page, binding the pending request to
@@ -123,7 +125,8 @@ const app = createServer(async (req, res) => {
       return
     }
     const who = pending.clientName ? escapeHtml(pending.clientName) : 'An application'
-    const verified = pending.clientKind === 'cimd' ? '' : ' <em>(unverified)</em>'
+    // The name is self-asserted; for CIMD clients the metadata host is the verified identity.
+    const verified = pending.clientHost ? ` (from ${escapeHtml(pending.clientHost)})` : ' <em>(unverified)</em>'
     page(
       res,
       `<h2>Connect as ${escapeHtml(session)}?</h2>

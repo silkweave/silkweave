@@ -18,6 +18,8 @@ export function createMemoryStore(): OAuthStore {
   const pkceVerifiers = new Map<string, { verifier: string; expiresAt: number }>()
   const clients = new Map<string, ClientRegistration>()
   const refreshTokens = new Map<string, RefreshTokenData>()
+  // Durable revocation tombstones (grant ids). Small, kept for the process life.
+  const revokedGrants = new Set<string>()
 
   return {
     async saveAuthCode(code, data) {
@@ -66,6 +68,14 @@ export function createMemoryStore(): OAuthStore {
     },
 
     async saveRefreshToken(token, data) {
+      // Rotated records are kept for replay detection until their absolute
+      // expiry; sweep expired ones so retained history stays bounded.
+      const now = Date.now() / 1000
+      for (const [key, item] of refreshTokens) {
+        if (item.expiresAt < now) {
+          refreshTokens.delete(key)
+        }
+      }
       refreshTokens.set(token, data)
     },
     async getRefreshToken(token) {
@@ -74,7 +84,35 @@ export function createMemoryStore(): OAuthStore {
     async deleteRefreshToken(token) {
       refreshTokens.delete(token)
     },
+    // The atomic operations below never await between read and write, so they
+    // are atomic within the process (the event loop runs them to completion).
+    async takeAuthCode(code) {
+      const data = withTtl(authCodes, code)
+      authCodes.delete(code)
+      return data
+    },
+    async takePendingAuth(state) {
+      const data = withTtl(pendingAuths, state)
+      pendingAuths.delete(state)
+      return data
+    },
+    async rotateRefreshToken(token, rotation) {
+      const data = withTtl(refreshTokens, token)
+      if (!data) {
+        return undefined
+      }
+      if (data.rotatedAt !== undefined) {
+        return data
+      }
+      const rotated = { ...data, ...rotation }
+      refreshTokens.set(token, rotated)
+      return rotated
+    },
+    async isGrantRevoked(grantId) {
+      return revokedGrants.has(grantId)
+    },
     async revokeGrant(grantId) {
+      revokedGrants.add(grantId)
       for (const [token, data] of refreshTokens) {
         if (data.grantId === grantId) {
           refreshTokens.delete(token)
