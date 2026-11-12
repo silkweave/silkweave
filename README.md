@@ -88,7 +88,7 @@ Silkweave is organized as a monorepo with modular packages. Install only what yo
 | Package | npm | Description |
 |---------|-----|-------------|
 | `@silkweave/core` | [![npm](https://img.shields.io/npm/v/@silkweave/core)](https://www.npmjs.com/package/@silkweave/core) | Core library - actions, adapters, builder, context, logger, utilities |
-| `@silkweave/auth` | [![npm](https://img.shields.io/npm/v/@silkweave/auth)](https://www.npmjs.com/package/@silkweave/auth) | Auth - resource-server core (bearer-token validation + protected-resource metadata, RFC 9728); opt-in OAuth 2.1 authorization-server proxy (PKCE, refresh, CIMD, dynamic client registration) via `@silkweave/auth/oauth` |
+| `@silkweave/auth` | [![npm](https://img.shields.io/npm/v/@silkweave/auth)](https://www.npmjs.com/package/@silkweave/auth) | Auth - resource-server core (bearer-token validation + protected-resource metadata, RFC 9728); opt-in OAuth 2.1 authorization server via `@silkweave/auth/oauth` - an upstream-IdP proxy or your app as the IdP (`createOAuthServer`), with PKCE, refresh rotation, CIMD, dynamic client registration |
 | `@silkweave/mcp` | [![npm](https://img.shields.io/npm/v/@silkweave/mcp)](https://www.npmjs.com/package/@silkweave/mcp) | MCP adapters - stdio, streamable HTTP, CLI proxy |
 | `@silkweave/cli` | [![npm](https://img.shields.io/npm/v/@silkweave/cli)](https://www.npmjs.com/package/@silkweave/cli) | CLI adapter - commander + plain `console` output |
 | `@silkweave/fastify` | [![npm](https://img.shields.io/npm/v/@silkweave/fastify)](https://www.npmjs.com/package/@silkweave/fastify) | Fastify REST adapter - auto-generated OpenAPI/Swagger docs |
@@ -710,6 +710,27 @@ const { adapter, handler } = edge({ auth })
 ```
 
 Importing only `@silkweave/auth` keeps the issuer/store machinery out of your bundle; reach for `@silkweave/auth/oauth` only when you run the OAuth 2.1 flow yourself.
+
+### Your app as the authorization server
+
+If your app already signs its users in, `createOAuthServer()` (also from `@silkweave/auth/oauth`) makes it the OAuth 2.1 authorization server itself: no upstream IdP, `/authorize` hands the browser to **your consent page**, and Claude Code, claude.ai / Claude Desktop connectors and Codex connect with just the server URL. Grants get a stable `grantId`, refresh tokens rotate with replay detection, and `isGrantActive` revokes a connection immediately.
+
+```typescript
+import { createOAuthServer } from '@silkweave/auth/oauth'
+
+const oauth = createOAuthServer({
+  resourceUrl: 'https://app.example.com/mcp',
+  redirectUris: ['http://localhost:*', 'http://127.0.0.1:*', 'https://claude.ai/*'],
+  signingKey: process.env.OAUTH_SIGNING_KEY!,
+  store,
+  onAuthorize: (pending) => `https://app.example.com/connect?request=${pending.id}`
+})
+
+// consent page backend, from a signed-in session:
+const { redirectTo } = (await oauth.approve(id, { sub: user.id }))! // or oauth.deny(id)
+```
+
+See the [`@silkweave/auth` README](./packages/auth/README.md#your-app-as-the-identity-provider-createoauthserver) for the consent-page checklist and grant/revocation details; `examples/mcp/src/http-local-oauth.ts` is a runnable version.
 
 ### One AS, N protected resources
 

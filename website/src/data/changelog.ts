@@ -39,6 +39,38 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    version: '7.2.0',
+    date: '2026-11-12',
+    summary: 'Your app as its own OAuth 2.1 authorization server.',
+    changes: [
+      {
+        type: 'feature',
+        text: '`createOAuthServer()` (`@silkweave/auth/oauth`): when your app already signs its users in, `/authorize` hands the browser to your consent page (`pending()` / `approve()` / `deny()`) instead of an upstream IdP. Claude Code, claude.ai connectors and Codex connect with just the server URL.',
+        commit: '7b546d7'
+      },
+      {
+        type: 'feature',
+        text: 'Grants: every approval gets a stable `grantId` kept across refresh rotation; access tokens carry `client_id` + `grant_id` (`AuthInfo.sub` / `oauthClientId` / `grantId`), and `isGrantActive` revokes a connection immediately, on every call and every refresh.',
+        commit: '7b546d7'
+      },
+      {
+        type: 'improvement',
+        text: 'Refresh rotation without forks: a compare-and-set rotation, a 30s grace window that returns the same successor, grant revocation on replay, and durable revocation tombstones. Stores gain atomic operations (memory, JSON and Redis implement them; `createOAuthServer` requires them, the proxy warns when a custom store lacks them).',
+        commit: '9ba49fd'
+      },
+      {
+        type: 'improvement',
+        text: 'OAuth hardening for the proxy too: RFC 9207 `iss` on every authorization response, CIMD documents must name themselves, dynamic client registration mints no client secret (public PKCE clients only), loopback redirect URIs match on any port (RFC 8252), redirect URIs with fragments are rejected.',
+        commit: 'c42609c'
+      },
+      {
+        type: 'feature',
+        text: 'New example `http-local-oauth`: a toy session + consent page as the identity provider, with a `whoami` tool returning the person, client and grant.',
+        commit: 'c6ccd62'
+      }
+    ]
+  },
+  {
     version: '7.1.1',
     date: '2026-11-09',
     summary: 'tRPC maps every HTTP status it can.',
